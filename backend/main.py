@@ -1,4 +1,11 @@
-import sys
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"status": "working"}
+'''import sys
 import os
 # Ensure the backend/ directory is on sys.path so that imports like
 # `from core.X` work whether uvicorn is run from the project root
@@ -38,4 +45,4 @@ def create_app() -> FastAPI:
 
     return app
 
-app = create_app()
+app = create_app()'''
