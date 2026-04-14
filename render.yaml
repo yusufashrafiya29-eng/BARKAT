@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: barkat-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: WHATSAPP_API_URL
+        value: ""
+      - key: WHATSAPP_API_KEY
+        value: ""
