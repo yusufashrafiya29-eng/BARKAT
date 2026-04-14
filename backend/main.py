@@ -1,10 +1,3 @@
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def root():
-    return {"status": "working"}
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -12,6 +5,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
+from api.router import main_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -28,9 +22,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(main_router)
+
     @app.get("/")
     def root():
-        return {"status": "config working"}
+        return {"status": "router working"}
 
     return app
 
