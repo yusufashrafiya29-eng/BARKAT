@@ -12,7 +12,7 @@ from api.router import main_router
 
 # Import database session and our models to ensure they are registered
 from db.session import engine, Base
-from models import *
+import models  # registers all models with Base.metadata (avoids shadowing core.config.settings)
 
 # Auto-Create all database tables 
 Base.metadata.create_all(bind=engine)
