@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings
+from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings
 
 api_router = APIRouter()
 

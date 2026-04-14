@@ -1,8 +1,8 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from backend.db.session import SessionLocal
-from backend.core.config import settings
+from db.session import SessionLocal
+from core.config import settings
 import jwt
 from jwt.exceptions import InvalidTokenError
 from typing import Generator

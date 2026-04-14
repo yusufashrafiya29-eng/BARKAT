@@ -2,7 +2,7 @@ import enum
 import uuid
 from sqlalchemy import Column, String, ForeignKey, Enum as SAEnum, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
-from backend.db.session import Base
+from db.session import Base
 
 class MessageStatus(str, enum.Enum):
     PENDING = "PENDING"

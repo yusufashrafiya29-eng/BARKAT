@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from backend.db.session import Base
+from db.session import Base
 
 class Table(Base):
     __tablename__ = "tables"

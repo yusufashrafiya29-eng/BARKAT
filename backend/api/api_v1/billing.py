@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.billing import BillCreate, BillRead, PaymentConfirmation
-from backend.services import billing_service
-from backend.models.notification import MessageType
-from backend.services.whatsapp_service import trigger_whatsapp_message
+from api.deps import get_db, get_current_user_token
+from schemas.billing import BillCreate, BillRead, PaymentConfirmation
+from services import billing_service
+from models.notification import MessageType
+from services.whatsapp_service import trigger_whatsapp_message
 
 router = APIRouter()
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.api.api_v1.router import api_router as api_v1_router
+from api.api_v1.router import api_router as api_v1_router
 
 main_router = APIRouter()
 

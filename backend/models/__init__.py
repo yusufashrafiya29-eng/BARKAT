@@ -1,9 +1,9 @@
 # Ensure metadata creates all tables by importing them together
-from backend.models.user import User
-from backend.models.menu import Category, MenuItem
-from backend.models.table import Table
-from backend.models.order import Order, OrderItem
-from backend.models.inventory import StockItem
-from backend.models.billing import Bill
-from backend.models.notification import NotificationLog
-from backend.models.otp import OTP
+from models.user import User
+from models.menu import Category, MenuItem
+from models.table import Table
+from models.order import Order, OrderItem
+from models.inventory import StockItem
+from models.billing import Bill
+from models.notification import NotificationLog
+from models.otp import OTP

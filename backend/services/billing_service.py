@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from backend.models.order import Order
-from backend.models.billing import Bill, PaymentStatus
-from backend.schemas.billing import BillCreate
+from models.order import Order
+from models.billing import Bill, PaymentStatus
+from schemas.billing import BillCreate
 
 def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate) -> Bill:
     existing = db.query(Bill).filter(Bill.order_id == order_id).first()

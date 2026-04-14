@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.menu import CategoryCreate, CategoryRead, MenuItemCreate, MenuItemRead, MenuItemUpdate
-from backend.services import menu_service
+from api.deps import get_db, get_current_user_token
+from schemas.menu import CategoryCreate, CategoryRead, MenuItemCreate, MenuItemRead, MenuItemUpdate
+from services import menu_service
 
 router = APIRouter()
 

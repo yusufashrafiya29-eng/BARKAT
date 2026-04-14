@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from backend.models.inventory import StockItem
-from backend.schemas.inventory import StockItemCreate
+from models.inventory import StockItem
+from schemas.inventory import StockItemCreate
 
 def get_all_stock(db: Session, active_only: bool = True):
     query = db.query(StockItem)

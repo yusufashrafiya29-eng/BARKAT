@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean, Float, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from backend.db.session import Base
+from db.session import Base
 
 class Category(Base):
     __tablename__ = "categories"

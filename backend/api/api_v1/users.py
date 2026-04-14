@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.user import UserRead
-from backend.models.user import User, UserRole
+from api.deps import get_db, get_current_user_token
+from schemas.user import UserRead
+from models.user import User, UserRole
 
 router = APIRouter()
 
@@ -52,7 +52,7 @@ def delete_staff_member(
     db.commit()
     return {"message": "Staff member deleted successfully"}
 
-from backend.schemas.auth import StaffSignupRequest
+from schemas.auth import StaffSignupRequest
 @router.post("/staff", response_model=UserRead)
 def create_staff_member(
     payload: StaffSignupRequest,
@@ -60,7 +60,7 @@ def create_staff_member(
     token: dict = Depends(require_owner)
 ):
     """Owner instantly creates a verified staff member."""
-    from backend.api.api_v1.auth import _hash_password
+    from api.api_v1.auth import _hash_password
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered.")
         

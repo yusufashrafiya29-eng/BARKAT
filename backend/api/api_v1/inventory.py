@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.inventory import StockItemCreate, StockItemRead, StockAdjustment
-from backend.services import inventory_service
+from api.deps import get_db, get_current_user_token
+from schemas.inventory import StockItemCreate, StockItemRead, StockAdjustment
+from services import inventory_service
 
 router = APIRouter()
 

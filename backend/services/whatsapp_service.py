@@ -1,9 +1,9 @@
 import logging
 import requests
 from uuid import UUID
-from backend.db.session import SessionLocal
-from backend.models.notification import NotificationLog, MessageStatus, MessageType
-from backend.core.config import settings
+from db.session import SessionLocal
+from models.notification import NotificationLog, MessageStatus, MessageType
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

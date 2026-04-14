@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from backend.models.menu import Category, MenuItem
-from backend.schemas.menu import CategoryCreate, MenuItemCreate
+from models.menu import Category, MenuItem
+from schemas.menu import CategoryCreate, MenuItemCreate
 
 def get_all_active_categories(db: Session):
     # This automatically includes menu_items via SQLAlchemy relationships!

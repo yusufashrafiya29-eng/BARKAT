@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems
-from backend.services import order_service
-from backend.models.order import OrderStatus
-from backend.models.notification import MessageType
-from backend.services.whatsapp_service import trigger_whatsapp_message
+from api.deps import get_db, get_current_user_token
+from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems
+from services import order_service
+from models.order import OrderStatus
+from models.notification import MessageType
+from services.whatsapp_service import trigger_whatsapp_message
 
 router = APIRouter()
 
@@ -41,8 +41,8 @@ def pull_waiter_orders(
     token: dict = Depends(get_current_user_token)
 ):
     """Fetches PENDING and PREPARING orders for Waiter displays including unaccepted customer orders."""
-    from backend.models.order import Order, OrderStatus
-    from backend.models.billing import Bill, PaymentStatus
+    from models.order import Order, OrderStatus
+    from models.billing import Bill, PaymentStatus
     return db.query(Order).outerjoin(Bill, Order.id == Bill.order_id).filter(
         Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
         (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED)
@@ -58,7 +58,7 @@ def accept_customer_order(
     db: Session = Depends(get_db),
     token: dict = Depends(get_current_user_token)
 ):
-    from backend.models.user import User
+    from models.user import User
     from fastapi import HTTPException
     waiter = db.query(User).filter(User.id == token["sub"]).first()
     if not waiter:

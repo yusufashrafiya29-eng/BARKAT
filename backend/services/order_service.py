@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from backend.models.order import Order, OrderItem, OrderStatus
-from backend.models.menu import MenuItem
-from backend.schemas.order import OrderCreate
+from models.order import Order, OrderItem, OrderStatus
+from models.menu import MenuItem
+from schemas.order import OrderCreate
 
 def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> Order:
     # 1. Validate Table Existence
-    from backend.models.table import Table
+    from models.table import Table
     table = db.query(Table).filter(Table.id == order_in.table_id).first()
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")

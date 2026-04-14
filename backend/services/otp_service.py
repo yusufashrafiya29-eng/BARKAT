@@ -2,8 +2,8 @@ import random
 import string
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from backend.models.otp import OTP
-from backend.models.user import User
+from models.otp import OTP
+from models.user import User
 
 
 class OTPService:

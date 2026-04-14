@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from backend.models.settings import RestaurantConfig
+from models.settings import RestaurantConfig
 
 def get_config_value(db: Session, key: str) -> str | None:
     config = db.query(RestaurantConfig).filter(RestaurantConfig.key == key).first()

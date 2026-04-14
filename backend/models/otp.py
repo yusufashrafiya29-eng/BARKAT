@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, DateTime, Boolean, func
 from sqlalchemy.dialects.postgresql import UUID
-from backend.db.session import Base
+from db.session import Base
 
 
 class OTP(Base):

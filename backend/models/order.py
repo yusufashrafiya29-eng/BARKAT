@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, String, Float, Integer, ForeignKey, Enum as SAEnum, DateTime, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from backend.db.session import Base
+from db.session import Base
 
 class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"

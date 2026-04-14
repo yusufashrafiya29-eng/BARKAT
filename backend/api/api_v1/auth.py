@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.auth import (
+from api.deps import get_db, get_current_user_token
+from schemas.auth import (
     SignupRequest, OwnerSignupRequest, StaffSignupRequest, 
     LoginRequest, AuthResponse, GenericResponse, 
     OTPVerifyRequest, OTPSendRequest
 )
-from backend.services.otp_service import OTPService
-from backend.models.user import User, UserRole
-from backend.core.config import settings
+from services.otp_service import OTPService
+from models.user import User, UserRole
+from core.config import settings
 import jwt as pyjwt
 import bcrypt
 import uuid

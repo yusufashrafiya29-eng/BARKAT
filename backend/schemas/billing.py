@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
-from backend.models.billing import PaymentMethod, PaymentStatus
+from models.billing import PaymentMethod, PaymentStatus
 
 class BillBase(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.CASH

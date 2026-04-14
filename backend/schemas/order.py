@@ -3,7 +3,7 @@ from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
-from backend.models.order import OrderStatus
+from models.order import OrderStatus
 
 class OrderItemCreate(BaseModel):
     menu_item_id: UUID

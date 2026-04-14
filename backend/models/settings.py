@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String
-from backend.db.session import Base
+from db.session import Base
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 

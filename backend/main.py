@@ -1,14 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from core.config import settings
 from api.router import main_router
 
-# Import database session and models
+# Import database session and our models to ensure they are registered
 from db.session import engine, Base
 from models import *
-
-from backend.core.config import settings
 
 # Auto-Create all database tables 
 Base.metadata.create_all(bind=engine)

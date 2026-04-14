@@ -4,9 +4,9 @@ from sqlalchemy import func
 from datetime import datetime, timezone, time
 from typing import Dict, Any
 
-from backend.api.deps import get_db, get_current_user_token
-from backend.models.order import Order, OrderStatus
-from backend.api.api_v1.users import require_owner
+from api.deps import get_db, get_current_user_token
+from models.order import Order, OrderStatus
+from api.api_v1.users import require_owner
 
 router = APIRouter()
 

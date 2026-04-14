@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from backend.api.deps import get_db, get_current_user_token
-from backend.schemas.table import TableCreate, TableRead
-from backend.models.table import Table
+from api.deps import get_db, get_current_user_token
+from schemas.table import TableCreate, TableRead
+from models.table import Table
 
 router = APIRouter()
 
