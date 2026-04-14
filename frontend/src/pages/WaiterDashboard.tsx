@@ -4,7 +4,7 @@ import {
   Users, ChevronLeft, Plus, Minus, Send, 
   Search, Trash2, Loader2, UtensilsCrossed,
   LayoutGrid, Coffee, CircleDot, Clock,
-  RefreshCcw, AlertCircle, Edit2
+  RefreshCcw, AlertCircle, Edit2, QrCode
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import toast from 'react-hot-toast';
