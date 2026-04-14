@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.core.config import settings
-from backend.api.router import main_router
 
-# Import database session and our models to ensure they are registered
-from backend.db.session import engine, Base
-from backend.models import *
+from core.config import settings
+from api.router import main_router
+
+# Import database session and models
+from db.session import engine, Base
+from models import *
 
 from backend.core.config import settings
 
