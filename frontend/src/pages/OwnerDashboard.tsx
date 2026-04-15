@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Briefcase, Coffee, CheckCircle2, 
+  Coffee, CheckCircle2, 
   ShieldAlert, LogOut, Loader2,
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee,
