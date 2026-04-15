@@ -1,5 +1,8 @@
 import sys
 import os
+import logging
+from contextlib import asynccontextmanager
+
 # Ensures backend/ is on sys.path so bare imports (core.X, api.X) work
 # whether uvicorn runs from the project root or from inside backend/.
 sys.path.insert(0, os.path.dirname(__file__))
@@ -10,19 +13,28 @@ from core.config import settings
 from api.router import main_router
 
 # Register all SQLAlchemy models with Base so create_all() picks them up.
-# Using `import models` (not `from models import *`) avoids the models.settings
-# submodule shadowing the core.config.settings object.
 from db.session import engine, Base
 import models
 
-# Auto-create all database tables on startup
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run DB table creation on startup — but don't crash if DB is unreachable."""
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables verified/created.")
+    except Exception as e:
+        logger.warning(f"⚠️  Could not connect to database on startup: {e}")
+        logger.warning("App will still start — DB errors will occur on first request.")
+    yield  # App runs here
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
-        description="Backend for the Smart Restaurant Software"
+        description="Backend for the Smart Restaurant Software",
+        lifespan=lifespan,
     )
 
     # CORS — allow all origins for now (tighten in production)
