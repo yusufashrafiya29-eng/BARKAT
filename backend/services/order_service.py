@@ -27,6 +27,7 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
     
     new_order = Order(
+        restaurant_id=table.restaurant_id,
         table_id=order_in.table_id,
         waiter_id=waiter_id,
         source=order_in.source,
@@ -75,8 +76,8 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
 def get_orders_by_table(db: Session, table_id: UUID):
     return db.query(Order).filter(Order.table_id == table_id).order_by(Order.created_at.desc()).all()
 
-def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus) -> Order:
-    order = db.query(Order).filter(Order.id == order_id).first()
+def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
@@ -85,14 +86,15 @@ def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus) ->
     db.refresh(order)
     return order
 
-def get_active_kitchen_orders(db: Session):
+def get_active_kitchen_orders(db: Session, restaurant_id: str):
     """Fetches ACCEPTED and PREPARING orders using strict FIFO (First In First Out) ordering."""
     return db.query(Order).filter(
-        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING])
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING]),
+        Order.restaurant_id == restaurant_id
     ).order_by(Order.created_at.asc()).all()
 
-def accept_order(db: Session, order_id: UUID, waiter_id: UUID) -> Order:
-    order = db.query(Order).filter(Order.id == order_id).first()
+def accept_order(db: Session, order_id: UUID, waiter_id: UUID, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
@@ -103,8 +105,8 @@ def accept_order(db: Session, order_id: UUID, waiter_id: UUID) -> Order:
     db.refresh(order)
     return order
 
-def delete_order(db: Session, order_id: UUID):
-    order = db.query(Order).filter(Order.id == order_id).first()
+def delete_order(db: Session, order_id: UUID, restaurant_id: str):
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if order.status == OrderStatus.SERVED:
@@ -113,8 +115,8 @@ def delete_order(db: Session, order_id: UUID):
     db.commit()
     return {"message": "Order deleted"}
 
-def update_order_items(db: Session, order_id: UUID, items_in: list) -> Order:
-    order = db.query(Order).filter(Order.id == order_id).first()
+def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if order.status == OrderStatus.SERVED:

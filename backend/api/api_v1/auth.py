@@ -9,6 +9,7 @@ from schemas.auth import (
 )
 from services.otp_service import OTPService
 from models.user import User, UserRole
+from models.restaurant import Restaurant
 from core.config import settings
 import jwt as pyjwt
 import bcrypt
@@ -58,12 +59,19 @@ def signup_owner(payload: OwnerSignupRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered.")
 
+    # First create the Restaurant
+    restaurant = Restaurant(
+        name=payload.restaurant_name
+    )
+    db.add(restaurant)
+    db.flush() # flush to get the UUID
+
     new_user = User(
         email=payload.email,
         full_name=payload.full_name,
         phone_number=payload.phone_number,
         role=UserRole.OWNER,
-        restaurant_name=payload.restaurant_name,
+        restaurant_id=restaurant.id,
         password_hash=_hash_password(payload.password),
         is_verified=False
     )
@@ -93,11 +101,24 @@ def signup_staff(payload: StaffSignupRequest, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER or KITCHEN.")
 
+    # Find owner to link restaurant
+    owner = db.query(User).filter(
+        User.email == payload.restaurant_email,
+        User.role == UserRole.OWNER
+    ).first()
+    
+    if not owner or not owner.restaurant_id:
+        raise HTTPException(
+            status_code=404, 
+            detail="Restaurant owner not found. Please check the owner's email address."
+        )
+
     new_user = User(
         email=payload.email,
         full_name=payload.full_name,
         phone_number=payload.phone_number,
         role=role,
+        restaurant_id=owner.restaurant_id,
         restaurant_email=payload.restaurant_email,
         password_hash=_hash_password(payload.password),
         is_verified=False
@@ -190,7 +211,7 @@ def get_current_user_info(
             "full_name": local_user.full_name,
             "phone_number": local_user.phone_number,
             "is_verified": local_user.is_verified,
-            "restaurant_name": local_user.restaurant_name,
+            "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
             "restaurant_email": local_user.restaurant_email,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }

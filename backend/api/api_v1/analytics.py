@@ -4,7 +4,7 @@ from sqlalchemy import func
 from datetime import datetime, timezone, time
 from typing import Dict, Any
 
-from api.deps import get_db, get_current_user_token
+from api.deps import get_db, get_current_user_token, get_current_restaurant
 from models.order import Order, OrderStatus
 from api.api_v1.users import require_owner
 
@@ -13,7 +13,8 @@ router = APIRouter()
 @router.get("/today", response_model=Dict[str, Any])
 def get_daily_analytics(
     db: Session = Depends(get_db), 
-    token: dict = Depends(require_owner)
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
 ):
     """Secure endpoint to calculate high-level operational statistics for today."""
     
@@ -25,6 +26,7 @@ def get_daily_analytics(
     valid_statuses = [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]
     
     daily_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
         Order.created_at >= today_start,
         Order.status.in_(valid_statuses)
     ).all()

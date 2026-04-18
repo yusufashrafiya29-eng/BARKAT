@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID
-from api.deps import get_db, get_current_user_token
+from api.deps import get_db, get_current_user_token, get_current_restaurant
 from schemas.billing import BillCreate, BillRead, PaymentConfirmation
 from services import billing_service
 from models.notification import MessageType
@@ -15,9 +15,10 @@ def generate_order_bill(
     bill_in: BillCreate, 
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    token: dict = Depends(get_current_user_token) # Secure route
+    token: dict = Depends(get_current_user_token), # Secure route
+    restaurant_id: UUID = Depends(get_current_restaurant)
 ):
-    bill = billing_service.generate_bill(db, order_id, bill_in)
+    bill = billing_service.generate_bill(db, order_id, bill_in, str(restaurant_id))
     
     if bill.order.customer_phone:
         background_tasks.add_task(
@@ -32,6 +33,7 @@ def apply_payment_confirmation(
     order_id: UUID, 
     confirmation: PaymentConfirmation, 
     db: Session = Depends(get_db),
-    token: dict = Depends(get_current_user_token)
+    token: dict = Depends(get_current_user_token),
+    restaurant_id: UUID = Depends(get_current_restaurant)
 ):
-    return billing_service.confirm_payment(db, order_id, confirmation.transaction_id)
+    return billing_service.confirm_payment(db, order_id, confirmation.transaction_id, str(restaurant_id))

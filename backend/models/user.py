@@ -1,9 +1,9 @@
 import enum
 import uuid
-from sqlalchemy import Column, String, Enum as SAEnum, Boolean, DateTime, func
+from sqlalchemy import Column, String, Enum as SAEnum, Boolean, DateTime, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
-
+from sqlalchemy.orm import relationship
 
 class UserRole(str, enum.Enum):
     OWNER = "OWNER"
@@ -28,8 +28,12 @@ class User(Base):
     is_verified = Column(Boolean, default=False, nullable=False)
 
     # Restaurant association
-    restaurant_name = Column(String, nullable=True)  # Only for OWNER
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=True)
     restaurant_email = Column(String, nullable=True) # For STAFF to link with OWNER
+
+    # Relationships
+    restaurant = relationship("Restaurant", back_populates="users")
+
 
     # Local password hash — only used in dev mode (when Supabase is not configured).
     # In production, Supabase Auth handles passwords; this column stays NULL.

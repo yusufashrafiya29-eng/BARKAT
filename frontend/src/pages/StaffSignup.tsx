@@ -28,7 +28,15 @@ const StaffSignup: React.FC = () => {
       toast.success('Registration successful. Please verify OTP.');
       navigate('/verify', { state: { email: formData.email } });
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      console.error("Signup error:", error.response?.data || error.message);
+      const detail = error.response?.data?.detail;
+      let errMsg = 'Registration failed';
+      if (typeof detail === 'string') {
+        errMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errMsg = detail.map((d: any) => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+      }
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }

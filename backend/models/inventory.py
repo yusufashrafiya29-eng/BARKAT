@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, Boolean, DateTime, func
+from sqlalchemy import Column, String, Float, Boolean, DateTime, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
 
@@ -7,6 +7,7 @@ class StockItem(Base):
     __tablename__ = "stock_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     name = Column(String, unique=True, index=True, nullable=False)
     quantity = Column(Float, default=0.0, nullable=False)
     unit = Column(String, nullable=False) # e.g., 'kg', 'pcs'

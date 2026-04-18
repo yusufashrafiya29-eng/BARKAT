@@ -38,6 +38,7 @@ class OrderCreate(BaseModel):
 
 class OrderRead(BaseModel):
     id: UUID
+    restaurant_id: UUID
     table_id: UUID
     waiter_id: Optional[UUID] = None
     customer_phone: Optional[str] = None

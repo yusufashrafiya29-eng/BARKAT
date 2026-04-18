@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Coffee, CheckCircle2, 
+import {
+  Coffee, CheckCircle2,
   ShieldAlert, LogOut, Loader2,
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
-import { customerApi } from '../api/customer';
+
 import { waiterApi } from '../api/waiter';
 
 // Interfaces
@@ -66,7 +66,7 @@ export default function OwnerDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('analytics');
   const [loading, setLoading] = useState(true);
-  
+
   // Data States
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -107,7 +107,7 @@ export default function OwnerDashboard() {
           setStaff(staffRes);
           break;
         case 'menu':
-          const menuRes = await customerApi.getMenu();
+          const menuRes = await waiterApi.getMenu();
           setMenuCategories(menuRes);
           break;
         case 'tables':
@@ -141,7 +141,7 @@ export default function OwnerDashboard() {
           setStaff(staffRes);
           break;
         case 'menu':
-          const menuRes = await customerApi.getMenu();
+          const menuRes = await waiterApi.getMenu();
           setMenuCategories(menuRes);
           break;
         case 'tables':
@@ -204,7 +204,7 @@ export default function OwnerDashboard() {
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
     const updatedUpi = formData.get('upi_id') as string;
-    
+
     try {
       await ownerApi.updateUpiId(updatedUpi);
       toast.success("UPI ID Saved!");
@@ -230,9 +230,9 @@ export default function OwnerDashboard() {
 
     try {
       if (showAddModal === 'tables') {
-        await ownerApi.addTable({ 
-          table_number: parseInt(data.number as string), 
-          capacity: parseInt(data.capacity as string) 
+        await ownerApi.addTable({
+          table_number: parseInt(data.number as string),
+          capacity: parseInt(data.capacity as string)
         });
       } else if (showAddModal === 'inventory') {
         await ownerApi.addInventoryItem({
@@ -251,20 +251,20 @@ export default function OwnerDashboard() {
           restaurant_email: 'admin@barkat.local' // Placeholder
         });
       } else if (showAddModal === 'menu') {
-         // Logic for adding category or item based on form fields
-         if (data.type === 'category') {
-            await ownerApi.addCategory({ name: data.name });
-         } else {
-            await ownerApi.addMenuItem({
-               name: data.item_name,
-               description: data.description,
-               price: parseFloat(data.price as string),
-               category_id: data.category_id,
-               is_available: true
-            });
-         }
+        // Logic for adding category or item based on form fields
+        if (data.type === 'category') {
+          await ownerApi.addCategory({ name: data.name });
+        } else {
+          await ownerApi.addMenuItem({
+            name: data.item_name,
+            description: data.description,
+            price: parseFloat(data.price as string),
+            category_id: data.category_id,
+            is_available: true
+          });
+        }
       }
-      
+
       toast.success("Added successfully!");
       setShowAddModal(null);
       fetchData();
@@ -285,7 +285,7 @@ export default function OwnerDashboard() {
           </h1>
           <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black mt-1">Control Center</p>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-1 mt-4">
           {[
             { id: 'analytics', label: 'Dashboard', icon: BarChart3 },
@@ -298,11 +298,10 @@ export default function OwnerDashboard() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as TabType)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${
-                activeTab === item.id 
-                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === item.id
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                 : 'text-slate-400 hover:bg-white/5 border border-transparent'
-              }`}
+                }`}
             >
               <item.icon size={20} /> {item.label}
             </button>
@@ -325,9 +324,9 @@ export default function OwnerDashboard() {
               <h2 className="text-4xl font-black capitalize tracking-tight">{activeTab}</h2>
               <p className="text-slate-500 font-medium mt-1">Manage your restaurant operations and data.</p>
             </div>
-            
+
             {activeTab !== 'analytics' && activeTab !== 'payments' && (
-              <button 
+              <button
                 onClick={() => setShowAddModal(activeTab)}
                 className="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white flex items-center gap-2 px-6 py-3 rounded-2xl font-black shadow-lg shadow-cyan-500/20 transition-all transform hover:scale-105"
               >
@@ -343,7 +342,7 @@ export default function OwnerDashboard() {
             </div>
           ) : (
             <div className="animate-fade-in pb-20">
-              
+
               {/* ANALYTICS TAB */}
               {activeTab === 'analytics' && analytics && (
                 <div className="space-y-8">
@@ -385,12 +384,12 @@ export default function OwnerDashboard() {
                   {/* RECENT STATUS PLACEHOLDER */}
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
                     <h4 className="text-xl font-black mb-6 flex items-center gap-2">
-                       <ShieldAlert size={20} className="text-cyan-400" />
-                       Operational Overview
+                      <ShieldAlert size={20} className="text-cyan-400" />
+                      Operational Overview
                     </h4>
                     <div className="h-64 flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-2xl">
-                       <BarChart3 size={48} className="mb-4 opacity-20" />
-                       <p className="font-bold">Full Activity Chart Coming Soon</p>
+                      <BarChart3 size={48} className="mb-4 opacity-20" />
+                      <p className="font-bold">Full Activity Chart Coming Soon</p>
                     </div>
                   </div>
                 </div>
@@ -417,13 +416,12 @@ export default function OwnerDashboard() {
                               <span className={`text-[10px] font-black tracking-widest px-2 py-1 rounded ${item.is_veg ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                                 {item.is_veg ? 'VEG' : 'NON-VEG'}
                               </span>
-                              <button 
+                              <button
                                 onClick={() => handleToggleMenu(item.id, item.is_available, item.name)}
-                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                                  item.is_available 
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${item.is_available
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                   : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                                }`}
+                                  }`}
                               >
                                 {item.is_available ? 'IN STOCK' : 'SOLD OUT'}
                               </button>
@@ -475,7 +473,7 @@ export default function OwnerDashboard() {
               {activeTab === 'tables' && (
                 <div className="space-y-6">
                   <div className="flex justify-end">
-                    <button 
+                    <button
                       onClick={() => setShowQRModal(true)}
                       className="bg-white/10 hover:bg-white/20 text-white flex items-center gap-2 px-6 py-3 rounded-2xl font-black transition-all"
                     >
@@ -556,27 +554,27 @@ export default function OwnerDashboard() {
                 <div className="max-w-2xl">
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
                     <h3 className="text-2xl font-black mb-2 flex items-center gap-3">
-                       <CreditCard className="text-cyan-400" size={28} />
-                       UPI Receive Setup
+                      <CreditCard className="text-cyan-400" size={28} />
+                      UPI Receive Setup
                     </h3>
                     <p className="text-slate-400 mb-8 font-medium font-bold text-sm">
-                       Configure your restaurant's UPI ID. This will automatically generate a dynamic QR code on the Waiter's tablet when a customer chooses to pay via UPI.
+                      Configure your restaurant's UPI ID. This will automatically generate a dynamic QR code on the Waiter's tablet when a customer chooses to pay via UPI.
                     </p>
 
                     <form onSubmit={handleSaveUpi} className="space-y-6">
                       <div>
                         <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 block">Restaurant UPI ID</label>
-                        <input 
-                          name="upi_id" 
-                          defaultValue={upiId} 
-                          placeholder="e.g. 9876543210@paytm or shop@ybl" 
-                          className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black text-xl hover:border-white/20 focus:border-cyan-500 transition-colors" 
+                        <input
+                          name="upi_id"
+                          defaultValue={upiId}
+                          placeholder="e.g. 9876543210@paytm or shop@ybl"
+                          className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black text-xl hover:border-white/20 focus:border-cyan-500 transition-colors"
                         />
                       </div>
-                      
-                      <button 
-                        type="submit" 
-                        disabled={formLoading} 
+
+                      <button
+                        type="submit"
+                        disabled={formLoading}
                         className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black p-5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
                         {formLoading ? <Loader2 className="animate-spin" /> : 'SAVE CONFIGURATION'}
@@ -587,11 +585,11 @@ export default function OwnerDashboard() {
                       <div className="mt-12 pt-12 border-t border-white/10 text-center animate-fade-in">
                         <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Generated Waiter QR Preview</h4>
                         <div className="inline-block bg-white p-6 rounded-[2rem] shadow-2xl">
-                           <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BARKAT_RESTAURANT&cu=INR`)}`} 
-                              alt="UPI QR Code Preset" 
-                              className="w-48 h-48 rounded-xl shrink-0"
-                           />
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BARKAT_RESTAURANT&cu=INR`)}`}
+                            alt="UPI QR Code Preset"
+                            className="w-48 h-48 rounded-xl shrink-0"
+                          />
                         </div>
                         <p className="mt-4 font-black tracking-widest">{upiId}</p>
                       </div>
@@ -618,12 +616,12 @@ export default function OwnerDashboard() {
                 {showAddModal === 'tables' && (
                   <>
                     <div className="space-y-2">
-                       <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Table Number</label>
-                       <input name="number" type="number" required placeholder="E.g. 10" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black" />
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Table Number</label>
+                      <input name="number" type="number" required placeholder="E.g. 10" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black" />
                     </div>
                     <div className="space-y-2">
-                       <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Seating Capacity</label>
-                       <input name="capacity" type="number" required placeholder="E.g. 4" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black" />
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Seating Capacity</label>
+                      <input name="capacity" type="number" required placeholder="E.g. 4" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black" />
                     </div>
                   </>
                 )}
@@ -632,8 +630,8 @@ export default function OwnerDashboard() {
                   <>
                     <input name="name" required placeholder="Ingredient Name (e.g. Rice)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     <div className="grid grid-cols-2 gap-4">
-                       <input name="quantity" type="number" step="0.01" required placeholder="Initial Qty" className="bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
-                       <input name="unit" required placeholder="Unit (Kg, Ltr, Pc)" className="bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
+                      <input name="quantity" type="number" step="0.01" required placeholder="Initial Qty" className="bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
+                      <input name="unit" required placeholder="Unit (Kg, Ltr, Pc)" className="bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     </div>
                     <input name="threshold" type="number" step="0.01" required placeholder="Low Stock Threshold" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                   </>
@@ -642,39 +640,39 @@ export default function OwnerDashboard() {
                 {showAddModal === 'menu' && (
                   <>
                     <select name="type" value={menuAddType} onChange={e => setMenuAddType(e.target.value)} className="w-full bg-slate-800 border border-white/10 p-5 rounded-2xl outline-none font-black text-cyan-400">
-                       <option value="item">Add New Food Item</option>
-                       <option value="category">Add New Category</option>
+                      <option value="item">Add New Food Item</option>
+                      <option value="category">Add New Category</option>
                     </select>
 
                     {menuAddType === 'category' && (
-                       <input name="name" required placeholder="Category Name (e.g. Desserts)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black focus:border-cyan-500 mt-6" />
+                      <input name="name" required placeholder="Category Name (e.g. Desserts)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black focus:border-cyan-500 mt-6" />
                     )}
 
                     {menuAddType === 'item' && (
-                       <div className="space-y-6 mt-6">
-                         <input name="item_name" required placeholder="Dish Name" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
-                         <input name="description" placeholder="Description (Optional)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-medium text-sm" />
-                         <input name="price" type="number" step="0.01" required placeholder="Price (INR)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
-                         <select name="category_id" required className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black">
-                            <option value="">-- Select Category --</option>
-                            {menuCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                         </select>
-                       </div>
+                      <div className="space-y-6 mt-6">
+                        <input name="item_name" required placeholder="Dish Name" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
+                        <input name="description" placeholder="Description (Optional)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-medium text-sm" />
+                        <input name="price" type="number" step="0.01" required placeholder="Price (INR)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
+                        <select name="category_id" required className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black">
+                          <option value="">-- Select Category --</option>
+                          {menuCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
                     )}
                   </>
                 )}
 
                 {showAddModal === 'staff' && (
-                   <>
+                  <>
                     <input name="name" required placeholder="Full Name" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     <input name="email" type="email" required placeholder="Email Address" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     <input name="phone" required placeholder="Phone Number" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     <input name="password" type="password" required placeholder="Secure Password" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black" />
                     <select name="role" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-black">
-                       <option value="WAITER">WAITER</option>
-                       <option value="KITCHEN">KITCHEN</option>
+                      <option value="WAITER">WAITER</option>
+                      <option value="KITCHEN">KITCHEN</option>
                     </select>
-                   </>
+                  </>
                 )}
 
                 <div className="flex gap-4 mt-8">
@@ -713,9 +711,9 @@ export default function OwnerDashboard() {
               return (
                 <div key={table.id} className="bg-white p-6 pb-8 rounded-[40px] flex flex-col items-center justify-center border-4 border-slate-900 print:break-inside-avoid print:border-black print:rounded-2xl">
                   <h3 className="text-4xl font-black text-black mb-4 tracking-tighter">TABLE {table.table_number}</h3>
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(orderUrl)}`} 
-                    alt={`QR for Table ${table.table_number}`} 
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(orderUrl)}`}
+                    alt={`QR for Table ${table.table_number}`}
                     className="w-full aspect-square mb-4 shadow border border-slate-200 rounded-xl"
                   />
                   <p className="text-black font-bold text-center text-xl mt-2">Scan to Order & Pay</p>
@@ -723,7 +721,7 @@ export default function OwnerDashboard() {
                 </div>
               );
             })}
-            
+
             {tables.length === 0 && (
               <div className="col-span-full h-64 flex flex-col items-center justify-center text-slate-500">
                 <QrCode size={48} className="mb-4 opacity-50" />

@@ -13,12 +13,23 @@ const getHeaders = () => {
 
 export const waiterApi = {
   getTables: async () => {
-    const response = await axios.get(`${BASE_URL}/tables/`);
+    const response = await axios.get(`${BASE_URL}/tables/`, getHeaders());
     return response.data;
   },
 
   getMenu: async () => {
-    const response = await axios.get(`${BASE_URL}/menu/categories`);
+    // We pass restaurant_id dynamically as query param for customer, but for waiter, they have a token.
+    // However, the backend expects restaurant_id as query for public, or it can be derived. 
+    // BUT wait! In our backend change, we made restaurant_id optional query? 
+    // Wait, let's just pass token and the backend will not need restaurant_id if it's not provided? 
+    // No, I explicitly raised 400 if it's not provided in `api/api_v1/menu.py` inside get_categories.
+    // Let me check my code. I wrote:
+    // `def get_categories(restaurant_id: UUID = None, db: Session = Depends(get_db)): if not restaurant_id: raise HTTPException(400)`
+    // So the frontend MUST pass restaurant_id? Wait, waiters don't know the restaurant_id easily!
+    // But they have a token. Wait, if they have a token, we could inject it if we change `get_categories` to use `Depends(get_current_restaurant)` optionally.
+    // Or I can change backend to handle it.
+    // Let me first add headers. `axios.get(..., getHeaders())`. I will need to fix backend `menu.py` slightly to allow waiters to use token.
+    const response = await axios.get(`${BASE_URL}/menu/categories`, getHeaders());
     return response.data;
   },
 
@@ -28,12 +39,12 @@ export const waiterApi = {
       ...orderData,
       source: 'WAITER',
       is_accepted: true
-    });
+    }, getHeaders());
     return response.data;
   },
 
   getOrdersByTable: async (tableId: string) => {
-    const response = await axios.get(`${BASE_URL}/orders/table/${tableId}`);
+    const response = await axios.get(`${BASE_URL}/orders/table/${tableId}`, getHeaders());
     return response.data;
   },
 

@@ -8,8 +8,10 @@ export const customerApi = {
     return response.data;
   },
 
-  getMenu: async () => {
-    const response = await axios.get(`${BASE_URL}/menu/categories`);
+  getMenu: async (restaurantId: string) => {
+    const response = await axios.get(`${BASE_URL}/menu/categories`, {
+      params: { restaurant_id: restaurantId }
+    });
     return response.data;
   },
 

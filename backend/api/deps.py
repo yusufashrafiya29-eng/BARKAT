@@ -8,6 +8,7 @@ from jwt.exceptions import InvalidTokenError
 from typing import Generator
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 def get_db() -> Generator[Session, None, None]:
     """Dependency to generate a database session per HTTP request."""
@@ -33,10 +34,45 @@ def get_current_user_token(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials - Token invalid or expired.",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
-# def get_current_user_token() -> dict:
+def get_optional_user_token(credentials: HTTPAuthorizationCredentials = Depends(optional_security)) -> dict:
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} 
+        )
+        return payload
+    except InvalidTokenError:
+        return None
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    token_payload: dict = Depends(get_current_user_token)
+):
+    from models.user import User
+    user_email = token_payload.get("email")
+    if not user_email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+    
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
+    return user
+
+def get_current_restaurant(user = Depends(get_current_user)):
+    if not user.restaurant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="User is not linked to any restaurant."
+        )
+    return user.restaurant_id
+
 #     """
 #     Mocked security dependency. 
 #     Returns a fake token payload to bypass Supabase JWT authentication for local Postman testing.

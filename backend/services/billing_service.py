@@ -5,12 +5,12 @@ from models.order import Order
 from models.billing import Bill, PaymentStatus
 from schemas.billing import BillCreate
 
-def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate) -> Bill:
-    existing = db.query(Bill).filter(Bill.order_id == order_id).first()
+def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_id: str) -> Bill:
+    existing = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
     if existing:
         return existing
         
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found. Cannot generate bill.")
         
@@ -23,6 +23,7 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate) -> Bill:
         total_amount = 0.0
         
     new_bill = Bill(
+        restaurant_id=restaurant_id,
         order_id=order_id,
         subtotal=subtotal,
         tax_amount=tax_amount,
@@ -36,8 +37,8 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate) -> Bill:
     db.refresh(new_bill)
     return new_bill
 
-def confirm_payment(db: Session, order_id: UUID, transaction_id: str = None) -> Bill:
-    bill = db.query(Bill).filter(Bill.order_id == order_id).first()
+def confirm_payment(db: Session, order_id: UUID, transaction_id: str = None, restaurant_id: str = None) -> Bill:
+    bill = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found for this order. Generate bill first.")
         

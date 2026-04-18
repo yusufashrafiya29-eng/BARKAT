@@ -19,6 +19,7 @@ class NotificationLog(Base):
     __tablename__ = "notification_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
     customer_phone = Column(String, nullable=False)
     message_type = Column(SAEnum(MessageType), nullable=False)

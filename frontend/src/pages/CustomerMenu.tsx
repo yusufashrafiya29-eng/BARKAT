@@ -47,7 +47,7 @@ interface Order {
 const CustomerMenu: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   
-  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number } | null>(null);
+  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
@@ -77,7 +77,7 @@ const CustomerMenu: React.FC = () => {
         setTableInfo(tblData);
 
         // Fetch active menu
-        const menuData = await customerApi.getMenu();
+        const menuData = await customerApi.getMenu(tblData.restaurant_id);
         setCategories(menuData);
 
         // Fetch running orders for the bill

@@ -7,6 +7,7 @@ from db.session import Base
 class Category(Base):
     __tablename__ = "categories"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
@@ -17,6 +18,7 @@ class Category(Base):
 class MenuItem(Base):
     __tablename__ = "menu_items"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
     
     name = Column(String, index=True, nullable=False)

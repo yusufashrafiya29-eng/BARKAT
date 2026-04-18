@@ -2,15 +2,18 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from api.deps import get_db, get_current_user_token
+from api.deps import get_db, get_current_restaurant, get_current_user_token
 from schemas.table import TableCreate, TableRead
 from models.table import Table
 
 router = APIRouter()
 
 @router.get("/", response_model=List[TableRead])
-def get_all_tables(db: Session = Depends(get_db)):
-    return db.query(Table).all()
+def get_all_tables(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return db.query(Table).filter(Table.restaurant_id == restaurant_id).all()
 
 @router.get("/{table_id}", response_model=TableRead)
 def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
@@ -24,9 +27,9 @@ def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
 def create_table(
     table_in: TableCreate, 
     db: Session = Depends(get_db),
-    token: dict = Depends(get_current_user_token)
+    restaurant_id: UUID = Depends(get_current_restaurant)
 ):
-    obj = Table(**table_in.model_dump())
+    obj = Table(**table_in.model_dump(), restaurant_id=restaurant_id)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -36,13 +39,14 @@ def create_table(
 def delete_table(
     table_id: UUID,
     db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
     token: dict = Depends(get_current_user_token)
 ):
     from fastapi import HTTPException
     if token.get("role") != "OWNER":
         raise HTTPException(status_code=403, detail="Owner access required")
     
-    table = db.query(Table).filter(Table.id == table_id).first()
+    table = db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
         
