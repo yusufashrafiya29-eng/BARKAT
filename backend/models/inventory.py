@@ -1,14 +1,18 @@
 import uuid
 from sqlalchemy import Column, String, Float, Boolean, DateTime, func, ForeignKey
+from sqlalchemy.schema import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
 
 class StockItem(Base):
     __tablename__ = "stock_items"
 
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'name', name='uq_stock_item_name_per_restaurant'),
+    )
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
-    name = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, index=True, nullable=False)
     quantity = Column(Float, default=0.0, nullable=False)
     unit = Column(String, nullable=False) # e.g., 'kg', 'pcs'
     minimum_threshold = Column(Float, default=0.0, nullable=False)
