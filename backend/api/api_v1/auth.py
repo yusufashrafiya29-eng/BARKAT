@@ -76,38 +76,40 @@ async def signup_owner(
         # Validate MIME type
         if logo.content_type not in ["image/jpeg", "image/png", "image/webp"]:
             raise HTTPException(status_code=400, detail="Invalid image type. Use JPEG, PNG or WebP.")
-        
-        try:
-            from PIL import Image
-            import io
-            import time
-            import os
 
-            # Read image data
-            image_data = await logo.read()
+        import io, time, os
+        image_data = await logo.read()
+        timestamp  = int(time.time())
+
+        try:
+            # Try PIL-based optimization (resize + compress)
+            from PIL import Image
             img = Image.open(io.BytesIO(image_data))
-            
-            # Basic optimization: Convert to RGB and resize if too large
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
-            
-            img.thumbnail((512, 512)) # Standardize size
-            
-            # Generate unique filename
-            timestamp = int(time.time())
-            filename = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
-            save_path = os.path.join("static/logos", filename)
-            
-            # Save optimized image
+            img.thumbnail((512, 512))
+            filename  = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
+            save_path = os.path.join("static", "logos", filename)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             img.save(save_path, "JPEG", quality=85)
             logo_url = f"/static/logos/{filename}"
-            
-        except Exception as e:
-            logger.error(f"Logo upload failed: {e}")
-            # Fallback or error based on preference
-            # For now, we'll allow signup to continue without logo if it fails, or raise error?
-            # Raising error is safer for user expectation.
-            raise HTTPException(status_code=500, detail="Failed to process restaurant logo.")
+            logger.info(f"Logo saved (PIL optimized): {save_path}")
+
+        except Exception as pil_err:
+            # PIL not available or failed — save the raw bytes as-is
+            logger.warning(f"PIL processing failed ({pil_err}), saving raw file instead.")
+            try:
+                ext       = logo.content_type.split("/")[-1].replace("jpeg", "jpg")
+                filename  = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
+                save_path = os.path.join("static", "logos", filename)
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                with open(save_path, "wb") as f:
+                    f.write(image_data)
+                logo_url = f"/static/logos/{filename}"
+                logger.info(f"Logo saved (raw fallback): {save_path}")
+            except Exception as raw_err:
+                # Even raw save failed — skip logo, don't block signup
+                logger.error(f"Logo raw save also failed: {raw_err}. Continuing without logo.")
 
     # First create the Restaurant
     restaurant = Restaurant(
