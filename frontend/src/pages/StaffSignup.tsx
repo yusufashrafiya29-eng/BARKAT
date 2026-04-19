@@ -62,7 +62,7 @@ const StaffSignup: React.FC = () => {
                 onClick={() => setFormData(f => ({ ...f, role: value }))}
                 className="p-3 rounded-2xl border-2 text-left transition-all duration-150"
                 style={{
-                  borderColor: formData.role === value ? color : '#e2e8f0',
+                  borderColor: formData.role === value ? color : border,
                   background: formData.role === value ? bg : 'white',
                   boxShadow: formData.role === value ? `0 0 0 3px ${color}18` : 'none',
                 }}
