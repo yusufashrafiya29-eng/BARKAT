@@ -5,6 +5,7 @@ from uuid import UUID
 class TableBase(BaseModel):
     table_number: int
     capacity: int = 4
+    category: str = "Non-AC"
     qr_code_url: Optional[str] = None
 
 class TableCreate(TableBase):

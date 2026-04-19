@@ -42,6 +42,7 @@ interface Table {
   id: string;
   table_number: number;
   capacity: number;
+  category: string;
 }
 
 interface InventoryItem {
@@ -232,7 +233,8 @@ export default function OwnerDashboard() {
       if (showAddModal === 'tables') {
         await ownerApi.addTable({
           table_number: parseInt(data.number as string),
-          capacity: parseInt(data.capacity as string)
+          capacity: parseInt(data.capacity as string),
+          category: data.category as string
         });
       } else if (showAddModal === 'inventory') {
         await ownerApi.addInventoryItem({
@@ -487,7 +489,16 @@ export default function OwnerDashboard() {
                           <LayoutGrid className="text-slate-500 group-hover:text-cyan-400" size={32} />
                         </div>
                         <h4 className="text-xl font-black mb-1">T-{table.table_number}</h4>
-                        <p className="text-slate-500 text-xs font-bold mb-4">{table.capacity} Seats</p>
+                        <p className="text-slate-500 text-xs font-bold mb-2">{table.capacity} Seats</p>
+                        <div className="mb-4">
+                          <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${
+                            table.category === 'AC' 
+                              ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' 
+                              : 'bg-slate-500/10 text-slate-400 border-white/10'
+                          }`}>
+                            {table.category}
+                          </span>
+                        </div>
                         <button onClick={() => handleDeleteTable(table.id, table.table_number)} className="text-rose-500 hover:text-rose-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Trash2 size={16} />
                         </button>
@@ -622,6 +633,13 @@ export default function OwnerDashboard() {
                     <div className="space-y-2">
                       <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Seating Capacity</label>
                       <input name="capacity" type="number" required placeholder="E.g. 4" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Category</label>
+                      <select name="category" required className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl focus:border-cyan-500 outline-none transition-all font-black">
+                        <option value="Non-AC">Non-AC</option>
+                        <option value="AC">AC</option>
+                      </select>
                     </div>
                   </>
                 )}

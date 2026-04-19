@@ -14,6 +14,7 @@ class Table(Base):
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     table_number = Column(Integer, index=True, nullable=False)
     capacity = Column(Integer, nullable=False, default=4)
+    category = Column(String, nullable=False, default="Non-AC")
     qr_code_url = Column(String, nullable=True)
     last_order_at = Column(DateTime(timezone=True), nullable=True)
 

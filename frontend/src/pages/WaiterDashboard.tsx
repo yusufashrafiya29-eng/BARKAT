@@ -29,6 +29,7 @@ interface Table {
   id: string;
   table_number: number;
   capacity: number;
+  category: string;
   status?: 'Free' | 'Occupied' | 'Ordering';
 }
 
@@ -465,6 +466,15 @@ const WaiterDashboard: React.FC = () => {
                     <div className="flex items-center gap-2 text-slate-500 text-xs justify-center">
                       <Users size={12} />
                       <span>{table.capacity} Seats</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                        table.category === 'AC' 
+                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' 
+                          : 'bg-slate-500/10 text-slate-400 border-white/5'
+                      }`}>
+                        {table.category}
+                      </span>
                     </div>
                   </div>
                   <div className={`
