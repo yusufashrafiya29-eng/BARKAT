@@ -1,33 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowRight, RefreshCw, Loader2, ShieldCheck, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VerifyOTP: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const email = location.state?.email || '';
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const email     = location.state?.email || '';
 
-  const [otpCode, setOtpCode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [otp, setOtp]           = useState<string[]>(Array(6).fill(''));
+  const [loading, setLoading]   = useState(false);
   const [resending, setResending] = useState(false);
+  const inputRefs               = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => {
-    if (!email) {
-      navigate('/login');
+  useEffect(() => { if (!email) navigate('/login'); }, [email, navigate]);
+  useEffect(() => { inputRefs.current[0]?.focus(); }, []);
+
+  const handleChange = (idx: number, val: string) => {
+    const digit = val.replace(/\D/g, '').slice(-1);
+    const next  = [...otp];
+    next[idx]   = digit;
+    setOtp(next);
+    if (digit && idx < 5) inputRefs.current[idx + 1]?.focus();
+  };
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
     }
-  }, [email, navigate]);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text   = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const digits = text.split('');
+    const next   = [...otp];
+    digits.forEach((d, i) => { next[i] = d; });
+    setOtp(next);
+    const focusIdx = Math.min(digits.length, 5);
+    inputRefs.current[focusIdx]?.focus();
+  };
+
+  const otpCode     = otp.join('');
+  const isComplete  = otpCode.length === 6;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isComplete) return;
     setLoading(true);
     try {
       const resp = await authApi.verifyOtp({ email, otp_code: otpCode });
-      toast.success(resp.message || 'Verification successful. You can now log in.');
+      toast.success(resp.message || '✅ Verified! You can now log in.');
       navigate('/login');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Invalid authentication code.');
+      toast.error(error.response?.data?.detail || 'Invalid code. Please try again.');
+      setOtp(Array(6).fill(''));
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -37,65 +66,94 @@ const VerifyOTP: React.FC = () => {
     setResending(true);
     try {
       const resp = await authApi.sendOtp({ email });
-      toast.success(resp.message || 'New code sent.');
+      toast.success(resp.message || '📬 New code sent!');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to dispatch code.');
+      toast.error(error.response?.data?.detail || 'Failed to send code.');
     } finally {
       setResending(false);
     }
   };
 
   return (
-    <div className="w-full max-w-[400px] animate-in fade-in duration-500">
-      <div className="mb-8 flex flex-col items-center text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Enter Verification Code</h1>
-        <p className="text-[14px] text-slate-500 mt-2 leading-relaxed">
-          We've sent a 6-digit secure code to<br />
-          <span className="text-slate-800 font-medium">{email}</span>.
+    <div>
+      {/* Icon + heading */}
+      <div className="flex flex-col items-center text-center mb-8">
+        <div className="w-16 h-16 rounded-3xl flex items-center justify-center mb-5"
+          style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', border: '1px solid #6ee7b7', boxShadow: '0 4px 20px rgb(16 185 129 / .18)' }}>
+          <ShieldCheck size={28} className="text-emerald-600" />
+        </div>
+        <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-none mb-2">
+          Verify your email
+        </h1>
+        <p className="text-[13px] text-slate-500 max-w-xs leading-relaxed">
+          We sent a 6-digit code to
         </p>
-      </div>
- 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2 text-center">
-            <input 
-              type="text" 
-              className="w-full bg-transparent border-0 border-b border-slate-200 text-center text-3xl font-medium tracking-[0.5em] focus:border-main focus:ring-0 outline-none transition-colors pb-2" 
-              maxLength={6}
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="••••••"
-              required 
-            />
-          </div>
- 
-          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full mt-4" disabled={loading || otpCode.length !== 6}>
-            {loading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : (
-              <>Verify Access <ArrowRight size={14} /></>
-            )}
-          </button>
-        </form>
- 
-        <div className="mt-8 pt-6 border-t border-slate-200 text-center flex flex-col items-center gap-2">
-          <p className="text-[13px] text-slate-500">Didn't receive the code?</p>
-          <button 
-            type="button"
-            onClick={handleResend}
-            disabled={resending}
-            className="text-[13px] font-medium text-slate-800 hover:text-slate-500 transition-colors flex items-center gap-2"
-          >
-            {resending ? (
-              <><Loader2 size={13} className="animate-spin" /> Sending...</>
-            ) : (
-              <><RefreshCw size={13} /> Resend Code</>
-            )}
-          </button>
+        <div className="flex items-center gap-1.5 mt-1">
+          <Mail size={13} className="text-indigo-500" />
+          <span className="text-[13px] font-bold text-indigo-600">{email}</span>
         </div>
       </div>
- 
-      <div className="text-center mt-6">
-        <Link to="/login" className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors">
-          Return to Sign In
+
+      <form onSubmit={handleSubmit}>
+        {/* OTP boxes */}
+        <div className="flex gap-2.5 justify-center mb-6" onPaste={handlePaste}>
+          {otp.map((digit, idx) => (
+            <input
+              key={idx}
+              ref={el => { inputRefs.current[idx] = el; }}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={e => handleChange(idx, e.target.value)}
+              onKeyDown={e => handleKeyDown(idx, e)}
+              className="w-12 h-14 text-center text-[22px] font-extrabold rounded-2xl border-2 transition-all duration-150 focus:outline-none"
+              style={{
+                borderColor: digit ? '#6366f1' : '#e2e8f0',
+                background: digit ? '#eef2ff' : '#f8fafc',
+                color: digit ? '#4338ca' : '#94a3b8',
+                boxShadow: digit ? '0 0 0 3px rgb(99 102 241 / .15)' : 'none',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading || !isComplete}
+          className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+            color: '#fff',
+            boxShadow: isComplete ? '0 4px 20px rgb(16 185 129 / .40)' : 'none',
+          }}
+        >
+          {loading
+            ? <Loader2 size={18} className="animate-spin" />
+            : <><ShieldCheck size={16} /><span>Verify Account</span><ArrowRight size={16} /></>
+          }
+        </button>
+      </form>
+
+      {/* Resend */}
+      <div className="mt-6 pt-6 border-t border-slate-200 flex flex-col items-center gap-2">
+        <p className="text-[12px] text-slate-400">Didn't receive the code?</p>
+        <button
+          onClick={handleResend}
+          disabled={resending}
+          className="flex items-center gap-1.5 text-[13px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors disabled:opacity-50"
+        >
+          {resending
+            ? <><Loader2 size={13} className="animate-spin" />Sending...</>
+            : <><RefreshCw size={13} />Resend Code</>
+          }
+        </button>
+      </div>
+
+      <div className="text-center mt-4">
+        <Link to="/login" className="text-[12px] text-slate-400 hover:text-slate-700 transition-colors">
+          ← Back to Sign In
         </Link>
       </div>
     </div>

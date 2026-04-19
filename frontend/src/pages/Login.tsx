@@ -1,86 +1,118 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [showPwd, setShowPwd]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const response = await authApi.login({ email, password });
-      
-      if (response.data && response.data.is_verified === false || response.message === "OTP verification required") {
-        toast.error('Verification code required.');
+      if (response.data?.is_verified === false || response.message === 'OTP verification required') {
+        toast.error('Verification required.');
         navigate('/verify', { state: { email } });
       } else {
         localStorage.setItem('auth_token', response.data.access_token);
         localStorage.setItem('userRole', response.data.role);
-        toast.success(response.message || 'Authentication successful.');
+        toast.success('Welcome back! 🎉');
         navigate('/dashboard');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Authentication failed');
+      toast.error(error.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
   };
 
+  const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-[14px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-3 focus:ring-indigo-100 transition-all";
+
   return (
-    <div className="w-full max-w-[400px] animate-in fade-in duration-500 mx-auto">
-      <div className="mb-8 flex flex-col items-center">
-        <div className="w-10 h-10 bg-slate-100 border border-slate-200 flex items-center justify-center rounded-md mb-6">
-          <div className="w-4 h-4 bg-slate-50 border border-indigo-500"></div>
-        </div>
-        <h1 className="text-[24px] font-semibold tracking-tight">Access Workspace</h1>
-        <p className="text-[14px] text-slate-500 mt-2">Enter credentials to authenticate.</p>
+    <div>
+      {/* Heading */}
+      <div className="mb-8">
+        <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight leading-none mb-2">
+          Welcome back 👋
+        </h1>
+        <p className="text-[14px] text-slate-500">Sign in to your restaurant dashboard.</p>
       </div>
- 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-slate-800">Work Email</label>
-            <input 
-              type="email" 
-              className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Email */}
+        <div className="space-y-1.5">
+          <label className="text-[12px] font-bold text-slate-600 uppercase tracking-wider">Email</label>
+          <div className="relative">
+            <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="email"
+              className={inputClass}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              required 
+              onChange={e => setEmail(e.target.value)}
+              placeholder="name@restaurant.com"
+              required
             />
           </div>
- 
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-slate-800">API / Passkey</label>
-            <input 
-              type="password" 
-              className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1.5">
+          <label className="text-[12px] font-bold text-slate-600 uppercase tracking-wider">Password</label>
+          <div className="relative">
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type={showPwd ? 'text' : 'password'}
+              className={`${inputClass} pr-10`}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
-              required 
+              required
             />
+            <button type="button" onClick={() => setShowPwd(p => !p)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors">
+              {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
           </div>
- 
-          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full mt-2" disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (
-              <>Authenticate <ArrowRight size={14} /></>
-            )}
-          </button>
-        </form>
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50 mt-2"
+          style={{
+            background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgb(99 102 241 / .40)',
+          }}
+        >
+          {loading
+            ? <Loader2 size={18} className="animate-spin" />
+            : <><span>Sign In</span><ArrowRight size={16} /></>
+          }
+        </button>
+      </form>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 my-6">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">or</span>
+        <div className="flex-1 h-px bg-slate-200" />
       </div>
- 
-      <div className="text-center mt-6">
-        <Link to="/signup" className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors">
-          Initialize new workspace
-        </Link>
-      </div>
+
+      {/* Signup link */}
+      <Link
+        to="/signup"
+        className="w-full py-3 rounded-2xl font-semibold text-[14px] flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all"
+      >
+        Create a new restaurant account
+      </Link>
     </div>
   );
 };

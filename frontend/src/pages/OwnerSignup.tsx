@@ -1,29 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowRight, Loader2, Mail, Lock, User, Phone, Store, UploadCloud, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OwnerSignup: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    password: '',
-    phone_number: '',
-    restaurant_name: '',
-    logo_url: '',
-  });
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [formData, setFormData] = useState({ full_name:'', email:'', password:'', phone_number:'', restaurant_name:'' });
+  const [logoFile, setLogoFile]     = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [showPwd, setShowPwd]       = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       const file = e.target.files[0];
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
@@ -35,115 +28,140 @@ const OwnerSignup: React.FC = () => {
     setLoading(true);
     try {
       const data = new FormData();
-      data.append('full_name', formData.full_name);
-      data.append('email', formData.email);
-      data.append('password', formData.password);
-      data.append('phone_number', formData.phone_number);
-      data.append('restaurant_name', formData.restaurant_name);
-      if (logoFile) {
-        data.append('logo', logoFile);
-      }
-
+      Object.entries(formData).forEach(([k, v]) => data.append(k, v));
+      if (logoFile) data.append('logo', logoFile);
       await authApi.signupOwner(data);
-      toast.success('Registration successful. Please secure your account.');
+      toast.success('🎉 Restaurant created! Please verify your email.');
       navigate('/verify', { state: { email: formData.email } });
     } catch (error: any) {
       const detail = error.response?.data?.detail;
-      let errMsg = 'Registration failed';
-      if (typeof detail === 'string') {
-        errMsg = detail;
-      } else if (Array.isArray(detail)) {
-        errMsg = detail.map((d: any) => `${d.loc.join('.')}: ${d.msg}`).join(', ');
-      }
-      toast.error(errMsg);
+      toast.error(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
+  const inputWrap = "relative";
+  const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all";
+  const labelClass = "text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block";
+  const IconWrap = ({ children }: { children: React.ReactNode }) => (
+    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">{children}</span>
+  );
+
   return (
-    <div className="w-full max-w-[600px] animate-in fade-in duration-500">
-      <div className="mb-8 flex flex-col items-center">
-        <div className="w-10 h-10 bg-slate-100 border border-slate-200 flex items-center justify-center rounded-md mb-6">
-          <div className="w-4 h-4 bg-slate-50 border border-slate-200"></div>
+    <div>
+      {/* Heading */}
+      <div className="mb-6">
+        <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-none mb-1.5">
+          Set up your restaurant 🍽️
+        </h1>
+        <p className="text-[13px] text-slate-500">Create your owner account and start managing.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Restaurant Identity */}
+        <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
+          <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">Restaurant Identity</p>
+
+          {/* Restaurant name */}
+          <div>
+            <label className={labelClass}>Restaurant Name</label>
+            <div className={inputWrap}>
+              <IconWrap><Store size={14} /></IconWrap>
+              <input name="restaurant_name" type="text" className={inputClass} placeholder="e.g. Barkat Biryani" onChange={handleChange} required />
+            </div>
+          </div>
+
+          {/* Logo upload */}
+          <div>
+            <label className={labelClass}>Restaurant Logo <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+            <div
+              className="flex items-center gap-4 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all hover:border-indigo-300 hover:bg-indigo-50/50 relative"
+              style={{ borderColor: logoPreview ? '#6366f1' : '#e2e8f0', background: logoPreview ? '#eef2ff50' : 'white' }}
+            >
+              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+                style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                {logoPreview
+                  ? <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                  : <UploadCloud size={18} className="text-slate-400" />
+                }
+              </div>
+              <div>
+                {logoPreview
+                  ? <div className="flex items-center gap-1.5 text-indigo-600"><CheckCircle2 size={14} /><span className="text-[13px] font-bold">Logo uploaded!</span></div>
+                  : <p className="text-[13px] font-semibold text-slate-700">Click to upload logo</p>
+                }
+                <p className="text-[11px] text-slate-400 mt-0.5">JPG, PNG or WebP · Max 2MB</p>
+              </div>
+              <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </div>
+          </div>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Create your workspace</h1>
-        <p className="text-[14px] text-slate-500 mt-2">Set up your brand and executive account.</p>
-      </div>
- 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          
-          <div className="space-y-4">
-            <h3 className="text-[13px] font-medium text-slate-800 border-b border-slate-200 pb-2">Workspace Identity</h3>
-            
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-slate-800">Organization Name</label>
-              <input name="restaurant_name" type="text" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Acme Corp" onChange={handleChange} required />
+
+        {/* Owner Details */}
+        <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
+          <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">Your Details</p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Full Name</label>
+              <div className={inputWrap}>
+                <IconWrap><User size={14} /></IconWrap>
+                <input name="full_name" type="text" className={inputClass} placeholder="Your name" onChange={handleChange} required />
+              </div>
             </div>
- 
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-slate-800">Brand Logo</label>
-              <div className="flex items-center gap-4 p-3 border border-dashed border-slate-200 rounded-md group hover:border-text-slate-500 transition-colors relative">
-                <div className="w-12 h-12 bg-slate-50 border border-slate-200 rounded flex items-center justify-center overflow-hidden shrink-0">
-                   {logoPreview ? (
-                     <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
-                   ) : (
-                     <UploadCloud size={16} className="text-slate-500" />
-                   )}
-                </div>
-                <div className="flex-1">
-                   <p className="text-[13px] font-medium text-slate-800">Upload Avatar</p>
-                   <p className="text-[12px] text-slate-500">JPG, PNG or WebP</p>
-                </div>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleFileChange}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
+            <div>
+              <label className={labelClass}>Phone</label>
+              <div className={inputWrap}>
+                <IconWrap><Phone size={14} /></IconWrap>
+                <input name="phone_number" type="tel" className={inputClass} placeholder="+91..." onChange={handleChange} required />
               </div>
             </div>
           </div>
- 
-          <div className="space-y-4">
-            <h3 className="text-[13px] font-medium text-slate-800 border-b border-slate-200 pb-2">Executive Details</h3>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-800">Full Name</label>
-                <input name="full_name" type="text" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Jane Doe" onChange={handleChange} required />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-800">Work Email</label>
-                <input name="email" type="email" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="jane@acme.com" onChange={handleChange} required />
-              </div>
-            </div>
- 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-800">Contact Number</label>
-                <input name="phone_number" type="tel" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="+1..." onChange={handleChange} required />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-800">Password</label>
-                <input name="password" type="password" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="••••••••" onChange={handleChange} required />
-              </div>
+
+          <div>
+            <label className={labelClass}>Email</label>
+            <div className={inputWrap}>
+              <IconWrap><Mail size={14} /></IconWrap>
+              <input name="email" type="email" className={inputClass} placeholder="owner@restaurant.com" onChange={handleChange} required />
             </div>
           </div>
- 
-          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full" disabled={loading}>
-            {loading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : (
-              <>Continue <ArrowRight size={14} /></>
-            )}
-          </button>
-        </form>
-      </div>
- 
-      <div className="text-center mt-6">
-        <Link to="/login" className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors">
-          Already have an account? Sign In
-        </Link>
+
+          <div>
+            <label className={labelClass}>Password</label>
+            <div className={inputWrap}>
+              <IconWrap><Lock size={14} /></IconWrap>
+              <input name="password" type={showPwd ? 'text' : 'password'} className={`${inputClass} pr-10`} placeholder="Min. 8 characters" onChange={handleChange} required />
+              <button type="button" onClick={() => setShowPwd(p => !p)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50"
+          style={{
+            background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgb(99 102 241 / .40)',
+          }}
+        >
+          {loading
+            ? <Loader2 size={18} className="animate-spin" />
+            : <><span>Create Restaurant Account</span><ArrowRight size={16} /></>
+          }
+        </button>
+      </form>
+
+      <div className="text-center mt-5">
+        <span className="text-[13px] text-slate-500">Already registered? </span>
+        <Link to="/login" className="text-[13px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>
       </div>
     </div>
   );
