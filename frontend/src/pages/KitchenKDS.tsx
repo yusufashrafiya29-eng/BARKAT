@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChefHat, Clock, AlertCircle, Loader2, CheckCircle2, Flame } from 'lucide-react';
+import { ChefHat, Clock, AlertCircle, Loader2, Flame } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { kitchenApi } from '../api/kitchen';
 import { waiterApi } from '../api/waiter'; // Reusing for menu and tables
@@ -67,33 +67,29 @@ export default function KitchenKDS() {
   }, [loading]);
 
   useEffect(() => {
-    // Initial fetch
     fetchMetadata().then(() => fetchOrders());
 
-    // Polling interval
     const interval = setInterval(() => {
       fetchOrders();
-    }, 4000); // 4 seconds
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [fetchMetadata, fetchOrders]);
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
-    // Optimistic UI update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     
     try {
       await kitchenApi.updateOrderStatus(orderId, newStatus);
       if (newStatus === 'READY') {
-        // Completely remove READY orders from view since KDS only fetches ACCEPTED/PREPARING
         setOrders(prev => prev.filter(o => o.id !== orderId));
-        toast.success('Order marked as READY!', { icon: '🍽️' });
+        toast.success('Ticket marked as READY');
       } else {
-        toast.success(`Order moved to ${newStatus}`);
+        toast.success(`Ticket moved to ${newStatus}`);
       }
     } catch (err) {
-      toast.error('Failed to update order status');
-      fetchOrders(); // Revert on failure
+      toast.error('Failed to update ticket status');
+      fetchOrders(); 
     }
   };
 
@@ -106,9 +102,9 @@ export default function KitchenKDS() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-orange-400 gap-4">
-        <Loader2 className="animate-spin w-16 h-16" />
-        <p className="text-xl font-bold font-mono tracking-widest animate-pulse">WARMING UP OVENS...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-main">
+        <Loader2 className="animate-spin w-5 h-5 text-muted" />
+        <p className="text-[11px] font-medium text-muted uppercase tracking-wider">Syncing KDS...</p>
       </div>
     );
   }
@@ -118,71 +114,74 @@ export default function KitchenKDS() {
 
   const OrderCard = ({ order, type }: { order: Order; type: 'incoming' | 'preparing' }) => {
     const elapsedMinutes = getElapsedTime(order.created_at);
-    // Visual alerts for orders taking too long
     const isWarning = elapsedMinutes > 15;
     const isDanger = elapsedMinutes > 25;
 
     return (
-      <div className={`relative bg-slate-800 rounded-3xl p-6 border-b-8 shadow-2xl transition-all duration-300 transform hover:-translate-y-1 ${
-        isDanger ? 'border-b-rose-500 bg-rose-500/10 shadow-rose-500/20' : 
-        isWarning ? 'border-b-yellow-500 bg-yellow-500/10 shadow-yellow-500/20' : 
-        type === 'incoming' ? 'border-b-orange-500 shadow-orange-500/10' : 'border-b-cyan-500 shadow-cyan-500/10'
+      <div className={`surface p-5 transition-colors relative overflow-hidden group border ${
+        isDanger ? 'border-rose-500/50' : 
+        isWarning ? 'border-amber-500/50' : 
+        type === 'incoming' ? 'border-primary/30' : 'border-emerald-500/30'
       }`}>
-        <div className="flex justify-between items-start mb-6 pb-4 border-b border-white/10 text-white">
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+          isDanger ? 'bg-rose-500' : 
+          isWarning ? 'bg-amber-500' : 
+          type === 'incoming' ? 'bg-primary' : 'bg-emerald-500'
+        }`}></div>
+        
+        <div className="flex justify-between items-start mb-5 pl-2">
           <div className="flex items-center gap-3">
-             <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center font-black text-2xl text-white">
-               {tableMap[order.table_id] || '?'}
+             <div className="w-9 h-9 bg-main border border-subtle rounded flex items-center justify-center font-semibold text-[15px]">
+               T{tableMap[order.table_id] || '?'}
              </div>
              <div>
-               <p className="text-xs font-black text-slate-400 tracking-widest uppercase">TABLE DINE-IN</p>
-               <p className="font-mono text-xs text-slate-500">#{order.id.split('-')[0]}</p>
+               <p className="text-[14px] font-semibold text-main mb-0.5">#{order.id.slice(0, 5)}</p>
+               <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                 isDanger ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 
+                 isWarning ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
+                 'bg-surface text-muted border-subtle'
+               }`}>
+                 <Clock size={10} />
+                 {elapsedMinutes}m elapsed
+               </div>
              </div>
-          </div>
-          
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-lg font-black text-xs tracking-widest uppercase ${
-            isDanger ? 'bg-rose-500 text-white animate-pulse' : 
-            isWarning ? 'bg-yellow-500/20 text-yellow-400' : 
-            'bg-slate-700 text-slate-300'
-          }`}>
-            <Clock size={16} />
-            {elapsedMinutes}m
           </div>
         </div>
 
-        <ul className="space-y-4 mb-8">
+        <div className="space-y-1 mb-6 pl-2">
           {order.items.map((item, idx) => (
-            <li key={idx} className="flex gap-4 p-4 bg-black/30 rounded-2xl border border-white/5">
-              <span className="w-10 h-10 bg-slate-700 text-white rounded-xl flex items-center justify-center font-black shadow-inner shrink-0">
+            <div key={idx} className="flex gap-2 py-1.5 border-b border-dashed border-subtle last:border-0 items-start">
+              <span className="text-main font-semibold text-[13px] shrink-0 min-w-[20px]">
                 {item.quantity}x
               </span>
               <div className="flex-1">
-                <p className="text-lg font-bold text-white leading-tight mb-1">{menuMap[item.menu_item_id] || 'Unknown Item'}</p>
+                <p className="text-[13px] text-muted">{menuMap[item.menu_item_id] || 'Item'}</p>
                 {item.notes && (
-                  <p className="text-xs text-rose-400 font-bold flex items-start gap-1">
-                     <AlertCircle size={14} className="shrink-0 mt-0.5" /> 
+                  <p className="text-[11px] text-amber-500 mt-0.5 flex items-start gap-1">
+                     <AlertCircle size={12} className="shrink-0 mt-[1px]" /> 
                      <span>{item.notes}</span>
                   </p>
                 )}
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 pl-2">
           {type === 'incoming' && (
              <button 
                onClick={() => handleStatusChange(order.id, 'PREPARING')}
-               className="flex-1 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-400 hover:to-orange-300 text-slate-950 font-black py-4 rounded-2xl tracking-widest uppercase flex justify-center items-center gap-2 shadow-lg shadow-orange-500/30 transition-all active:scale-95"
+               className="btn flex-1 py-2 text-[12px]"
              >
-               <Flame size={20} /> Start Cooking
+               Start Preparation
              </button>
           )}
           {type === 'preparing' && (
              <button 
                onClick={() => handleStatusChange(order.id, 'READY')}
-               className="flex-1 bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-black py-4 rounded-2xl tracking-widest uppercase flex justify-center items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all active:scale-95"
+               className="flex-1 py-2 text-[12px] rounded-md font-semibold bg-emerald-500 hover:bg-emerald-600 text-black transition-colors"
              >
-               <CheckCircle2 size={20} /> Mark Ready
+               Fire to Pass (Ready)
              </button>
           )}
         </div>
@@ -191,89 +190,83 @@ export default function KitchenKDS() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col p-8 overflow-hidden">
-      {/* HEADER */}
-      <header className="flex justify-between items-center mb-10 border-b border-white/10 pb-6 shrink-0">
-        <div>
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-rose-500 tracking-tighter flex items-center gap-4">
-            <ChefHat size={48} className="text-orange-400 drop-shadow-lg" /> Kitchen KDS
-          </h1>
-          <p className="text-slate-500 font-bold tracking-widest mt-2 ml-1 text-sm uppercase">Smart Display System</p>
+    <div className="min-h-screen flex flex-col bg-main">
+      {/* Header */}
+      <header className="h-[60px] border-b border-subtle flex justify-between items-center px-6 shrink-0 bg-main">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-surface border border-subtle flex items-center justify-center text-muted">
+            <ChefHat size={16} />
+          </div>
+          <div>
+            <h1 className="text-[15px] font-semibold text-main tracking-tight">Kitchen Display</h1>
+          </div>
         </div>
         <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end">
-             <div className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase tracking-widest">
-               <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div> Live Sync
+          <div className="flex items-center gap-3">
+             <div className="flex items-center gap-1.5 text-emerald-500 font-medium text-[11px] uppercase tracking-wider">
+               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Live
              </div>
-             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Last seen: {lastSync.toLocaleTimeString()}</p>
+             <p className="text-[11px] text-muted font-medium border-l border-subtle pl-3 border-dashed">
+               Sync: {lastSync.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+             </p>
           </div>
           <button 
             onClick={() => navigate('/dashboard')} 
-            className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black tracking-widest uppercase transition-all shadow-xl hover:-translate-y-0.5 active:scale-95"
+            className="btn-secondary px-3 py-1.5 text-[12px]"
           >
-            Leave Line
+            Exit KDS
           </button>
         </div>
       </header>
 
       {/* BOARDS */}
-      <div className="flex-1 grid grid-cols-2 gap-8 overflow-hidden">
+      <div className="flex-1 grid grid-cols-2 gap-px bg-subtle overflow-hidden">
         
-        {/* INCOMING COLUMN */}
-        <div className="flex flex-col bg-slate-900 border border-white/10 rounded-[40px] overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500/20 to-orange-500/5 p-6 border-b border-orange-500/20 flex justify-between items-center shrink-0">
-            <div>
-              <h2 className="text-orange-400 font-black tracking-widest text-lg uppercase flex items-center gap-2">
-                <AlertCircle size={24} /> New Tickets
-              </h2>
-            </div>
-            <span className="bg-orange-500 text-orange-950 px-4 py-1.5 rounded-xl text-sm font-black ring-1 ring-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]">
+        {/* Incoming Column */}
+        <div className="flex flex-col bg-main overflow-hidden">
+          <div className="h-[50px] border-b border-subtle flex justify-between items-center px-5 shrink-0 bg-surface">
+            <h2 className="text-primary font-semibold text-[13px] flex items-center gap-2">
+              <AlertCircle size={14} /> New Tickets
+            </h2>
+            <span className="bg-main text-primary px-2 py-0.5 rounded text-[11px] font-semibold border border-subtle">
                {incomingOrders.length}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
              {incomingOrders.map(order => (
                <OrderCard key={order.id} order={order} type="incoming" />
              ))}
              {incomingOrders.length === 0 && (
-               <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
-                 <ChefHat size={64} className="opacity-20" />
-                 <p className="font-black uppercase tracking-widest">No incoming tickets</p>
-               </div>
+                <div className="h-40 flex flex-col items-center justify-center text-muted border border-dashed border-subtle rounded m-2">
+                  <p className="font-medium text-[12px]">No incoming tickets</p>
+                </div>
              )}
           </div>
         </div>
-
-        {/* PREPARING COLUMN */}
-        <div className="flex flex-col bg-slate-900 border border-white/10 rounded-[40px] overflow-hidden">
-          <div className="bg-gradient-to-r from-cyan-500/20 to-cyan-500/5 p-6 border-b border-cyan-500/20 flex justify-between items-center shrink-0">
-            <div>
-               <h2 className="text-cyan-400 font-black tracking-widest text-lg uppercase flex items-center gap-2">
-                 <Flame size={24} /> Firing Now
-               </h2>
-            </div>
-            <span className="bg-cyan-500 text-cyan-950 px-4 py-1.5 rounded-xl text-sm font-black ring-1 ring-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-               {preparingOrders.length}
-            </span>
+ 
+        {/* Preparing Column */}
+        <div className="flex flex-col bg-main overflow-hidden">
+          <div className="h-[50px] border-b border-subtle flex justify-between items-center px-5 shrink-0 bg-surface">
+             <h2 className="text-emerald-500 font-semibold text-[13px] flex items-center gap-2">
+               <Flame size={14} /> Preparing
+             </h2>
+             <span className="bg-main text-emerald-500 px-2 py-0.5 rounded text-[11px] font-semibold border border-subtle">
+                {preparingOrders.length}
+             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
              {preparingOrders.map(order => (
                <OrderCard key={order.id} order={order} type="preparing" />
              ))}
              {preparingOrders.length === 0 && (
-               <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
-                 <Clock size={64} className="opacity-20" />
-                 <p className="font-black uppercase tracking-widest">Nothing on the stoves</p>
-               </div>
+               <div className="h-40 flex flex-col items-center justify-center text-muted border border-dashed border-subtle rounded m-2">
+                  <p className="font-medium text-[12px]">Kitchen is clear</p>
+                </div>
              )}
           </div>
         </div>
-
+ 
       </div>
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 }

@@ -14,6 +14,9 @@ from core.config import settings
 import jwt as pyjwt
 import bcrypt
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

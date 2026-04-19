@@ -32,11 +32,9 @@ const Dashboard: React.FC = () => {
           setRole(response.data.role);
           setUserName(response.data.full_name || response.data.email.split('@')[0]);
           
-          // Store branding info
           if (response.data.restaurant_name) localStorage.setItem('restaurantName', response.data.restaurant_name);
           if (response.data.restaurant_logo) localStorage.setItem('restaurantLogo', response.data.restaurant_logo);
           
-          // Update Page UI
           updateBrandingUI(response.data.restaurant_name, response.data.restaurant_logo);
         } else {
           toast.error("Failed to fetch user role.");
@@ -54,110 +52,107 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-        <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-transparent">
+        <Loader2 className="w-6 h-6 text-muted animate-spin" />
       </div>
     );
   }
 
-  // Access constraints
   const canSeeOwner = role === 'OWNER';
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
   const canSeeKitchen = role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN';
 
   return (
-    <div className="flex min-h-screen bg-[#050505] text-white">
-      {/* Main Content Area */}
+    <div className="flex min-h-screen bg-main">
       <main className="flex-grow flex flex-col">
-        {/* Top Header */}
-        <header className="top-header">
+        {/* Sleek Vercel-like Header */}
+        <header className="h-[60px] flex items-center justify-between px-6 border-b border-subtle bg-main sticky top-0 z-40">
           <div className="flex items-center gap-3">
-             {localStorage.getItem('restaurantLogo') ? (
-               <img 
-                 src={localStorage.getItem('restaurantLogo') || ''} 
-                 alt="Logo" 
-                 className="w-10 h-10 rounded-xl object-cover border border-white/10"
-               />
-             ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <UtensilsCrossed size={22} className="text-white" />
-              </div>
-             )}
+             <div className="w-8 h-8 rounded-full flex items-center justify-center border border-subtle bg-surface shrink-0 overflow-hidden">
+               {localStorage.getItem('restaurantLogo') ? (
+                 <img 
+                   src={localStorage.getItem('restaurantLogo') || ''} 
+                   alt="Logo" 
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <UtensilsCrossed size={14} className="text-muted" />
+               )}
+             </div>
+             <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+               <span>{localStorage.getItem('restaurantName') || 'BARKAT'}</span>
+               <span className="text-muted font-normal">/</span>
+               <span className="text-muted">Workspaces</span>
+             </div>
           </div>
-
-          <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-            <h1 className="text-2xl font-bold tracking-[0.2em] text-gradient truncate max-w-[300px]">
-              {localStorage.getItem('restaurantName') || 'BARKAT'}
-            </h1>
-            <span className="text-[10px] text-slate-500 uppercase tracking-[0.3em]">Smart Restaurant</span>
-          </div>
-
+ 
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-white transition-colors cursor-pointer relative">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-pink-500 rounded-full border-2 border-[#050505]"></span>
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] font-medium text-muted">{userName}</span>
+              <div className="w-6 h-6 rounded-full bg-surface border border-subtle flex items-center justify-center text-[10px] font-bold">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+            </div>
+            <button className="text-muted hover:text-main transition-colors relative">
+              <Bell size={16} />
+              <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-primary rounded-full border border-main"></span>
             </button>
           </div>
         </header>
-
-        {/* Dashboard Content */}
-        <div className="px-12 pb-12 flex-grow flex flex-col">
-          {/* Top Section: Welcome Text */}
-          <div className="w-full flex flex-col items-center text-center pt-10 mb-10">
-            <h2 className="text-4xl font-bold mb-4 tracking-tight">Welcome back, <span className="text-gradient">{userName}</span></h2>
-            <p className="text-slate-400 max-w-md mx-auto">Select a module below to begin managing your restaurant operations.</p>
-          </div>
-
-          {/* Center Section: Cards */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl">
-              {/* Owner Card */}
+ 
+        {/* Minimal Content */}
+        <div className="px-6 py-24 flex-grow flex flex-col items-center">
+          <div className="w-full max-w-5xl">
+            <div className="mb-12 text-center md:text-left">
+              <h2 className="text-3xl font-semibold mb-3 tracking-tight">Select your workspace</h2>
+              <p className="text-[14px] text-muted max-w-md">Connect to an operational module to begin your shift.</p>
+            </div>
+ 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {canSeeOwner && (
                 <button
                   onClick={() => navigate('/owner')}
-                  className="role-card group glass-panel p-10 flex flex-col items-center text-center hover:-translate-y-2 cursor-pointer transition-all duration-500 border-cyan-400/20 hover:border-cyan-400/50"
+                  className="surface p-6 text-left hover:border-active transition-all group flex flex-col"
                 >
-                  <div className="w-20 h-20 rounded-2xl bg-cyan-400/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 animate-float">
-                    <Store size={40} className="text-cyan-400" />
+                  <div className="w-10 h-10 rounded-lg bg-surface border border-subtle flex items-center justify-center mb-6 group-hover:border-primary/50 transition-colors">
+                    <Store size={18} className="text-main" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Owner Panel</h3>
-                  <p className="text-sm text-slate-400">Business analytics, settings, and staff management.</p>
-                  <div className="mt-8 flex items-center gap-2 text-cyan-400 font-semibold text-sm group-hover:gap-4 transition-all">
-                    Access Portal <span className="text-xl">→</span>
+                  <h3 className="text-[15px] font-semibold mb-2">Executive Portal</h3>
+                  <p className="text-[13px] text-muted leading-relaxed flex-grow">Advanced analytics, catalog management, and team oversight.</p>
+                  <div className="mt-8 text-[13px] font-medium text-muted group-hover:text-main transition-colors flex items-center justify-between">
+                    Enter workspace →
                   </div>
                 </button>
               )}
-
-              {/* Waiter Card */}
+ 
               {canSeeWaiter && (
                 <button
                   onClick={() => navigate('/waiter')}
-                  className="role-card group glass-panel p-10 flex flex-col items-center text-center hover:-translate-y-2 cursor-pointer transition-all duration-500 border-pink-500/20 hover:border-pink-500/50"
+                  className="surface p-6 text-left hover:border-active transition-all group flex flex-col"
                 >
-                  <div className="w-20 h-20 rounded-2xl bg-pink-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 animate-float" style={{ animationDelay: '0.5s' }}>
-                    <ConciergeBell size={40} className="text-pink-500" />
+                  <div className="w-10 h-10 rounded-lg bg-surface border border-subtle flex items-center justify-center mb-6 group-hover:border-primary/50 transition-colors">
+                    <ConciergeBell size={18} className="text-main" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Waiter Station</h3>
-                  <p className="text-sm text-slate-400">Table management, order taking, and service flow.</p>
-                  <div className="mt-8 flex items-center gap-2 text-pink-500 font-semibold text-sm group-hover:gap-4 transition-all">
-                    Enter Station <span className="text-xl">→</span>
+                  <h3 className="text-[15px] font-semibold mb-2">Service Terminal</h3>
+                  <p className="text-[13px] text-muted leading-relaxed flex-grow">Manage ongoing tables, submit kitchen orders, and process bills.</p>
+                  <div className="mt-8 text-[13px] font-medium text-muted group-hover:text-main transition-colors flex items-center justify-between">
+                    Enter workspace →
                   </div>
                 </button>
               )}
-
-              {/* Kitchen Card */}
+ 
               {canSeeKitchen && (
                 <button
                   onClick={() => navigate('/kitchen')}
-                  className="role-card group glass-panel p-10 flex flex-col items-center text-center hover:-translate-y-2 cursor-pointer transition-all duration-500 border-slate-400/20 hover:border-slate-400/50"
+                  className="surface p-6 text-left hover:border-active transition-all group flex flex-col"
                 >
-                  <div className="w-20 h-20 rounded-2xl bg-slate-400/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 animate-float" style={{ animationDelay: '1s' }}>
-                    <ChefHat size={40} className="text-slate-300" />
+                  <div className="w-10 h-10 rounded-lg bg-surface border border-subtle flex items-center justify-center mb-6 group-hover:border-primary/50 transition-colors">
+                    <ChefHat size={18} className="text-main" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Kitchen KDS</h3>
-                  <p className="text-sm text-slate-400">Active orders, preparation tracking, and supply status.</p>
-                  <div className="mt-8 flex items-center gap-2 text-slate-300 font-semibold text-sm group-hover:gap-4 transition-all">
-                    Open KDS <span className="text-xl">→</span>
+                  <h3 className="text-[15px] font-semibold mb-2">Kitchen Display (KDS)</h3>
+                  <p className="text-[13px] text-muted leading-relaxed flex-grow">Live ticket management, preparation queues, and dispatching.</p>
+                  <div className="mt-8 text-[13px] font-medium text-muted group-hover:text-main transition-colors flex items-center justify-between">
+                    Enter workspace →
                   </div>
                 </button>
               )}

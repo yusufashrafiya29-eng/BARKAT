@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, User, Mail, Lock, Phone, Briefcase } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const StaffSignup: React.FC = () => {
@@ -11,8 +11,8 @@ const StaffSignup: React.FC = () => {
     email: '',
     password: '',
     phone_number: '',
-    restaurant_email: '',
     role: 'WAITER',
+    restaurant_email: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -25,96 +25,78 @@ const StaffSignup: React.FC = () => {
     setLoading(true);
     try {
       await authApi.signupStaff(formData);
-      toast.success('Registration successful. Please verify OTP.');
-      navigate('/verify', { state: { email: formData.email } });
+      toast.success('Registration successful. Awaiting verification.');
+      navigate('/login');
     } catch (error: any) {
-      console.error("Signup error:", error.response?.data || error.message);
-      const detail = error.response?.data?.detail;
-      let errMsg = 'Registration failed';
-      if (typeof detail === 'string') {
-        errMsg = detail;
-      } else if (Array.isArray(detail)) {
-        errMsg = detail.map((d: any) => `${d.loc.join('.')}: ${d.msg}`).join(', ');
-      }
-      toast.error(errMsg);
+      toast.error(error.response?.data?.detail || 'Staff registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="auth-header">
-        <h1 className="text-gradient">Join Staff</h1>
-        <p>Connect with your restaurant.</p>
+    <div className="w-full max-w-[450px] animate-in fade-in duration-500">
+      <div className="mb-8 flex flex-col items-center">
+        <div className="w-10 h-10 bg-slate-100 border border-slate-200 flex items-center justify-center rounded-md mb-6">
+          <div className="w-4 h-4 rounded-full border-2 border-slate-200"></div>
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Staff Enrollment</h1>
+        <p className="text-[14px] text-slate-500 mt-2">Connect to your workspace.</p>
       </div>
+ 
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-slate-800">Full Name</label>
+            <input name="full_name" type="text" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="John Doe" onChange={handleChange} required />
+          </div>
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">Role</label>
-            <div style={{ position: 'relative' }}>
-              <Briefcase size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-              <select name="role" className="form-input" style={{ paddingLeft: '44px', appearance: 'none' }} value={formData.role} onChange={handleChange}>
-                <option value="WAITER">Waiter</option>
-                <option value="KITCHEN">Kitchen</option>
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-slate-800">Email Component</label>
+            <input name="email" type="email" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="john@company.com" onChange={handleChange} required />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-slate-800">Contact Line</label>
+            <input name="phone_number" type="tel" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="+1..." onChange={handleChange} required />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-slate-800">Security Key</label>
+            <input name="password" type="password" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="••••••••" onChange={handleChange} required />
+          </div>
+
+          <div className="space-y-4 pt-2 border-t border-slate-200">
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-800">Target Workspace Email</label>
+              <input name="restaurant_email" type="email" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="admin@acmecorp.com" onChange={handleChange} required />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-800">Requested Role</label>
+              <select name="role" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" onChange={handleChange}>
+                <option value="WAITER">Service (Waiter)</option>
+                <option value="KITCHEN">Preparation (Kitchen)</option>
               </select>
             </div>
           </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Full Name</label>
-          <div style={{ position: 'relative' }}>
-            <User size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="full_name" type="text" className="form-input" style={{ paddingLeft: '44px' }} placeholder="John Doe" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Restaurant's Email</label>
-          <div style={{ position: 'relative' }}>
-            <Store size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="restaurant_email" type="email" className="form-input" style={{ paddingLeft: '44px' }} placeholder="owner@restaurant.com" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Your Email Address</label>
-          <div style={{ position: 'relative' }}>
-            <Mail size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="email" type="email" className="form-input" style={{ paddingLeft: '44px' }} placeholder="you@mail.com" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Phone Number</label>
-          <div style={{ position: 'relative' }}>
-            <Phone size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="phone_number" type="tel" className="form-input" style={{ paddingLeft: '44px' }} placeholder="+1234567890" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Password</label>
-          <div style={{ position: 'relative' }}>
-            <Lock size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="password" type="password" className="form-input" style={{ paddingLeft: '44px' }} placeholder="••••••••" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <button type="submit" className="btn" style={{ marginTop: '20px' }} disabled={loading}>
-          {loading ? 'Creating Account...' : 'Continue'} <ArrowRight size={18} />
-        </button>
-      </form>
-
-      <div className="auth-footer">
-        <p><Link to="/signup">Back to choices</Link></p>
+ 
+          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full mt-2" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : (
+              <>Request Access <ArrowRight size={14} /></>
+            )}
+          </button>
+        </form>
+      </div>
+ 
+      <div className="text-center mt-6">
+        <Link to="/signup" className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors">
+          Not a staff member? Go back
+        </Link>
       </div>
     </div>
   );
 };
 
-// Quick fix for the missing Store icon import above:
-import { Store } from 'lucide-react';
 export default StaffSignup;

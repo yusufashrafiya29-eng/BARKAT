@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, User, Mail, Lock, Phone, Store, Image } from 'lucide-react';
+import { ArrowRight, Loader2, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OwnerSignup: React.FC = () => {
@@ -45,10 +45,9 @@ const OwnerSignup: React.FC = () => {
       }
 
       await authApi.signupOwner(data);
-      toast.success('Registration successful. Please verify OTP.');
+      toast.success('Registration successful. Please secure your account.');
       navigate('/verify', { state: { email: formData.email } });
     } catch (error: any) {
-      console.error("Signup error:", error.response?.data || error.message);
       const detail = error.response?.data?.detail;
       let errMsg = 'Registration failed';
       if (typeof detail === 'string') {
@@ -63,91 +62,88 @@ const OwnerSignup: React.FC = () => {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="auth-header">
-        <h1 className="text-gradient">Owner Setup</h1>
-        <p>Register your new restaurant.</p>
+    <div className="w-full max-w-[600px] animate-in fade-in duration-500">
+      <div className="mb-8 flex flex-col items-center">
+        <div className="w-10 h-10 bg-slate-100 border border-slate-200 flex items-center justify-center rounded-md mb-6">
+          <div className="w-4 h-4 bg-slate-50 border border-slate-200"></div>
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Create your workspace</h1>
+        <p className="text-[14px] text-slate-500 mt-2">Set up your brand and executive account.</p>
       </div>
-
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label className="form-label">Full Name</label>
-          <div style={{ position: 'relative' }}>
-            <User size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="full_name" type="text" className="form-input" style={{ paddingLeft: '44px' }} placeholder="Jane Doe" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Restaurant Name</label>
-          <div style={{ position: 'relative' }}>
-            <Store size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="restaurant_name" type="text" className="form-input" style={{ paddingLeft: '44px' }} placeholder="The Great Grill" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Restaurant Logo</label>
-          <div className="flex items-center gap-4 mt-2">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-               {logoPreview ? (
-                 <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
-               ) : (
-                 <Image size={24} className="text-slate-500" />
-               )}
+ 
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          <div className="space-y-4">
+            <h3 className="text-[13px] font-medium text-slate-800 border-b border-slate-200 pb-2">Workspace Identity</h3>
+            
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-800">Organization Name</label>
+              <input name="restaurant_name" type="text" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Acme Corp" onChange={handleChange} required />
             </div>
-            <div className="flex-grow">
-               <label className="block">
-                 <span className="sr-only">Choose logo</span>
-                 <input 
-                   type="file" 
-                   accept="image/*" 
-                   onChange={handleFileChange}
-                   className="block w-full text-sm text-slate-500
-                     file:mr-4 file:py-2 file:px-4
-                     file:rounded-full file:border-0
-                     file:text-sm file:font-semibold
-                     file:bg-cyan-400/10 file:text-cyan-400
-                     hover:file:bg-cyan-400/20
-                     cursor-pointer"
-                 />
-               </label>
-               <p className="text-[10px] text-slate-500 mt-2">JPG, PNG or WebP. Max 2MB.</p>
+ 
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-800">Brand Logo</label>
+              <div className="flex items-center gap-4 p-3 border border-dashed border-slate-200 rounded-md group hover:border-text-slate-500 transition-colors relative">
+                <div className="w-12 h-12 bg-slate-50 border border-slate-200 rounded flex items-center justify-center overflow-hidden shrink-0">
+                   {logoPreview ? (
+                     <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                   ) : (
+                     <UploadCloud size={16} className="text-slate-500" />
+                   )}
+                </div>
+                <div className="flex-1">
+                   <p className="text-[13px] font-medium text-slate-800">Upload Avatar</p>
+                   <p className="text-[12px] text-slate-500">JPG, PNG or WebP</p>
+                </div>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Email Address</label>
-          <div style={{ position: 'relative' }}>
-            <Mail size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="email" type="email" className="form-input" style={{ paddingLeft: '44px' }} placeholder="you@restaurant.com" onChange={handleChange} required />
+ 
+          <div className="space-y-4">
+            <h3 className="text-[13px] font-medium text-slate-800 border-b border-slate-200 pb-2">Executive Details</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-slate-800">Full Name</label>
+                <input name="full_name" type="text" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Jane Doe" onChange={handleChange} required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-slate-800">Work Email</label>
+                <input name="email" type="email" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="jane@acme.com" onChange={handleChange} required />
+              </div>
+            </div>
+ 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-slate-800">Contact Number</label>
+                <input name="phone_number" type="tel" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="+1..." onChange={handleChange} required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-slate-800">Password</label>
+                <input name="password" type="password" className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="••••••••" onChange={handleChange} required />
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Phone Number</label>
-          <div style={{ position: 'relative' }}>
-            <Phone size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="phone_number" type="tel" className="form-input" style={{ paddingLeft: '44px' }} placeholder="+1234567890" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Password</label>
-          <div style={{ position: 'relative' }}>
-            <Lock size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
-            <input name="password" type="password" className="form-input" style={{ paddingLeft: '44px' }} placeholder="••••••••" onChange={handleChange} required />
-          </div>
-        </div>
-
-        <button type="submit" className="btn" style={{ marginTop: '20px' }} disabled={loading}>
-          {loading ? 'Creating Account...' : 'Continue'} <ArrowRight size={18} />
-        </button>
-      </form>
-
-      <div className="auth-footer">
-        <p><Link to="/signup">Back to choices</Link></p>
+ 
+          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : (
+              <>Continue <ArrowRight size={14} /></>
+            )}
+          </button>
+        </form>
+      </div>
+ 
+      <div className="text-center mt-6">
+        <Link to="/login" className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors">
+          Already have an account? Sign In
+        </Link>
       </div>
     </div>
   );
