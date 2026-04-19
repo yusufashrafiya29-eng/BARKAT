@@ -2,9 +2,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from core.config import settings
 
-# pool_pre_ping automatically verifies the connection is still alive before using it, 
-# preventing "MySQL server has gone away" style drops from Supabase connection pooling.
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# Supabase (and many cloud providers) give a postgres:// URL.
+# SQLAlchemy 1.4+ requires postgresql:// — fix it silently.
+db_url = settings.DATABASE_URL
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(
+    db_url,
+    pool_pre_ping=True,          # Verify connections before use
+    pool_recycle=300,             # Recycle connections every 5 min (Supabase pooler)
+    connect_args={"connect_timeout": 10},
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
