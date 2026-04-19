@@ -10,3 +10,5 @@ requests
 PyJWT
 bcrypt
 email-validator
+python-multipart
+Pillow
