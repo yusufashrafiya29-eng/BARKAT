@@ -4,7 +4,8 @@ import {
   CheckCircle2, LogOut, Loader2,
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee,
-  ShoppingBag, Users, Clock, QrCode, CreditCard
+  ShoppingBag, Users, Clock, QrCode, CreditCard,
+  TrendingUp, Activity, Flame
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -250,14 +251,15 @@ export default function OwnerDashboard() {
           restaurant_email: 'admin@barkat.local'
         });
       } else if (showAddModal === 'menu') {
-        if (data.type === 'category') {
-          await ownerApi.addCategory({ name: data.name });
+        if (menuAddType === 'category') {
+          await ownerApi.addCategory({ name: data.name as string });
         } else {
           await ownerApi.addMenuItem({
-            name: data.item_name,
-            description: data.description,
+            name: data.item_name as string,
+            description: (data.description as string) || undefined,
             price: parseFloat(data.price as string),
-            category_id: data.category_id,
+            category_id: data.category_id as string,
+            is_veg: data.is_veg === 'true',
             is_available: true
           });
         }
@@ -277,22 +279,36 @@ export default function OwnerDashboard() {
     <div className="min-h-screen flex bg-slate-50 text-slate-800">
       {/* Sleek Vercel-like Sidebar */}
       <aside className="w-64 border-r border-slate-800 bg-[#0F172A] text-slate-300 flex flex-col sticky top-0 h-screen z-50">
-        <div className="h-[60px] pl-6 pr-4 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-6 h-6 rounded border border-slate-700 bg-slate-800 flex items-center justify-center overflow-hidden shrink-0">
-            {localStorage.getItem('restaurantLogo') ? (
-              <img 
-                src={localStorage.getItem('restaurantLogo') || ''} 
-                alt="Logo" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-3 h-3 bg-indigo-500 rounded-sm"></div>
-            )}
-          </div>
-          <div className="overflow-hidden">
-            <h1 className="text-[14px] font-medium tracking-tight truncate leading-none">
-              {localStorage.getItem('restaurantName') || 'Acme Corp'}
-            </h1>
+        {/* ── Brand Header ─────────────────────────────────── */}
+        <div className="px-5 pt-6 pb-5 border-b border-slate-800">
+          <div className="flex items-center gap-3.5">
+            {/* Logo */}
+            <div
+              className="w-12 h-12 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,#312e81,#4f46e5)', boxShadow: '0 0 0 2px #6366f130, 0 4px 16px rgb(99 102 241 / .35)' }}
+            >
+              {localStorage.getItem('restaurantLogo') ? (
+                <img src={localStorage.getItem('restaurantLogo') || ''} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-extrabold text-[20px]">
+                  {(localStorage.getItem('restaurantName') || 'R').charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            {/* Name + badge */}
+            <div className="overflow-hidden min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" style={{boxShadow:'0 0 6px #10b981'}} />
+                <h1 className="text-[15px] font-extrabold text-white tracking-tight truncate leading-none">
+                  {localStorage.getItem('restaurantName') || 'My Restaurant'}
+                </h1>
+              </div>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
+                style={{ background: '#4f46e520', color: '#818cf8', border: '1px solid #4f46e530' }}
+              >
+                Owner Portal
+              </span>
+            </div>
           </div>
         </div>
 
@@ -371,47 +387,75 @@ export default function OwnerDashboard() {
           ) : (
             <div className="animate-in fade-in duration-300">
               
-              {/* ANALYTICS TAB */}
               {activeTab === 'analytics' && analytics && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="surface p-5 flex flex-col justify-between h-[120px]">
-                      <div className="flex items-center gap-2 text-muted text-[13px] font-medium">
-                        <IndianRupee size={14} />
-                        Daily Revenue
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+                    {/* Revenue */}
+                    <div className="stat-card stat-indigo">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Daily Revenue</p>
+                          <p className="text-[32px] font-extrabold text-indigo-900 tracking-tight leading-none">₹{analytics.today_revenue}</p>
+                        </div>
+                        <div className="w-11 h-11 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+                          <IndianRupee size={20} className="text-white" strokeWidth={2.5}/>
+                        </div>
                       </div>
-                      <h3 className="text-2xl font-semibold tracking-tight">₹{analytics.today_revenue}</h3>
+                      <p className="text-[12px] text-indigo-600/70 font-medium flex items-center gap-1"><TrendingUp size={12}/>Today's earnings</p>
                     </div>
- 
-                    <div className="surface p-5 flex flex-col justify-between h-[120px]">
-                      <div className="flex items-center gap-2 text-muted text-[13px] font-medium">
-                        <ShoppingBag size={14} />
-                        Total Orders
+
+                    {/* Total Orders */}
+                    <div className="stat-card stat-amber">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest mb-1">Total Orders</p>
+                          <p className="text-[32px] font-extrabold text-amber-900 tracking-tight leading-none">{analytics.total_orders}</p>
+                        </div>
+                        <div className="w-11 h-11 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                          <ShoppingBag size={20} className="text-white" strokeWidth={2.5}/>
+                        </div>
                       </div>
-                      <h3 className="text-2xl font-semibold tracking-tight">{analytics.total_orders}</h3>
+                      <p className="text-[12px] text-amber-700/70 font-medium flex items-center gap-1"><Activity size={12}/>All time tickets</p>
                     </div>
- 
-                    <div className="surface p-5 flex flex-col justify-between h-[120px]">
-                      <div className="flex items-center gap-2 text-muted text-[13px] font-medium">
-                        <Clock size={14} />
-                        Active Orders
+
+                    {/* Active Orders */}
+                    <div className="stat-card stat-violet">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold text-violet-600 uppercase tracking-widest mb-1">Active Orders</p>
+                          <p className="text-[32px] font-extrabold text-violet-900 tracking-tight leading-none">{analytics.active_orders}</p>
+                        </div>
+                        <div className="w-11 h-11 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
+                          <Flame size={20} className="text-white" strokeWidth={2.5}/>
+                        </div>
                       </div>
-                      <h3 className="text-2xl font-semibold tracking-tight">{analytics.active_orders}</h3>
+                      <p className="text-[12px] text-violet-700/70 font-medium flex items-center gap-1"><Clock size={12}/>Currently in kitchen</p>
                     </div>
- 
-                    <div className="surface p-5 flex flex-col justify-between h-[120px]">
-                      <div className="flex items-center gap-2 text-muted text-[13px] font-medium">
-                        <CheckCircle2 size={14} />
-                        Completed Orders
+
+                    {/* Completed */}
+                    <div className="stat-card stat-emerald">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Completed</p>
+                          <p className="text-[32px] font-extrabold text-emerald-900 tracking-tight leading-none">{analytics.served_orders}</p>
+                        </div>
+                        <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
+                          <CheckCircle2 size={20} className="text-white" strokeWidth={2.5}/>
+                        </div>
                       </div>
-                      <h3 className="text-2xl font-semibold tracking-tight">{analytics.served_orders}</h3>
+                      <p className="text-[12px] text-emerald-700/70 font-medium flex items-center gap-1"><TrendingUp size={12}/>Orders served today</p>
                     </div>
+
                   </div>
- 
-                  <div className="surface p-8 h-[300px] flex flex-col items-center justify-center border-dashed border-subtle">
-                    <BarChart3 size={32} className="text-muted/30 mb-4" />
-                    <h4 className="text-[14px] font-medium mb-1">Advanced Metrics Setup</h4>
-                    <p className="text-[13px] text-muted text-center max-w-xs">Detailed revenue charts and item performance graphs are currently being provisioned.</p>
+
+                  {/* Chart placeholder */}
+                  <div className="bg-white rounded-2xl border border-slate-200 p-8 h-[280px] flex flex-col items-center justify-center shadow-sm" style={{background:'linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%)'}}>
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4">
+                      <BarChart3 size={28} className="text-indigo-400" />
+                    </div>
+                    <h4 className="text-[15px] font-bold text-slate-700 mb-1">Advanced Analytics</h4>
+                    <p className="text-[13px] text-slate-400 text-center max-w-xs">Revenue charts and item performance graphs are being provisioned for your account.</p>
                   </div>
                 </div>
               )}
@@ -688,24 +732,30 @@ export default function OwnerDashboard() {
                   </div>
                 </>
               )}
- 
+
               {showAddModal === 'menu' && (
+
                 <>
                   <div className="space-y-1.5 mb-4">
                     <label className="text-[12px] font-medium text-main">Entity Type</label>
-                    <select value={menuAddType} onChange={(e) => setMenuAddType(e.target.value)} className="form-input">
+                    <select
+                      name="type"
+                      value={menuAddType}
+                      onChange={(e) => setMenuAddType(e.target.value)}
+                      className="form-input"
+                    >
                       <option value="item">Menu Item</option>
                       <option value="category">Menu Category</option>
                     </select>
                   </div>
- 
+
                   {menuAddType === 'category' && (
                     <div className="space-y-1.5">
                       <label className="text-[12px] font-medium text-main">Category Name</label>
                       <input name="name" required className="form-input" />
                     </div>
                   )}
- 
+
                   {menuAddType === 'item' && (
                     <>
                       <div className="space-y-1.5">
@@ -729,10 +779,18 @@ export default function OwnerDashboard() {
                           </select>
                         </div>
                       </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Item Type</label>
+                        <select name="is_veg" className="form-input">
+                          <option value="true">Vegetarian 🟢</option>
+                          <option value="false">Non-Vegetarian 🔴</option>
+                        </select>
+                      </div>
                     </>
                   )}
                 </>
               )}
+
  
               {showAddModal === 'staff' && (
                 <>
