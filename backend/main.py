@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     yield  # App runs here
 
 # Ensure static directory exists before mounting
-os.makedirs("static/logos", exist_ok=True)
+os.makedirs("static", exist_ok=True)
 
 def create_app() -> FastAPI:
     app = FastAPI(

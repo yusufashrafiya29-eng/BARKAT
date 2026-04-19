@@ -11,10 +11,12 @@ from services.otp_service import OTPService
 from models.user import User, UserRole
 from models.restaurant import Restaurant
 from core.config import settings
+from db.supabase import supabase_client
 import jwt as pyjwt
 import bcrypt
 import uuid
 import logging
+import io, time, os
 
 logger = logging.getLogger(__name__)
 
@@ -77,39 +79,45 @@ async def signup_owner(
         if logo.content_type not in ["image/jpeg", "image/png", "image/webp"]:
             raise HTTPException(status_code=400, detail="Invalid image type. Use JPEG, PNG or WebP.")
 
-        import io, time, os
         image_data = await logo.read()
-        timestamp  = int(time.time())
+        
+        # Generate unique filename using UUID
+        filename = f"logo_{uuid.uuid4().hex}.jpg"
 
         try:
-            # Try PIL-based optimization (resize + compress)
+            # Process image with PIL for optimization
             from PIL import Image
             img = Image.open(io.BytesIO(image_data))
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             img.thumbnail((512, 512))
-            filename  = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
-            save_path = os.path.join("static", "logos", filename)
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            img.save(save_path, "JPEG", quality=85)
-            logo_url = f"/static/logos/{filename}"
-            logger.info(f"Logo saved (PIL optimized): {save_path}")
-
+            
+            # Save optimized image to memory
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            buffer.seek(0)
+            final_bytes = buffer.getvalue()
+            content_type = "image/jpeg"
         except Exception as pil_err:
-            # PIL not available or failed — save the raw bytes as-is
-            logger.warning(f"PIL processing failed ({pil_err}), saving raw file instead.")
-            try:
-                ext       = logo.content_type.split("/")[-1].replace("jpeg", "jpg")
-                filename  = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
-                save_path = os.path.join("static", "logos", filename)
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, "wb") as f:
-                    f.write(image_data)
-                logo_url = f"/static/logos/{filename}"
-                logger.info(f"Logo saved (raw fallback): {save_path}")
-            except Exception as raw_err:
-                # Even raw save failed — skip logo, don't block signup
-                logger.error(f"Logo raw save also failed: {raw_err}. Continuing without logo.")
+            logger.warning(f"PIL processing failed ({pil_err}), falling back to raw upload.")
+            final_bytes = image_data
+            content_type = logo.content_type
+
+        try:
+            # Upload to Supabase Storage
+            res = supabase_client.storage.from_("logos").upload(
+                path=filename,
+                file=final_bytes,
+                file_options={"content-type": content_type}
+            )
+            
+            # If upload was successful (or no error raised), get the public URL
+            logo_url = supabase_client.storage.from_("logos").get_public_url(filename)
+            logger.info(f"Logo uploaded to Supabase: {logo_url}")
+
+        except Exception as storage_err:
+            logger.error(f"Supabase storage upload failed: {storage_err}")
+            # Do not block signup if only logo fails, but log the error
 
     # First create the Restaurant
     restaurant = Restaurant(
@@ -245,7 +253,6 @@ def verify_otp(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=GenericResponse)
 def get_current_user_info(
-    request: Request,
     token_payload: dict = Depends(get_current_user_token),
     db: Session = Depends(get_db),
 ):
@@ -255,9 +262,6 @@ def get_current_user_info(
     
     if not local_user:
         raise HTTPException(status_code=404, detail="User not found.")
-
-    # Dynamically determine the base URL using the incoming request
-    base_url = str(request.base_url).rstrip("/")
 
     return GenericResponse(
         message="Profile retrieved",
@@ -270,7 +274,7 @@ def get_current_user_info(
             "is_verified": local_user.is_verified,
             "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
             "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
-            "restaurant_logo": f"{base_url}{local_user.restaurant.logo_url}" if local_user.restaurant and local_user.restaurant.logo_url else None,
+            "restaurant_logo": local_user.restaurant.logo_url if local_user.restaurant else None,
             "restaurant_email": local_user.restaurant_email,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }
