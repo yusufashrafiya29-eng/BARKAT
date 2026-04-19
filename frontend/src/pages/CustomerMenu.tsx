@@ -47,7 +47,7 @@ interface Order {
 const CustomerMenu: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   
-  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string } | null>(null);
+  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
@@ -80,9 +80,19 @@ const CustomerMenu: React.FC = () => {
         const menuData = await customerApi.getMenu(tblData.restaurant_id);
         setCategories(menuData);
 
-        // Fetch running orders for the bill
+        // Running total for the bill
         const ordersData = await customerApi.getTableOrders(tableId);
         setTableOrders(ordersData);
+
+        // Update UI branding
+        if (tblData.restaurant_name) document.title = `${tblData.restaurant_name} | Smart Menu`;
+        if (tblData.restaurant_logo) {
+          const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
+          link.type = 'image/x-icon';
+          link.rel = 'shortcut icon';
+          link.href = tblData.restaurant_logo;
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
       } catch (err: any) {
         setErrorHeader(err.response?.data?.detail || "Invalid Table or Error Loading Menu");
       } finally {
@@ -194,11 +204,21 @@ const CustomerMenu: React.FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-md border-b border-white/10 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-             <UtensilsCrossed size={20} className="text-white" />
-          </div>
+          {tableInfo?.restaurant_logo ? (
+            <img 
+              src={tableInfo.restaurant_logo} 
+              alt="Logo" 
+              className="w-10 h-10 rounded-xl object-cover border border-white/10"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+               <UtensilsCrossed size={20} className="text-white" />
+            </div>
+          )}
           <div>
-            <h1 className="text-lg font-bold tracking-[0.2em] text-gradient">BARKAT</h1>
+            <h1 className="text-lg font-bold tracking-[0.2em] text-gradient truncate max-w-[150px]">
+              {tableInfo?.restaurant_name || 'BARKAT'}
+            </h1>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest">{categories.length} Categories Available</p>
           </div>
         </div>

@@ -20,6 +20,7 @@ class OwnerSignupRequest(BaseModel):
     full_name: str
     phone_number: str
     restaurant_name: str
+    logo_url: Optional[str] = None
 
 
 class StaffSignupRequest(BaseModel):

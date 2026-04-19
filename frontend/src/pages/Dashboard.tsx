@@ -13,6 +13,17 @@ const Dashboard: React.FC = () => {
   const [userName, setUserName] = useState<string>("User");
   const [loading, setLoading] = useState(true);
 
+  const updateBrandingUI = (name?: string, logo?: string) => {
+    if (name) document.title = `${name} | BARKAT`;
+    if (logo) {
+      const link: any = document.querySelector("link[rel*='icon']") || document.createElement('link');
+      link.type = 'image/x-icon';
+      link.rel = 'shortcut icon';
+      link.href = logo;
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+  };
+
   useEffect(() => {
     const fetchUserRole = async () => {
       try {
@@ -20,6 +31,13 @@ const Dashboard: React.FC = () => {
         if (response.data && response.data.role) {
           setRole(response.data.role);
           setUserName(response.data.full_name || response.data.email.split('@')[0]);
+          
+          // Store branding info
+          if (response.data.restaurant_name) localStorage.setItem('restaurantName', response.data.restaurant_name);
+          if (response.data.restaurant_logo) localStorage.setItem('restaurantLogo', response.data.restaurant_logo);
+          
+          // Update Page UI
+          updateBrandingUI(response.data.restaurant_name, response.data.restaurant_logo);
         } else {
           toast.error("Failed to fetch user role.");
         }
@@ -54,14 +72,22 @@ const Dashboard: React.FC = () => {
         {/* Top Header */}
         <header className="top-header">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <UtensilsCrossed size={22} className="text-white" />
-            </div>
+             {localStorage.getItem('restaurantLogo') ? (
+               <img 
+                 src={localStorage.getItem('restaurantLogo') || ''} 
+                 alt="Logo" 
+                 className="w-10 h-10 rounded-xl object-cover border border-white/10"
+               />
+             ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <UtensilsCrossed size={22} className="text-white" />
+              </div>
+             )}
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-            <h1 className="text-2xl font-bold tracking-[0.2em] text-gradient">
-              BARKAT
+            <h1 className="text-2xl font-bold tracking-[0.2em] text-gradient truncate max-w-[300px]">
+              {localStorage.getItem('restaurantName') || 'BARKAT'}
             </h1>
             <span className="text-[10px] text-slate-500 uppercase tracking-[0.3em]">Smart Restaurant</span>
           </div>

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_restaurant, get_current_user_token
+from core.config import settings
 from schemas.table import TableCreate, TableRead
 from models.table import Table
 
@@ -15,13 +16,24 @@ def get_all_tables(
 ):
     return db.query(Table).filter(Table.restaurant_id == restaurant_id).all()
 
-@router.get("/{table_id}", response_model=TableRead)
+@router.get("/{table_id}")
 def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
     table = db.query(Table).filter(Table.id == table_id).first()
     if not table:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Table not found")
-    return table
+    
+    # Fetch restaurant branding
+    from models.restaurant import Restaurant
+    restaurant = db.query(Restaurant).filter(Restaurant.id == table.restaurant_id).first()
+    
+    return {
+        "id": str(table.id),
+        "table_number": table.table_number,
+        "restaurant_id": str(table.restaurant_id),
+        "restaurant_name": restaurant.name if restaurant else "BARKAT",
+        "restaurant_logo": f"{settings.BASE_URL}{restaurant.logo_url}" if restaurant and restaurant.logo_url else None
+    }
 
 @router.post("/", response_model=TableRead)
 def create_table(

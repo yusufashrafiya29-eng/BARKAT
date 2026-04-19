@@ -282,9 +282,23 @@ export default function OwnerDashboard() {
       {/* SIDEBAR */}
       <div className="w-64 bg-black/40 border-r border-white/5 flex flex-col hidden md:flex backdrop-blur-xl">
         <div className="p-8 border-b border-white/5">
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-500 tracking-tighter">
-            BARKAT
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            {tables.length > 0 && (activeTab as any) === 'tables' ? null : null} {/* dummy for future */}
+             {localStorage.getItem('restaurantLogo') ? (
+               <img 
+                 src={localStorage.getItem('restaurantLogo') || ''} 
+                 alt="Logo" 
+                 className="w-10 h-10 rounded-xl object-cover border border-white/10"
+               />
+             ) : (
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center text-cyan-400 font-black">
+                {localStorage.getItem('restaurantName')?.charAt(0) || 'B'}
+              </div>
+             )}
+            <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-500 tracking-tighter truncate">
+              {localStorage.getItem('restaurantName') || 'BARKAT'}
+            </h1>
+          </div>
           <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black mt-1">Control Center</p>
         </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { ArrowRight, User, Mail, Lock, Phone, Store } from 'lucide-react';
+import { ArrowRight, User, Mail, Lock, Phone, Store, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OwnerSignup: React.FC = () => {
@@ -12,18 +12,39 @@ const OwnerSignup: React.FC = () => {
     password: '',
     phone_number: '',
     restaurant_name: '',
+    logo_url: '',
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await authApi.signupOwner(formData);
+      const data = new FormData();
+      data.append('full_name', formData.full_name);
+      data.append('email', formData.email);
+      data.append('password', formData.password);
+      data.append('phone_number', formData.phone_number);
+      data.append('restaurant_name', formData.restaurant_name);
+      if (logoFile) {
+        data.append('logo', logoFile);
+      }
+
+      await authApi.signupOwner(data);
       toast.success('Registration successful. Please verify OTP.');
       navigate('/verify', { state: { email: formData.email } });
     } catch (error: any) {
@@ -62,6 +83,37 @@ const OwnerSignup: React.FC = () => {
           <div style={{ position: 'relative' }}>
             <Store size={18} style={{ position: 'absolute', top: '14px', left: '14px', color: 'var(--text-muted)' }} />
             <input name="restaurant_name" type="text" className="form-input" style={{ paddingLeft: '44px' }} placeholder="The Great Grill" onChange={handleChange} required />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Restaurant Logo</label>
+          <div className="flex items-center gap-4 mt-2">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+               {logoPreview ? (
+                 <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+               ) : (
+                 <Image size={24} className="text-slate-500" />
+               )}
+            </div>
+            <div className="flex-grow">
+               <label className="block">
+                 <span className="sr-only">Choose logo</span>
+                 <input 
+                   type="file" 
+                   accept="image/*" 
+                   onChange={handleFileChange}
+                   className="block w-full text-sm text-slate-500
+                     file:mr-4 file:py-2 file:px-4
+                     file:rounded-full file:border-0
+                     file:text-sm file:font-semibold
+                     file:bg-cyan-400/10 file:text-cyan-400
+                     hover:file:bg-cyan-400/20
+                     cursor-pointer"
+                 />
+               </label>
+               <p className="text-[10px] text-slate-500 mt-2">JPG, PNG or WebP. Max 2MB.</p>
+            </div>
           </div>
         </div>
 

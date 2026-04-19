@@ -324,21 +324,35 @@ const WaiterDashboard: React.FC = () => {
       
       {/* Header */}
       <header className="h-16 border-b border-white/5 bg-white/[0.02] backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          {view === 'order' && (
-            <button 
-              onClick={() => setView('tables')}
-              className="p-2 hover:bg-white/5 rounded-full transition-colors"
-            >
-              <ChevronLeft size={24} />
-            </button>
-          )}
-          <h1 className="text-xl font-bold tracking-tight">
-            {view === 'tables' && 'Waiter Station'}
-            {view === 'order' && `Ordering: Table ${selectedTable?.table_number}`}
-            {view === 'status' && 'Active Orders'}
-          </h1>
-        </div>
+          <div className="flex items-center gap-3">
+            {view === 'order' && (
+              <button 
+                onClick={() => setView('tables')}
+                className="p-2 hover:bg-white/5 rounded-full transition-colors mr-1"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+             {localStorage.getItem('restaurantLogo') ? (
+               <img 
+                 src={localStorage.getItem('restaurantLogo') || ''} 
+                 alt="Logo" 
+                 className="w-10 h-10 rounded-xl object-cover border border-white/10"
+               />
+             ) : (
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center text-cyan-400 font-bold">
+                {localStorage.getItem('restaurantName')?.charAt(0) || 'B'}
+              </div>
+             )}
+            <h1 className="text-xl font-bold tracking-tight">
+              {localStorage.getItem('restaurantName') || 'BARKAT'}
+              <span className="text-slate-500 text-sm ml-3 font-medium hidden sm:inline">
+                {view === 'tables' && 'Waiter Station'}
+                {view === 'order' && `Ordering: Table ${selectedTable?.table_number}`}
+                {view === 'status' && 'Active Orders'}
+              </span>
+            </h1>
+          </div>
         
         <div className="flex items-center gap-4">
           <button 

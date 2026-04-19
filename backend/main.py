@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from core.config import settings
 from api.router import main_router
 
@@ -29,6 +30,9 @@ async def lifespan(app: FastAPI):
         logger.warning("App will still start — DB errors will occur on first request.")
     yield  # App runs here
 
+# Ensure static directory exists before mounting
+os.makedirs("static/logos", exist_ok=True)
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.PROJECT_NAME,
@@ -48,6 +52,9 @@ def create_app() -> FastAPI:
 
     # Mount the full API router tree (all endpoints live under /api/v1/...)
     app.include_router(main_router)
+
+    # Static files for logos
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
     @app.get("/", tags=["Health"])
     def root():

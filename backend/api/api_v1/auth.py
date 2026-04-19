@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from api.deps import get_db, get_current_user_token
@@ -54,25 +54,73 @@ def _build_auth_data(local_user: User, access_token: str) -> AuthResponse:
 # ─── Signup Endpoints ─────────────────────────────────────────────────────────
 
 @router.post("/signup/owner", response_model=GenericResponse, status_code=status.HTTP_201_CREATED)
-def signup_owner(payload: OwnerSignupRequest, db: Session = Depends(get_db)):
-    """Register a new restaurant owner."""
-    if db.query(User).filter(User.email == payload.email).first():
+async def signup_owner(
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(...),
+    phone_number: str = Form(...),
+    restaurant_name: str = Form(...),
+    logo: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    """Register a new restaurant owner with direct logo upload."""
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered.")
+
+    # Save logo if provided
+    logo_url = None
+    if logo:
+        # Validate MIME type
+        if logo.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+            raise HTTPException(status_code=400, detail="Invalid image type. Use JPEG, PNG or WebP.")
+        
+        try:
+            from PIL import Image
+            import io
+            import time
+            import os
+
+            # Read image data
+            image_data = await logo.read()
+            img = Image.open(io.BytesIO(image_data))
+            
+            # Basic optimization: Convert to RGB and resize if too large
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            
+            img.thumbnail((512, 512)) # Standardize size
+            
+            # Generate unique filename
+            timestamp = int(time.time())
+            filename = f"logo_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
+            save_path = os.path.join("static/logos", filename)
+            
+            # Save optimized image
+            img.save(save_path, "JPEG", quality=85)
+            logo_url = f"/static/logos/{filename}"
+            
+        except Exception as e:
+            logger.error(f"Logo upload failed: {e}")
+            # Fallback or error based on preference
+            # For now, we'll allow signup to continue without logo if it fails, or raise error?
+            # Raising error is safer for user expectation.
+            raise HTTPException(status_code=500, detail="Failed to process restaurant logo.")
 
     # First create the Restaurant
     restaurant = Restaurant(
-        name=payload.restaurant_name
+        name=restaurant_name,
+        logo_url=logo_url
     )
     db.add(restaurant)
     db.flush() # flush to get the UUID
 
     new_user = User(
-        email=payload.email,
-        full_name=payload.full_name,
-        phone_number=payload.phone_number,
+        email=email,
+        full_name=full_name,
+        phone_number=phone_number,
         role=UserRole.OWNER,
         restaurant_id=restaurant.id,
-        password_hash=_hash_password(payload.password),
+        password_hash=_hash_password(password),
         is_verified=False
     )
     db.add(new_user)
@@ -80,11 +128,11 @@ def signup_owner(payload: OwnerSignupRequest, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     # Trigger OTP
-    OTPService.create_otp(db, payload.email)
+    OTPService.create_otp(db, email)
 
     return GenericResponse(
-        message="Owner registered successfully. Please verify your OTP.",
-        data={"email": payload.email}
+        message="Owner registered successfully with branding. Please verify your OTP.",
+        data={"email": email}
     )
 
 
@@ -212,6 +260,8 @@ def get_current_user_info(
             "phone_number": local_user.phone_number,
             "is_verified": local_user.is_verified,
             "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
+            "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
+            "restaurant_logo": f"{settings.BASE_URL}{local_user.restaurant.logo_url}" if local_user.restaurant and local_user.restaurant.logo_url else None,
             "restaurant_email": local_user.restaurant_email,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     
     WHATSAPP_API_URL: str = ""
     WHATSAPP_API_KEY: str = ""
+    BASE_URL: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
