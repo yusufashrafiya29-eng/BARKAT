@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from api.deps import get_db, get_current_user_token
@@ -245,6 +245,7 @@ def verify_otp(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=GenericResponse)
 def get_current_user_info(
+    request: Request,
     token_payload: dict = Depends(get_current_user_token),
     db: Session = Depends(get_db),
 ):
@@ -254,6 +255,9 @@ def get_current_user_info(
     
     if not local_user:
         raise HTTPException(status_code=404, detail="User not found.")
+
+    # Dynamically determine the base URL using the incoming request
+    base_url = str(request.base_url).rstrip("/")
 
     return GenericResponse(
         message="Profile retrieved",
@@ -266,7 +270,7 @@ def get_current_user_info(
             "is_verified": local_user.is_verified,
             "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
             "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
-            "restaurant_logo": f"{settings.BASE_URL}{local_user.restaurant.logo_url}" if local_user.restaurant and local_user.restaurant.logo_url else None,
+            "restaurant_logo": f"{base_url}{local_user.restaurant.logo_url}" if local_user.restaurant and local_user.restaurant.logo_url else None,
             "restaurant_email": local_user.restaurant_email,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }
