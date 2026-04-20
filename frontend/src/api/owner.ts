@@ -78,6 +78,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  getHistoryAnalytics: async () => {
+    const response = await axios.get(`${BASE_URL}/analytics/history`, getHeaders());
+    return response.data;
+  },
+
   // Settings
   getUpiId: async () => {
     const response = await axios.get(`${BASE_URL}/settings/upi`, getHeaders());

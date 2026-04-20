@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
 import { waiterApi } from '../api/waiter';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Interfaces
 interface MenuItem {
@@ -68,6 +69,8 @@ export default function OwnerDashboard() {
 
   // Data States
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [selectedMetric, setSelectedMetric] = useState<'revenue' | 'total_orders' | 'active_orders' | 'completed'>('revenue');
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
@@ -98,8 +101,12 @@ export default function OwnerDashboard() {
     try {
       switch (activeTab) {
         case 'analytics':
-          const analyticRes = await ownerApi.getDailyAnalytics();
-          setAnalytics(analyticRes);
+          const [silAnalyticRes, silHistoryRes] = await Promise.all([
+            ownerApi.getDailyAnalytics(),
+            ownerApi.getHistoryAnalytics()
+          ]);
+          setAnalytics(silAnalyticRes);
+          setHistoryData(silHistoryRes);
           break;
         case 'staff':
           const staffRes = await ownerApi.getStaff();
@@ -132,8 +139,12 @@ export default function OwnerDashboard() {
     try {
       switch (activeTab) {
         case 'analytics':
-          const analyticRes = await ownerApi.getDailyAnalytics();
+          const [analyticRes, historyRes] = await Promise.all([
+            ownerApi.getDailyAnalytics(),
+            ownerApi.getHistoryAnalytics()
+          ]);
           setAnalytics(analyticRes);
+          setHistoryData(historyRes);
           break;
         case 'staff':
           const staffRes = await ownerApi.getStaff();
@@ -392,70 +403,141 @@ export default function OwnerDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
                     {/* Revenue */}
-                    <div className="stat-card stat-indigo">
+                    <div 
+                      onClick={() => setSelectedMetric('revenue')}
+                      className={`stat-card cursor-pointer transition-all duration-200 border-2 ${selectedMetric === 'revenue' ? 'border-indigo-400 shadow-sm shadow-indigo-100 bg-indigo-50/40 relative transform scale-[1.02]' : 'border-transparent stat-indigo opacity-70 hover:opacity-100 hover:scale-[1.01]'}`}
+                    >
+                      {selectedMetric === 'revenue' && <div className="absolute inset-0 rounded-[14px] ring-2 ring-indigo-500/20 pointer-events-none"></div>}
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Daily Revenue</p>
-                          <p className="text-[32px] font-extrabold text-indigo-900 tracking-tight leading-none">₹{analytics.today_revenue}</p>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${selectedMetric === 'revenue' ? 'text-indigo-600' : 'text-indigo-500'}`}>Daily Revenue</p>
+                          <p className={`text-[32px] font-extrabold tracking-tight leading-none ${selectedMetric === 'revenue' ? 'text-indigo-950' : 'text-indigo-900'}`}>₹{analytics.today_revenue}</p>
                         </div>
-                        <div className="w-11 h-11 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 ${selectedMetric === 'revenue' ? 'bg-indigo-600 shadow-indigo-500/40' : 'bg-indigo-500 shadow-indigo-500/20'}`}>
                           <IndianRupee size={20} className="text-white" strokeWidth={2.5}/>
                         </div>
                       </div>
-                      <p className="text-[12px] text-indigo-600/70 font-medium flex items-center gap-1"><TrendingUp size={12}/>Today's earnings</p>
+                      <p className={`text-[12px] font-medium flex items-center gap-1 mt-4 ${selectedMetric === 'revenue' ? 'text-indigo-700' : 'text-indigo-600/70'}`}><TrendingUp size={12}/>Today's earnings</p>
                     </div>
 
                     {/* Total Orders */}
-                    <div className="stat-card stat-amber">
+                    <div 
+                      onClick={() => setSelectedMetric('total_orders')}
+                      className={`stat-card cursor-pointer transition-all duration-200 border-2 ${selectedMetric === 'total_orders' ? 'border-amber-400 shadow-sm shadow-amber-100 bg-amber-50/40 relative transform scale-[1.02]' : 'border-transparent stat-amber opacity-70 hover:opacity-100 hover:scale-[1.01]'}`}
+                    >
+                      {selectedMetric === 'total_orders' && <div className="absolute inset-0 rounded-[14px] ring-2 ring-amber-500/20 pointer-events-none"></div>}
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest mb-1">Total Orders</p>
-                          <p className="text-[32px] font-extrabold text-amber-900 tracking-tight leading-none">{analytics.total_orders}</p>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${selectedMetric === 'total_orders' ? 'text-amber-600' : 'text-amber-500'}`}>Total Orders</p>
+                          <p className={`text-[32px] font-extrabold tracking-tight leading-none ${selectedMetric === 'total_orders' ? 'text-amber-950' : 'text-amber-900'}`}>{analytics.total_orders}</p>
                         </div>
-                        <div className="w-11 h-11 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 ${selectedMetric === 'total_orders' ? 'bg-amber-500 shadow-amber-500/40' : 'bg-amber-400 shadow-amber-500/20'}`}>
                           <ShoppingBag size={20} className="text-white" strokeWidth={2.5}/>
                         </div>
                       </div>
-                      <p className="text-[12px] text-amber-700/70 font-medium flex items-center gap-1"><Activity size={12}/>All time tickets</p>
+                      <p className={`text-[12px] font-medium flex items-center gap-1 mt-4 ${selectedMetric === 'total_orders' ? 'text-amber-700' : 'text-amber-700/70'}`}><Activity size={12}/>All time tickets</p>
                     </div>
 
                     {/* Active Orders */}
-                    <div className="stat-card stat-violet">
+                    <div 
+                      onClick={() => setSelectedMetric('active_orders')}
+                      className={`stat-card cursor-pointer transition-all duration-200 border-2 ${selectedMetric === 'active_orders' ? 'border-violet-400 shadow-sm shadow-violet-100 bg-violet-50/40 relative transform scale-[1.02]' : 'border-transparent stat-violet opacity-70 hover:opacity-100 hover:scale-[1.01]'}`}
+                    >
+                      {selectedMetric === 'active_orders' && <div className="absolute inset-0 rounded-[14px] ring-2 ring-violet-500/20 pointer-events-none"></div>}
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-[11px] font-bold text-violet-600 uppercase tracking-widest mb-1">Active Orders</p>
-                          <p className="text-[32px] font-extrabold text-violet-900 tracking-tight leading-none">{analytics.active_orders}</p>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${selectedMetric === 'active_orders' ? 'text-violet-600' : 'text-violet-500'}`}>Active Orders</p>
+                          <p className={`text-[32px] font-extrabold tracking-tight leading-none ${selectedMetric === 'active_orders' ? 'text-violet-950' : 'text-violet-900'}`}>{analytics.active_orders}</p>
                         </div>
-                        <div className="w-11 h-11 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 ${selectedMetric === 'active_orders' ? 'bg-violet-600 shadow-violet-500/40' : 'bg-violet-500 shadow-violet-500/20'}`}>
                           <Flame size={20} className="text-white" strokeWidth={2.5}/>
                         </div>
                       </div>
-                      <p className="text-[12px] text-violet-700/70 font-medium flex items-center gap-1"><Clock size={12}/>Currently in kitchen</p>
+                      <p className={`text-[12px] font-medium flex items-center gap-1 mt-4 ${selectedMetric === 'active_orders' ? 'text-violet-700' : 'text-violet-700/70'}`}><Clock size={12}/>Currently in kitchen</p>
                     </div>
 
                     {/* Completed */}
-                    <div className="stat-card stat-emerald">
+                    <div 
+                      onClick={() => setSelectedMetric('completed')}
+                      className={`stat-card cursor-pointer transition-all duration-200 border-2 ${selectedMetric === 'completed' ? 'border-emerald-400 shadow-sm shadow-emerald-100 bg-emerald-50/40 relative transform scale-[1.02]' : 'border-transparent stat-emerald opacity-70 hover:opacity-100 hover:scale-[1.01]'}`}
+                    >
+                      {selectedMetric === 'completed' && <div className="absolute inset-0 rounded-[14px] ring-2 ring-emerald-500/20 pointer-events-none"></div>}
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Completed</p>
-                          <p className="text-[32px] font-extrabold text-emerald-900 tracking-tight leading-none">{analytics.served_orders}</p>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${selectedMetric === 'completed' ? 'text-emerald-600' : 'text-emerald-500'}`}>Completed</p>
+                          <p className={`text-[32px] font-extrabold tracking-tight leading-none ${selectedMetric === 'completed' ? 'text-emerald-950' : 'text-emerald-900'}`}>{analytics.served_orders}</p>
                         </div>
-                        <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shrink-0 ${selectedMetric === 'completed' ? 'bg-emerald-500 shadow-emerald-500/40' : 'bg-emerald-400 shadow-emerald-500/20'}`}>
                           <CheckCircle2 size={20} className="text-white" strokeWidth={2.5}/>
                         </div>
                       </div>
-                      <p className="text-[12px] text-emerald-700/70 font-medium flex items-center gap-1"><TrendingUp size={12}/>Orders served today</p>
+                      <p className={`text-[12px] font-medium flex items-center gap-1 mt-4 ${selectedMetric === 'completed' ? 'text-emerald-700' : 'text-emerald-700/70'}`}><TrendingUp size={12}/>Orders served today</p>
                     </div>
 
                   </div>
 
-                  {/* Chart placeholder */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-8 h-[280px] flex flex-col items-center justify-center shadow-sm" style={{background:'linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%)'}}>
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4">
-                      <BarChart3 size={28} className="text-indigo-400" />
+                  {/* Chart Area */}
+                  <div className="bg-white rounded-2xl border border-slate-200 p-6 h-[340px] shadow-sm flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                      <h4 className="text-[15px] font-bold text-slate-800 capitalize flex items-center gap-2">
+                        {selectedMetric === 'revenue' && <IndianRupee size={16} className="text-indigo-500"/>}
+                        {selectedMetric === 'total_orders' && <ShoppingBag size={16} className="text-amber-500"/>}
+                        {selectedMetric === 'active_orders' && <Flame size={16} className="text-violet-500"/>}
+                        {selectedMetric === 'completed' && <CheckCircle2 size={16} className="text-emerald-500"/>}
+                        {selectedMetric.replace('_', ' ')} History
+                      </h4>
+                      <div className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">LAST 7 DAYS</div>
                     </div>
-                    <h4 className="text-[15px] font-bold text-slate-700 mb-1">Advanced Analytics</h4>
-                    <p className="text-[13px] text-slate-400 text-center max-w-xs">Revenue charts and item performance graphs are being provisioned for your account.</p>
+                    
+                    <div className="flex-1 min-h-0 w-full animate-in fade-in duration-500">
+                      {historyData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={selectedMetric === 'revenue' ? '#6366f1' : selectedMetric === 'total_orders' ? '#f59e0b' : selectedMetric === 'active_orders' ? '#8b5cf6' : '#10b981'} stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor={selectedMetric === 'revenue' ? '#6366f1' : selectedMetric === 'total_orders' ? '#f59e0b' : selectedMetric === 'active_orders' ? '#8b5cf6' : '#10b981'} stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} 
+                              dy={15} 
+                            />
+                            <YAxis 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} 
+                              dx={-15} 
+                              tickFormatter={(value) => selectedMetric === 'revenue' ? `₹${value}` : value} 
+                            />
+                            <Tooltip 
+                              cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                              contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', fontWeight: 600, fontSize: '13px' }}
+                              formatter={(value: any) => [selectedMetric === 'revenue' ? `₹${value}` : value, selectedMetric.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())]}
+                              labelStyle={{ color: '#64748b', fontWeight: 500, marginBottom: '4px' }}
+                            />
+                            <Area 
+                              type="monotone" 
+                              dataKey={selectedMetric} 
+                              stroke={selectedMetric === 'revenue' ? '#6366f1' : selectedMetric === 'total_orders' ? '#f59e0b' : selectedMetric === 'active_orders' ? '#8b5cf6' : '#10b981'} 
+                              strokeWidth={3}
+                              fillOpacity={1} 
+                              fill="url(#colorMetric)" 
+                              animationDuration={700}
+                              activeDot={{ r: 6, strokeWidth: 0, fill: selectedMetric === 'revenue' ? '#6366f1' : selectedMetric === 'total_orders' ? '#f59e0b' : selectedMetric === 'active_orders' ? '#8b5cf6' : '#10b981' }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
