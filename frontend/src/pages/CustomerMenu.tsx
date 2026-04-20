@@ -53,6 +53,7 @@ const CustomerMenu: React.FC = () => {
   
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [customerName, setCustomerName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -136,7 +137,8 @@ const CustomerMenu: React.FC = () => {
           quantity: i.quantity,
           notes: i.notes
         })),
-        customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
+        customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
+        customer_name: customerName || undefined
       };
 
       await customerApi.placeOrder(payload);
@@ -417,21 +419,30 @@ const CustomerMenu: React.FC = () => {
                  </div>
               </div>
  
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 <input 
-                  type="tel"
-                  placeholder="WhatsApp number (optional)"
-                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[12px] py-2 flex-grow border-slate-200 focus:border-muted"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  type="text"
+                  placeholder="Your Name (optional)"
+                  className="w-full bg-white border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[12px] border-slate-200 focus:border-indigo-400 shadow-sm"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
                 />
-                <button 
-                  disabled={isSubmitting}
-                  onClick={handlePlaceOrder}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center px-4 text-[12px] whitespace-nowrap min-w-[120px]"
-                >
-                  {isSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : <>Place Order <ChevronRight size={14} className="ml-1" /></>}
-                </button>
+                <div className="flex gap-2">
+                  <input 
+                    type="tel"
+                    placeholder="WhatsApp number (optional)"
+                    className="w-full bg-white border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[12px] border-slate-200 focus:border-indigo-400 shadow-sm flex-grow"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                  <button 
+                    disabled={isSubmitting}
+                    onClick={handlePlaceOrder}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center text-[12px] whitespace-nowrap min-w-[120px]"
+                  >
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : <>Place Order <ChevronRight size={14} className="ml-1" /></>}
+                  </button>
+                </div>
               </div>
            </div>
         </div>

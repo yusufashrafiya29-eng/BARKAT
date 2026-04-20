@@ -107,3 +107,49 @@ def update_order_items(
     restaurant_id: UUID = Depends(get_current_restaurant)
 ):
     return order_service.update_order_items(db, order_id, items_update.items, str(restaurant_id))
+
+@router.get("/history/owner")
+def get_owner_order_history(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from models.order import Order
+    from models.menu import MenuItem
+    
+    # Secure role check
+    from api.api_v1.users import require_owner
+    require_owner(token)
+
+    orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).order_by(Order.created_at.desc()).limit(150).all()
+    
+    # Pre-fetch menu items to avoid N+1 queries
+    menu_items = db.query(MenuItem).all() # Just fetching all here is fine since it's cached by SQLAlchemy or we can filter by restaurant
+    menu_map = {str(item.id): item.name for item in menu_items}
+    
+    result = []
+    from datetime import timezone
+    for order in orders:
+        items_data = []
+        for oi in order.items:
+            items_data.append({
+                "name": menu_map.get(str(oi.menu_item_id), "Unknown Item"),
+                "quantity": oi.quantity,
+                "subtotal": oi.subtotal
+            })
+        
+        # Format local time easily
+        local_dt = order.created_at.astimezone() if order.created_at.tzinfo else order.created_at
+        
+        result.append({
+            "id": str(order.id),
+            "date": local_dt.strftime("%d %b"),
+            "time": local_dt.strftime("%I:%M %p"),
+            "day": local_dt.strftime("%A"),
+            "customer_phone": order.customer_phone or "Walk-in",
+            "customer_name": order.customer_name or "",
+            "total_amount": order.total_amount,
+            "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
+            "items": items_data
+        })
+    return result

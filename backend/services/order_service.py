@@ -30,6 +30,8 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         restaurant_id=table.restaurant_id,
         table_id=order_in.table_id,
         waiter_id=waiter_id,
+        customer_phone=order_in.customer_phone,
+        customer_name=order_in.customer_name,
         source=order_in.source,
         status=initial_status,
         is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,

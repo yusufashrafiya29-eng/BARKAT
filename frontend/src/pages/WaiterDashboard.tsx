@@ -42,6 +42,8 @@ export default function WaiterDashboard() {
   const [loading, setLoading]         = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   const [checkoutModalOpen, setCheckoutModalOpen]   = useState(false);
   const [checkoutOrder, setCheckoutOrder]           = useState<Order | null>(null);
@@ -112,8 +114,15 @@ export default function WaiterDashboard() {
         toast.success('Order updated!');
         setEditingOrderId(null);
       } else {
-        await waiterApi.placeOrder({ table_id: selectedTable.id, items: cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })) });
+        await waiterApi.placeOrder({ 
+          table_id: selectedTable.id, 
+          items: cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })),
+          customer_name: customerName || undefined,
+          customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
+        });
         toast.success('🚀 Ticket sent to kitchen!');
+        setCustomerName('');
+        setCustomerPhone('');
       }
       setView('status');
       fetchInitialData();
@@ -580,6 +589,25 @@ export default function WaiterDashboard() {
                 <span className="text-[13px] text-slate-500 font-medium">Draft Total</span>
                 <span className="text-[20px] font-extrabold text-slate-900 tracking-tight">₹{totalAmount}</span>
               </div>
+              
+              {!editingOrderId && cart.length > 0 && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                  <input
+                    type="text"
+                    placeholder="Customer Name (optional)"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all placeholder:text-slate-400"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="WhatsApp Number (optional)"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all placeholder:text-slate-400"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                  />
+                </div>
+              )}
               <button
                 onClick={placeOrder}
                 disabled={cart.length === 0}

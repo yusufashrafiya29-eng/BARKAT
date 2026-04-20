@@ -25,6 +25,7 @@ class OrderCreate(BaseModel):
     table_id: UUID
     items: List[OrderItemCreate]
     customer_phone: Optional[str] = None
+    customer_name: Optional[str] = None
     source: str = "CUSTOMER"
     is_accepted: bool = False
     
@@ -42,6 +43,7 @@ class OrderRead(BaseModel):
     table_id: UUID
     waiter_id: Optional[UUID] = None
     customer_phone: Optional[str] = None
+    customer_name: Optional[str] = None
     status: OrderStatus
     source: str
     is_accepted: bool

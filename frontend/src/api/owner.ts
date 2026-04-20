@@ -83,6 +83,12 @@ export const ownerApi = {
     return response.data;
   },
 
+  // Orders
+  getOwnerOrders: async () => {
+    const response = await axios.get(`${BASE_URL}/orders/history/owner`, getHeaders());
+    return response.data;
+  },
+
   // Settings
   getUpiId: async () => {
     const response = await axios.get(`${BASE_URL}/settings/upi`, getHeaders());

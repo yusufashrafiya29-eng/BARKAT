@@ -24,6 +24,7 @@ class Order(Base):
     # Waiter tracking
     waiter_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     customer_phone = Column(String, nullable=True) # Used for WhatsApp
+    customer_name = Column(String, nullable=True) # Gathered for UI
     
     status = Column(SAEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     total_amount = Column(Float, default=0.0, nullable=False)
