@@ -55,6 +55,7 @@ const CustomerMenu: React.FC = () => {
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorHeader, setErrorHeader] = useState<string | null>(null);
 
@@ -195,14 +196,17 @@ const CustomerMenu: React.FC = () => {
       <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-slate-200 px-5 h-[60px] flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden">
-            {tableInfo?.restaurant_logo ? (
+            {(tableInfo?.restaurant_logo && !imageError) ? (
               <img 
                 src={tableInfo.restaurant_logo} 
                 alt="Logo" 
                 className="w-full h-full object-cover"
+                onError={() => setImageError(true)}
               />
             ) : (
-              <UtensilsCrossed size={14} className="text-slate-500" />
+              <span className="text-indigo-600 font-bold text-[13px]">
+                {(tableInfo?.restaurant_name || 'R').charAt(0).toUpperCase()}
+              </span>
             )}
           </div>
           <div>

@@ -4,6 +4,8 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1')
 
 export const authApi = {
   signupOwner: async (data: FormData) => {
+    // Note: Do NOT set Content-Type header manually for FormData. 
+    // Axios will automatically set it with the correct boundary.
     const response = await axios.post(`${API_URL}/signup/owner`, data);
     return response.data;
   },

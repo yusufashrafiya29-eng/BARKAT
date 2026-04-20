@@ -74,9 +74,12 @@ async def signup_owner(
 
     # Save logo if provided
     logo_url = None
-    if logo:
+    if logo and logo.filename:
+        print(f"DEBUG: Logo received: {logo.filename}, type: {logo.content_type}")
+        
         # Validate MIME type
         if logo.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+            print(f"DEBUG: Invalid logo type rejected: {logo.content_type}")
             raise HTTPException(status_code=400, detail="Invalid image type. Use JPEG, PNG or WebP.")
 
         image_data = await logo.read()
@@ -84,9 +87,13 @@ async def signup_owner(
         # Generate unique filename using UUID
         filename = f"logo_{uuid.uuid4().hex}.jpg"
 
+        final_bytes = image_data
+        content_type = logo.content_type
+
         try:
             # Process image with PIL for optimization
             from PIL import Image
+            print("DEBUG: Processing logo with PIL...")
             img = Image.open(io.BytesIO(image_data))
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
@@ -98,26 +105,41 @@ async def signup_owner(
             buffer.seek(0)
             final_bytes = buffer.getvalue()
             content_type = "image/jpeg"
+            print("DEBUG: PIL processing complete.")
         except Exception as pil_err:
-            logger.warning(f"PIL processing failed ({pil_err}), falling back to raw upload.")
-            final_bytes = image_data
-            content_type = logo.content_type
+            print(f"DEBUG: PIL processing failed ({pil_err}), falling back to raw upload.")
 
         try:
-            # Upload to Supabase Storage
+            print(f"DEBUG: Uploading to Supabase bucket 'logos', path: {filename}, size: {len(final_bytes)} bytes")
+            # Upload to Supabase Storage (upsert=True avoids conflicts on retry)
             res = supabase_client.storage.from_("logos").upload(
                 path=filename,
                 file=final_bytes,
-                file_options={"content-type": content_type}
+                file_options={"content-type": content_type, "upsert": "true"}
             )
-            
-            # If upload was successful (or no error raised), get the public URL
+            print(f"DEBUG: Supabase upload response: {res}")
+
+            # Check if the response indicates an error (handling multiple supabase-py versions)
+            if hasattr(res, 'error') and res.error:
+                raise Exception(f"Supabase storage error: {res.error}")
+
+            # Get the public URL
             logo_url = supabase_client.storage.from_("logos").get_public_url(filename)
-            logger.info(f"Logo uploaded to Supabase: {logo_url}")
+            print(f"DEBUG: Generated Public URL: {logo_url}")
+
+            if not logo_url:
+                print("DEBUG: WARNING — get_public_url returned empty string!")
+                logo_url = None
 
         except Exception as storage_err:
+            import traceback
+            print(f"DEBUG: Supabase storage upload FAILED: {storage_err}")
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
             logger.error(f"Supabase storage upload failed: {storage_err}")
-            # Do not block signup if only logo fails, but log the error
+            # Ensure logo_url remains None on failure
+            logo_url = None
+    else:
+        print("DEBUG: No logo provided in request.")
 
     # First create the Restaurant
     restaurant = Restaurant(

@@ -9,9 +9,10 @@ import toast from 'react-hot-toast';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [role, setRole]       = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [userName, setUserName] = useState('User');
-  const [loading, setLoading]  = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -20,11 +21,11 @@ const Dashboard: React.FC = () => {
         if (data?.role) {
           setRole(data.role);
           setUserName(data.full_name || data.email.split('@')[0]);
+          localStorage.setItem('restaurantName', data.restaurant_name || '');
           if (data.restaurant_name) {
-            localStorage.setItem('restaurantName', data.restaurant_name);
             document.title = `${data.restaurant_name} | BARKAT`;
           }
-          if (data.restaurant_logo) localStorage.setItem('restaurantLogo', data.restaurant_logo);
+          localStorage.setItem('restaurantLogo', data.restaurant_logo || '');
         }
       } catch {
         toast.error('Session expired. Please log in again.');
@@ -48,8 +49,8 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const canSeeOwner   = role === 'OWNER';
-  const canSeeWaiter  = role === 'OWNER' || role === 'WAITER';
+  const canSeeOwner = role === 'OWNER';
+  const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
   const canSeeKitchen = role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN';
 
   const restaurantName = localStorage.getItem('restaurantName') || 'BARKAT';
@@ -103,13 +104,13 @@ const Dashboard: React.FC = () => {
           <div
             className="w-11 h-11 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center"
             style={{
-              background: restaurantLogo ? '#f8fafc' : 'linear-gradient(135deg,#4338ca,#6366f1)',
+              background: (restaurantLogo && !imageError) ? '#f8fafc' : 'linear-gradient(135deg,#4338ca,#6366f1)',
               boxShadow: '0 0 0 2.5px #6366f140, 0 4px 14px rgb(79 70 229 / .25)',
               border: '1px solid #e0e7ff',
             }}
           >
-            {restaurantLogo
-              ? <img src={restaurantLogo} alt="Logo" className="w-full h-full object-cover" />
+            {(restaurantLogo && !imageError)
+              ? <img src={restaurantLogo} alt="Logo" className="w-full h-full object-cover" onError={() => setImageError(true)} />
               : <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
             }
           </div>
@@ -117,9 +118,9 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               <h2 className="text-[17px] font-extrabold text-slate-900 tracking-tight leading-none">{restaurantName}</h2>
               <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
-                style={{ background:'#ecfdf5', color:'#059669', border:'1px solid #6ee7b7' }}
+                style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #6ee7b7' }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" style={{boxShadow:'0 0 6px #10b981'}} />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" style={{ boxShadow: '0 0 6px #10b981' }} />
                 Live
               </span>
             </div>
@@ -195,11 +196,10 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Workspace Cards */}
-          <div className={`grid gap-5 ${
-            workspaces.length === 1 ? 'max-w-sm mx-auto' :
-            workspaces.length === 2 ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' :
-            'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-          }`}>
+          <div className={`grid gap-5 ${workspaces.length === 1 ? 'max-w-sm mx-auto' :
+              workspaces.length === 2 ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' :
+                'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            }`}>
             {workspaces.map((ws: any) => (
               <button
                 key={ws.path}
@@ -267,7 +267,7 @@ const Dashboard: React.FC = () => {
 
           {/* Footer note */}
           <p className="text-center text-[11px] text-slate-400 mt-10 font-medium uppercase tracking-widest">
-            BARKAT Restaurant OS · Powered by AI
+            BARKAT Restaurant OS · Powered by YUSUF ASHRAFIYA
           </p>
         </div>
       </main>
