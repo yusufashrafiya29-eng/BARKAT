@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { 
   UtensilsCrossed, Plus, Minus, 
   ShoppingCart, AlertCircle, CheckCircle2, ChevronRight,
-  Receipt, QrCode, X, Loader2
+  Receipt, QrCode, X, Loader2, Zap
 } from 'lucide-react';
 import { customerApi } from '../api/customer';
 import toast from 'react-hot-toast';
