@@ -194,58 +194,75 @@ const CustomerMenu: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-32 font-sans selection:bg-primary/20">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-slate-200 px-5 h-[60px] flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden">
+      {/* Hero Banner Header */}
+      <header className="relative bg-white pb-6 rounded-b-[2rem] shadow-sm mb-2">
+        {/* Cover Photo / Gradient Banner */}
+        <div className="h-36 w-full overflow-hidden relative bg-slate-900">
+          {(tableInfo?.restaurant_logo && !imageError) ? (
+            <>
+               <img 
+                 src={tableInfo.restaurant_logo} 
+                 alt="Cover" 
+                 className="w-full h-full object-cover opacity-50 blur-[6px] scale-110"
+                 onError={() => setImageError(true)}
+               />
+               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-indigo-900 opacity-95"></div>
+          )}
+        </div>
+
+        {/* Floating Avatar & Details */}
+        <div className="px-5 relative -mt-12 flex flex-col items-center">
+          <div className="w-24 h-24 rounded-2xl border-4 border-white bg-white shadow-xl flex items-center justify-center overflow-hidden mb-4 z-10 rotate-3 transform hover:rotate-0 transition-transform">
             {(tableInfo?.restaurant_logo && !imageError) ? (
               <img 
                 src={tableInfo.restaurant_logo} 
                 alt="Logo" 
-                className="w-full h-full object-cover"
-                onError={() => setImageError(true)}
+                className="w-full h-full object-cover -rotate-3 hover:rotate-0 transition-transform"
               />
             ) : (
-              <span className="text-indigo-600 font-bold text-[13px]">
-                {(tableInfo?.restaurant_name || 'R').charAt(0).toUpperCase()}
+              <span className="text-indigo-600 font-black text-4xl -rotate-3">
+                {(tableInfo?.restaurant_name || 'D').charAt(0).toUpperCase()}
               </span>
             )}
           </div>
-          <div>
-            <h1 className="text-[15px] font-semibold tracking-tight truncate max-w-[150px]">
-              {tableInfo?.restaurant_name || 'Restaurant'}
-            </h1>
-            <p className="text-[10px] text-slate-500">Digital Menu</p>
+          
+          <h1 className="text-[22px] font-black tracking-tight text-slate-800 text-center leading-tight mb-2">
+            {tableInfo?.restaurant_name || 'DineFlow Select'}
+          </h1>
+          
+          <div className="flex items-center gap-2.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200">
+            <span>Table {tableInfo?.table_number}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+            <span className="text-emerald-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Live Menu</span>
           </div>
-        </div>
-        <div className="bg-slate-50 px-3 py-1.5 rounded border border-slate-200 text-center flex items-center gap-2">
-          <p className="text-[10px] text-slate-500 font-medium uppercase">Table</p>
-          <p className="text-[14px] font-semibold">{tableInfo?.table_number}</p>
         </div>
       </header>
 
       {/* Category Navigation */}
       {customerView === 'menu' && (
-      <div className="sticky top-[60px] z-30 bg-white shadow-sm border-b border-slate-200 py-3 pl-5 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-        <div className="flex gap-2 overflow-x-auto pr-5 scrollbar-hide">
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.04)] border-b border-slate-100 py-3 pl-5 transition-all">
+        <div className="flex gap-2.5 overflow-x-auto pr-5 scrollbar-hide items-center pb-1">
           <button
             onClick={() => { setSelectedCategory('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`px-4 py-1.5 rounded border text-[12px] font-medium whitespace-nowrap transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 ${
               selectedCategory === 'all' 
-                ? 'bg-slate-50 text-slate-800 border-indigo-500' 
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-800 hover:border-indigo-500'
+                ? 'bg-slate-900 text-white shadow-md ring-2 ring-slate-900 ring-offset-2' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            All Choices
+            All Items
           </button>
           {categories.map(cat => (
              <button
               key={cat.id}
               onClick={() => { setSelectedCategory(cat.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`px-4 py-1.5 rounded border text-[12px] font-medium whitespace-nowrap transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all duration-300 ${
                 selectedCategory === cat.id 
-                  ? 'bg-slate-50 text-slate-800 border-indigo-500' 
-                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-800 hover:border-indigo-500'
+                  ? 'bg-slate-900 text-white shadow-md ring-2 ring-slate-900 ring-offset-2' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
               }`}
              >
                {cat.name}
@@ -275,46 +292,38 @@ const CustomerMenu: React.FC = () => {
                   {items.map(item => {
                     const cartItem = cart.find(i => i.id === item.id);
                     return (
-                      <div key={item.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex gap-4 transition-colors group">
-                         <div className="shrink-0 pt-1">
-                            <div className={`w-2.5 h-2.5 border p-[1px] rounded-sm flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
-                              <div className={`w-1 h-1 rounded flex-grow ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                            </div>
-                         </div>
-                         <div className="flex-grow min-w-0">
-                           <div className="flex justify-between items-start mb-1 gap-2">
-                             <h3 className="font-semibold text-[14px] leading-snug truncate group-hover:text-primary transition-colors">{item.name}</h3>
-                             <span className="font-semibold text-[14px] shrink-0">₹{item.price}</span>
+                      <div key={item.id} className="bg-white rounded-2xl shadow-[0_2px_15px_rgba(0,0,0,0.03)] border border-slate-100 p-4 pb-5 flex flex-col gap-3 transition-colors group relative overflow-hidden">
+                         <div className="flex justify-between items-start gap-4">
+                           <div className="flex-grow min-w-0 pr-2">
+                              <div className={`w-3.5 h-3.5 border p-[2px] rounded-sm flex items-center justify-center mb-1.5 ${item.is_veg ? 'border-emerald-500/50' : 'border-rose-500/50'}`}>
+                                <div className={`w-1.5 h-1.5 rounded flex-grow ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                              </div>
+                              <h3 className="font-bold text-[15px] leading-snug text-slate-800 mb-1">{item.name}</h3>
+                              <span className="font-bold text-[14px] text-slate-700 block mb-2">₹{item.price}</span>
+                              <p className="text-[12px] text-slate-500 line-clamp-2 leading-relaxed">{item.description}</p>
                            </div>
-                           <p className="text-[12px] text-slate-500 line-clamp-2 mb-4 leading-relaxed">{item.description}</p>
                            
-                           <div className="flex items-center justify-end mt-2">
-                              {!item.is_available ? (
-                                <span className="text-[10px] uppercase font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">SOLD OUT</span>
-                              ) : cartItem ? (
-                                <div className="flex items-center gap-3 bg-slate-50 px-2 py-1.5 rounded border border-slate-200">
-                                  <button 
-                                    onClick={() => updateQuantity(item.id, -1)}
-                                    className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
-                                  >
-                                    <Minus size={12} />
+                           {/* Right floating "Image" slot & Add button */}
+                           <div className="shrink-0 w-[110px] flex flex-col items-center justify-end relative">
+                              <div className="w-full h-[95px] rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] flex items-center justify-center overflow-hidden">
+                                 <span className="text-slate-300 font-bold text-4xl">{item.name.charAt(0)}</span>
+                              </div>
+                              
+                              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-[85%] z-10 shadow-lg rounded-xl">
+                                {!item.is_available ? (
+                                  <span className="flex w-full text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-2 rounded-xl justify-center shadow-sm">SOLDOUT</span>
+                                ) : cartItem ? (
+                                  <div className="flex items-center justify-between bg-white px-1.5 py-1.5 rounded-xl border border-indigo-100 shadow-md">
+                                    <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-50 text-slate-600 font-bold hover:bg-slate-100"><Minus size={12} /></button>
+                                    <span className="text-[13px] font-black w-6 text-center text-slate-800">{cartItem.quantity}</span>
+                                    <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100"><Plus size={12} /></button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => addToCart(item)} className="w-full bg-white border border-indigo-100 text-indigo-600 font-black tracking-wide rounded-xl px-2 py-1.5 text-[13px] shadow-md hover:bg-indigo-50 transition-colors uppercase">
+                                    ADD
                                   </button>
-                                  <span className="text-[13px] font-semibold w-5 text-center">{cartItem.quantity}</span>
-                                  <button 
-                                    onClick={() => updateQuantity(item.id, 1)}
-                                    className="w-5 h-5 flex items-center justify-center text-slate-800 hover:text-primary transition-colors"
-                                  >
-                                    <Plus size={12} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={() => addToCart(item)}
-                                  className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center px-4 py-1.5 text-[12px]"
-                                >
-                                  Add
-                                </button>
-                              )}
+                                )}
+                              </div>
                            </div>
                          </div>
                       </div>
@@ -324,6 +333,10 @@ const CustomerMenu: React.FC = () => {
               </div>
             );
           })}
+        <div className="mt-12 text-center pb-8 opacity-50 flex items-center justify-center gap-2">
+           <Zap size={14} className="text-slate-400" />
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Powered by DineFlow</p>
+        </div>
       </div>
       ) : (
         <div className="p-5 pb-40 animate-in fade-in duration-300 max-w-2xl mx-auto">
