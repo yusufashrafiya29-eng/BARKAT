@@ -32,7 +32,7 @@ def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
         "table_number": table.table_number,
         "restaurant_id": str(table.restaurant_id),
         "restaurant_name": restaurant.name if restaurant else "BARKAT",
-        "restaurant_logo": f"{settings.BASE_URL}{restaurant.logo_url}" if restaurant and restaurant.logo_url else None
+        "restaurant_logo": (restaurant.logo_url if restaurant.logo_url.startswith("http") else f"{settings.BASE_URL}{restaurant.logo_url}") if restaurant and restaurant.logo_url else None
     }
 
 @router.post("/", response_model=TableRead)
