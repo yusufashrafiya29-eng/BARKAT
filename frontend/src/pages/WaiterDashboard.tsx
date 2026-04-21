@@ -7,7 +7,7 @@ import {
   RefreshCcw, AlertCircle, Edit2,
   ShoppingCart, CheckCircle2, X,
   Wallet, CreditCard, Smartphone,
-  Send, Zap
+  Send, Zap, ChefHat, Shield
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import toast from 'react-hot-toast';
@@ -846,6 +846,26 @@ export default function WaiterDashboard() {
           </div>
         </div>
       )}
+
+      {/* Fixed bottom-left: Navigation Buttons */}
+      <div className="fixed bottom-5 left-5 z-50 flex items-center gap-2">
+        <button
+          onClick={() => navigate('/kitchen')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-[13px] shadow-xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', boxShadow: '0 4px 20px rgb(245 158 11 / .4)' }}
+        >
+          <ChefHat size={15} />
+          Kitchen View
+        </button>
+        <button
+          onClick={() => navigate('/owner')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-[13px] shadow-xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', boxShadow: '0 4px 20px rgb(99 102 241 / .4)' }}
+        >
+          <Shield size={15} />
+          Owner View
+        </button>
+      </div>
     </div>
   );
 }

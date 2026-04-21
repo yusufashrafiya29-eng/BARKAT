@@ -36,6 +36,28 @@ const Dashboard: React.FC = () => {
     })();
   }, [navigate]);
 
+  // Intercept browser back button on Dashboard to show logout confirmation
+  useEffect(() => {
+    // Push a duplicate entry so the first "back" press stays here
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      const confirmed = window.confirm(
+        'Are you sure you want to log out?\n\nYou will be redirected to the login page.'
+      );
+      if (confirmed) {
+        localStorage.clear();
+        window.location.replace('/login');
+      } else {
+        // Stay on Dashboard — push state again to block the back
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">

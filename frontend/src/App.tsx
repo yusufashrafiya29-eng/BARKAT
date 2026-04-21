@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Layout
 import AuthLayout from './components/AuthLayout';
+import PrivateRoute from './components/PrivateRoute';
 
 // Pages
 import Login from './pages/Login';
@@ -20,9 +21,10 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Customer QR Route (Public) */}
+        {/* Customer QR Route (Public — no auth needed) */}
         <Route path="/order/table/:tableId" element={<CustomerMenu />} />
 
+        {/* Auth Layout Routes (Login / Signup) */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignupChoice />} />
@@ -31,14 +33,13 @@ const App: React.FC = () => {
           <Route path="/verify" element={<VerifyOTP />} />
         </Route>
         
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Protected Routes — require auth_token in localStorage */}
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/owner" element={<PrivateRoute><OwnerDashboard /></PrivateRoute>} />
+        <Route path="/waiter" element={<PrivateRoute><WaiterDashboard /></PrivateRoute>} />
+        <Route path="/kitchen" element={<PrivateRoute><KitchenKDS /></PrivateRoute>} />
         
-        {/* Placeholder routes for the dashboard links */}
-        <Route path="/owner" element={<OwnerDashboard />} />
-        <Route path="/waiter" element={<WaiterDashboard />} />
-        <Route path="/kitchen" element={<KitchenKDS />} />
-        
-        {/* Default redirect to login */}
+        {/* Fallback redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
@@ -46,3 +47,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

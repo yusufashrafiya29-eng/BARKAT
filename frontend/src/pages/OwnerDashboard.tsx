@@ -359,7 +359,14 @@ export default function OwnerDashboard() {
           ))}
         </nav>
  
-        <div className="p-3 border-t border-slate-800">
+        <div className="p-3 border-t border-slate-800 space-y-0.5">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <LayoutGrid size={15} />
+            Back to Dashboard
+          </button>
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

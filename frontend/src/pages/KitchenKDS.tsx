@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChefHat, Clock, AlertCircle, Loader2, Flame, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { ChefHat, Clock, AlertCircle, Loader2, Flame, CheckCircle2, ArrowLeft, ShoppingCart, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { kitchenApi } from '../api/kitchen';
 import { waiterApi } from '../api/waiter';
@@ -293,6 +293,26 @@ export default function KitchenKDS() {
           </div>
         </div>
 
+      </div>
+
+      {/* Fixed bottom-left: Navigation Buttons */}
+      <div className="fixed bottom-5 left-5 z-50 flex items-center gap-2">
+        <button
+          onClick={() => navigate('/waiter')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-[13px] shadow-xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', boxShadow: '0 4px 20px rgb(99 102 241 / .4)' }}
+        >
+          <ShoppingCart size={15} />
+          Waiter View
+        </button>
+        <button
+          onClick={() => navigate('/owner')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-[13px] shadow-xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 20px rgb(16 185 129 / .4)' }}
+        >
+          <Shield size={15} />
+          Owner View
+        </button>
       </div>
     </div>
   );
