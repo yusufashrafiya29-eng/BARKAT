@@ -46,6 +46,10 @@ def confirm_payment(db: Session, order_id: UUID, transaction_id: str = None, res
     if transaction_id:
         bill.transaction_id = transaction_id
         
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if order:
+        order.payment_status = "PAID"
+        
     db.commit()
     db.refresh(bill)
     return bill
