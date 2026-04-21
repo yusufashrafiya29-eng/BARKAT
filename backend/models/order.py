@@ -32,7 +32,7 @@ class Order(Base):
     # New fields for Customer vs Waiter ordering
     source = Column(String, default="WAITER", nullable=False)
     is_accepted = Column(Boolean, default=True, nullable=False)
-    payment_status = Column(String, default="pending", nullable=False)
+    payment_status = Column(String, default="PENDING", nullable=False)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
