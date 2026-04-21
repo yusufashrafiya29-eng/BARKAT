@@ -88,6 +88,16 @@ def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, re
     db.refresh(order)
     return order
 
+def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order.payment_status = new_payment_status
+    db.commit()
+    db.refresh(order)
+    return order
+
 def get_active_kitchen_orders(db: Session, restaurant_id: str):
     """Fetches ACCEPTED and PREPARING orders using strict FIFO (First In First Out) ordering."""
     return db.query(Order).filter(

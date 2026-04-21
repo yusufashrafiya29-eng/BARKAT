@@ -47,6 +47,7 @@ class OrderRead(BaseModel):
     status: OrderStatus
     source: str
     is_accepted: bool
+    payment_status: str
     total_amount: float
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -57,6 +58,9 @@ class OrderRead(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
+
+class PaymentStatusUpdate(BaseModel):
+    payment_status: str
 
 class OrderUpdateItems(BaseModel):
     items: List[OrderItemCreate]

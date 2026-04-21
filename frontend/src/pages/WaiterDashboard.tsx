@@ -18,7 +18,7 @@ interface Category  { id: string; name: string; menu_items: MenuItem[]; }
 interface Table     { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
 interface CartItem  extends MenuItem { quantity: number; notes: string; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
-interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; }
+interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -67,7 +67,7 @@ export default function WaiterDashboard() {
 
   useEffect(() => {
     fetchInitialData();
-    const interval = setInterval(fetchOrdersOnly, 4000);
+    const interval = setInterval(fetchOrdersOnly, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -137,6 +137,7 @@ export default function WaiterDashboard() {
   const handleServeOrder    = async (id: string) => { try { await waiterApi.updateOrderStatus(id,'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
   const handleAcceptOrder   = async (id: string) => { try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
   const handleRejectOrder   = async (id: string) => { if (!confirm('Reject this order?')) return; try { await waiterApi.updateOrderStatus(id,'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
+  const handleDirectPaymentConfirm = async (id: string) => { try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
   const handleStartCheckout = async (order: Order) => { try { const bill = await waiterApi.generateBill(order.id,'CASH',0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
   const handleConfirmPayment = async () => {
     if (!checkoutOrder) return;
@@ -729,7 +730,12 @@ export default function WaiterDashboard() {
                                 <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name||'Item'}</p>
                               ))}
                             </div>
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-2 mt-2">
+                              {order.payment_status === 'PENDING' && (
+                                <button onClick={() => handleDirectPaymentConfirm(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 transition-all hover:bg-indigo-100">
+                                  Confirm Payment
+                                </button>
+                              )}
                               {order.status === 'READY' && (
                                 <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#10b981,#059669)', boxShadow:'0 2px 8px rgb(16 185 129 / .4)' }}>
                                   ✓ Mark Served

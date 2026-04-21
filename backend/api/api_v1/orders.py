@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_user_token, get_current_restaurant
-from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems
+from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate
 from services import order_service
 from models.order import OrderStatus
 from models.notification import MessageType
@@ -90,6 +90,15 @@ def update_order_status(
             )
             
     return order
+
+@router.put("/{order_id}/payment-status", response_model=OrderRead)
+def update_order_payment_status(
+    order_id: UUID,
+    status_update: PaymentStatusUpdate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return order_service.update_payment_status(db, order_id, status_update.payment_status, str(restaurant_id))
 
 @router.delete("/{order_id}")
 def delete_customer_order(

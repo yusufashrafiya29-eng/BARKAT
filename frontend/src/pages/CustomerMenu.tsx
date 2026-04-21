@@ -39,6 +39,7 @@ interface OrderItem {
 interface Order {
   id: string;
   status: string;
+  payment_status: 'PENDING' | 'PAID' | 'FAILED';
   total_amount: number;
   created_at: string;
   items?: OrderItem[];
@@ -63,6 +64,7 @@ const CustomerMenu: React.FC = () => {
   const [customerView, setCustomerView] = useState<'menu' | 'bill'>('menu');
   const [tableOrders, setTableOrders] = useState<Order[]>([]);
   const [showPaymentQR, setShowPaymentQR] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (!tableId) {
@@ -99,7 +101,28 @@ const CustomerMenu: React.FC = () => {
     };
 
     fetchData();
+
+    // Set up 3s polling for active orders and sync payment
+    const interval = setInterval(async () => {
+      try {
+        const ordersData = await customerApi.getTableOrders(tableId);
+        setTableOrders(ordersData);
+      } catch (e) {}
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [tableId, isSuccess]);
+
+  // Watch for changes in order statuses
+  useEffect(() => {
+    // If we are currently resolving a payment and it goes through successfully:
+    const hasUnpaid = tableOrders.some(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING');
+    if (!hasUnpaid && isVerifying) {
+      setIsVerifying(false);
+      setShowPaymentQR(false);
+      toast.success('Payment Confirmed!');
+    }
+  }, [tableOrders, isVerifying]);
 
   const addToCart = (item: MenuItem) => {
     if (!item.is_available) return;
@@ -396,15 +419,16 @@ const CustomerMenu: React.FC = () => {
                 <div className="text-center mb-6">
                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Cumulative Total</p>
                   <p className="text-3xl font-semibold tracking-tight">
-                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total_amount, 0)}
+                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
                   </p>
                 </div>
                 
                 <button 
                   onClick={() => setShowPaymentQR(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full"
+                  disabled={tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0) === 0}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full"
                 >
-                  <QrCode size={16} className="mr-2" /> Pay Electronically
+                  <QrCode size={16} className="mr-2" /> {tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0) === 0 ? 'All Settled' : 'Pay Electronically'}
                 </button>
               </div>
             </div>
@@ -482,35 +506,54 @@ const CustomerMenu: React.FC = () => {
         </div>
       </div>
 
-      {/* Payment QR Modal */}
+      {/* Payment QR / UPI Deep Link Modal */}
       {showPaymentQR && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-sm w-full relative animate-in zoom-in-95 duration-200">
             <button 
-              onClick={() => setShowPaymentQR(false)}
+              onClick={() => { setShowPaymentQR(false); setIsVerifying(false); }}
               className="absolute top-4 right-4 text-slate-500 hover:text-slate-800"
             >
               <X size={18} />
             </button>
-            <div className="flex flex-col items-center text-center">
-              <h3 className="text-[18px] font-semibold mb-2 mt-4">Scan & Pay</h3>
-              <p className="text-[12px] text-slate-500 mb-6 leading-relaxed px-4">Pay instantly using any UPI client. Show confirmation to staff.</p>
-              
-              <div className="bg-white p-3 rounded mb-6 border border-slate-200">
-                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=restaurant@upi&pn=Barkat&am=${tableOrders.filter(o => o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total_amount, 0)}`)}`} 
-                  alt="Payment QR" 
-                  className="w-40 h-40"
-                />
+
+            {isVerifying ? (
+              <div className="flex flex-col items-center text-center py-8">
+                 <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
+                 <h3 className="text-[18px] font-semibold mb-2 mt-2">Waiting for Confirmation</h3>
+                 <p className="text-[12px] text-slate-500 leading-relaxed max-w-[200px]">
+                   Please ask your waiter to confirm the payment on their screen.
+                 </p>
               </div>
- 
-              <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-6">
-                 <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
-                 <p className="text-[20px] font-semibold text-slate-800">₹{tableOrders.filter(o => o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total_amount, 0)}</p>
+            ) : (
+              <div className="flex flex-col items-center text-center">
+                <h3 className="text-[18px] font-semibold mb-2 mt-4">Pay & Settle</h3>
+                <p className="text-[12px] text-slate-500 mb-6 leading-relaxed px-4">Pay instantly using any UPI client, then inform the staff.</p>
+                
+                <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-4">
+                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
+                   <p className="text-[20px] font-semibold text-slate-800">
+                     ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
+                   </p>
+                </div>
+   
+                <a 
+                  href={`upi://pay?pa=restaurant@upi&pn=Barkat&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-3 transition-colors shadow-sm"
+                >
+                  Pay via UPI App
+                </a>
+  
+                <button 
+                  onClick={() => setIsVerifying(true)}
+                  className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-6 hover:bg-indigo-50 transition-colors"
+                >
+                  I have paid
+                </button>
+   
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by BARKAT</p>
               </div>
- 
-              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by BARKAT</p>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -73,6 +73,11 @@ export const waiterApi = {
     return response.data;
   },
 
+  updatePaymentStatus: async (orderId: string, payment_status: string) => {
+    const response = await axios.put(`${BASE_URL}/orders/${orderId}/payment-status`, { payment_status }, getHeaders());
+    return response.data;
+  },
+
   generateBill: async (orderId: string, paymentMethod: string = 'CASH', discount: number = 0) => {
     const response = await axios.post(`${BASE_URL}/billing/${orderId}/generate`, {
       payment_method: paymentMethod,
