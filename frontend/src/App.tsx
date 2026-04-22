@@ -17,6 +17,7 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import CustomerMenu from './pages/CustomerMenu';
 import KitchenKDS from './pages/KitchenKDS';
 import LandingPage from './pages/LandingPage';
+import SubscriptionLock from './pages/SubscriptionLock';
 
 const App: React.FC = () => {
   return (
@@ -42,6 +43,9 @@ const App: React.FC = () => {
         <Route path="/owner" element={<PrivateRoute><OwnerDashboard /></PrivateRoute>} />
         <Route path="/waiter" element={<PrivateRoute><WaiterDashboard /></PrivateRoute>} />
         <Route path="/kitchen" element={<PrivateRoute><KitchenKDS /></PrivateRoute>} />
+        
+        {/* Subscription Expired — accessible when logged in but subscription lapsed */}
+        <Route path="/subscription-expired" element={<PrivateRoute><SubscriptionLock /></PrivateRoute>} />
         
         {/* Fallback redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />

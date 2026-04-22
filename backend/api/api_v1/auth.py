@@ -142,10 +142,12 @@ async def signup_owner(
     else:
         print("DEBUG: No logo provided in request.")
 
-    # First create the Restaurant
+    # First create the Restaurant with trial
     restaurant = Restaurant(
         name=restaurant_name,
-        logo_url=logo_url
+        logo_url=logo_url,
+        subscription_status="trial",
+        trial_ends_at=datetime.utcnow() + timedelta(days=7)
     )
     db.add(restaurant)
     db.flush() # flush to get the UUID
@@ -299,6 +301,9 @@ def get_current_user_info(
             "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
             "restaurant_logo": local_user.restaurant.logo_url if local_user.restaurant else None,
             "restaurant_email": local_user.restaurant_email,
+            "subscription_status": local_user.restaurant.subscription_status if local_user.restaurant else None,
+            "trial_ends_at": local_user.restaurant.trial_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.trial_ends_at else None,
+            "subscription_ends_at": local_user.restaurant.subscription_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.subscription_ends_at else None,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }
     )

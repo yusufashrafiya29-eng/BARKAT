@@ -23,9 +23,26 @@ const Dashboard: React.FC = () => {
           setUserName(data.full_name || data.email.split('@')[0]);
           localStorage.setItem('restaurantName', data.restaurant_name || '');
           if (data.restaurant_name) {
-            document.title = `${data.restaurant_name} | BARKAT`;
+            document.title = `${data.restaurant_name} | Dine Flow`;
           }
           localStorage.setItem('restaurantLogo', data.restaurant_logo || '');
+
+          // ── Subscription Guard ──────────────────────────────
+          const status = data.subscription_status;
+          const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
+          const subEndsAt = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
+          const now = new Date();
+
+          const isExpired =
+            (status === 'trial' && trialEndsAt && trialEndsAt < now) ||
+            (status === 'expired') ||
+            (status === 'active' && subEndsAt && subEndsAt < now);
+
+          if (isExpired) {
+            navigate('/subscription-expired');
+            return;
+          }
+          // ───────────────────────────────────────────────────
         }
       } catch {
         toast.error('Session expired. Please log in again.');
