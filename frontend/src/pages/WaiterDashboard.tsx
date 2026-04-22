@@ -18,7 +18,7 @@ interface Category  { id: string; name: string; menu_items: MenuItem[]; }
 interface Table     { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
 interface CartItem  extends MenuItem { quantity: number; notes: string; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
-interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'|'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; }
+interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'|'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -731,10 +731,15 @@ export default function WaiterDashboard() {
                               ))}
                             </div>
                             <div className="flex justify-end gap-2 mt-2">
-                              {order.payment_status === 'VERIFYING' && (
+                              {order.payment_status === 'VERIFYING' && !order.razorpay_order_id && (
                                 <button onClick={() => handleDirectPaymentConfirm(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 transition-all hover:bg-indigo-100">
                                   Confirm Payment
                                 </button>
+                              )}
+                              {order.payment_status === 'VERIFYING' && order.razorpay_order_id && (
+                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                                  ⚡ Razorpay — Auto Confirming
+                                </span>
                               )}
                               {order.status === 'READY' && (
                                 <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#10b981,#059669)', boxShadow:'0 2px 8px rgb(16 185 129 / .4)' }}>

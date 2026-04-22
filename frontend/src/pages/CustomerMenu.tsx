@@ -65,6 +65,7 @@ const CustomerMenu: React.FC = () => {
   const [tableOrders, setTableOrders] = useState<Order[]>([]);
   const [showPaymentQR, setShowPaymentQR] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isRazorpayVerifying, setIsRazorpayVerifying] = useState(false);
 
   useEffect(() => {
     if (!tableId) {
@@ -119,8 +120,9 @@ const CustomerMenu: React.FC = () => {
     const hasUnpaid = tableOrders.some(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING'));
     if (!hasUnpaid && isVerifying) {
       setIsVerifying(false);
+      setIsRazorpayVerifying(false);
       setShowPaymentQR(false);
-      toast.success('Payment Confirmed!');
+      toast.success('Payment Confirmed! 🎉');
     }
   }, [tableOrders, isVerifying]);
 
@@ -145,8 +147,9 @@ const CustomerMenu: React.FC = () => {
         description: `Payment for Table ${tableInfo?.table_number}`,
         order_id: razorpay_order_id,
         handler: function (_response: any) {
-          toast.success("Payment successful! Verifying...");
+          toast.success("Payment successful! Updating your bill...");
           setIsVerifying(true);
+          setIsRazorpayVerifying(true);
           // The webhook will mark it PAID, and our 3s polling will catch it.
         },
         prefill: {
@@ -562,11 +565,27 @@ const CustomerMenu: React.FC = () => {
 
             {isVerifying ? (
               <div className="flex flex-col items-center text-center py-8">
-                 <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
-                 <h3 className="text-[18px] font-semibold mb-2 mt-2">Waiting for Confirmation</h3>
-                 <p className="text-[12px] text-slate-500 leading-relaxed max-w-[200px]">
-                   Please ask your waiter to confirm the payment on their screen.
+                 <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+                   {isRazorpayVerifying
+                     ? <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                     : <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                   }
+                 </div>
+                 <h3 className="text-[18px] font-semibold mb-2">
+                   {isRazorpayVerifying ? 'Payment Successful! ✅' : 'Waiting for Confirmation'}
+                 </h3>
+                 <p className="text-[13px] text-slate-500 leading-relaxed max-w-[220px]">
+                   {isRazorpayVerifying
+                     ? 'Your payment was received. Your bill is being updated automatically. This will refresh in a few seconds.'
+                     : 'Please ask your waiter to confirm the payment on their screen.'
+                   }
                  </p>
+                 {isRazorpayVerifying && (
+                   <div className="mt-4 flex items-center gap-2 text-[12px] text-indigo-500">
+                     <Loader2 className="w-3 h-3 animate-spin" />
+                     Syncing with server...
+                   </div>
+                 )}
               </div>
             ) : (
               <div className="flex flex-col items-center text-center">
