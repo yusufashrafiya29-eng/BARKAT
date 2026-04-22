@@ -33,6 +33,10 @@ class Order(Base):
     source = Column(String, default="WAITER", nullable=False)
     is_accepted = Column(Boolean, default=True, nullable=False)
     payment_status = Column(String, default="PENDING", nullable=False)
+    
+    # Razorpay tracking
+    razorpay_order_id = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

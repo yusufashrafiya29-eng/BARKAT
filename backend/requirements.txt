@@ -12,3 +12,4 @@ bcrypt
 email-validator
 python-multipart
 Pillow
+razorpay

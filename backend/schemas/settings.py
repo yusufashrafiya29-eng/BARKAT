@@ -13,3 +13,7 @@ class RestaurantConfigRead(RestaurantConfigBase):
 
 class UPIConfig(BaseModel):
     upi_id: str
+
+class RazorpayConfig(BaseModel):
+    razorpay_key_id: str
+    razorpay_key_secret: str
