@@ -38,5 +38,13 @@ export const customerApi = {
       table_id: tableId
     });
     return response.data;
+  },
+
+  confirmRazorpayPayment: async (razorpay_order_id: string, razorpay_payment_id: string) => {
+    const response = await axios.post(`${BASE_URL}/payments/confirm`, {
+      razorpay_order_id,
+      razorpay_payment_id
+    });
+    return response.data;
   }
 };

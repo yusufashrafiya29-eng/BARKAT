@@ -15,7 +15,26 @@ router = APIRouter()
 class CreateOrderRequest(BaseModel):
     table_id: UUID
 
+class ConfirmPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+
 from models.table import Table
+
+@router.post("/confirm")
+def confirm_razorpay_payment(req: ConfirmPaymentRequest, db: Session = Depends(get_db)):
+    """
+    Called directly by the frontend after Razorpay's success handler fires.
+    This is the primary confirmation path — webhook is a secondary backup.
+    """
+    orders = db.query(Order).filter(Order.razorpay_order_id == req.razorpay_order_id).all()
+    if not orders:
+        raise HTTPException(status_code=404, detail="No orders found for this Razorpay order.")
+    for order in orders:
+        order.payment_status = 'PAID'
+        order.razorpay_payment_id = req.razorpay_payment_id
+    db.commit()
+    return {"status": "ok", "orders_updated": len(orders)}
 
 @router.post("/create-order")
 def create_razorpay_order(

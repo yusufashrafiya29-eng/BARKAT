@@ -143,14 +143,26 @@ const CustomerMenu: React.FC = () => {
         key: razorpay_key_id,
         amount: amount,
         currency: currency,
-        name: tableInfo?.restaurant_name || "BARKAT",
+        name: tableInfo?.restaurant_name || "Dine Flow",
         description: `Payment for Table ${tableInfo?.table_number}`,
         order_id: razorpay_order_id,
-        handler: function (_response: any) {
+        handler: async function (response: any) {
           toast.success("Payment successful! Updating your bill...");
           setIsVerifying(true);
           setIsRazorpayVerifying(true);
-          // The webhook will mark it PAID, and our 3s polling will catch it.
+          // PRIMARY: Directly confirm with backend — instant, no webhook needed
+          try {
+            await customerApi.confirmRazorpayPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id
+            );
+            // Immediately refresh orders to show PAID status
+            const updatedOrders = await customerApi.getTableOrders(tableId as string);
+            setTableOrders(updatedOrders);
+          } catch (err) {
+            // Fallback: polling will pick it up from webhook
+            console.warn("Direct confirm failed, webhook will handle it:", err);
+          }
         },
         prefill: {
           name: customerName,
