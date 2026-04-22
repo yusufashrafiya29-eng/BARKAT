@@ -539,33 +539,43 @@ const CustomerMenu: React.FC = () => {
                 <h3 className="text-[18px] font-semibold mb-2 mt-4">Pay & Settle</h3>
                 <p className="text-[12px] text-slate-500 mb-6 leading-relaxed px-4">Pay instantly using any UPI client, then inform the staff.</p>
                 
-                <div className="bg-white p-3 rounded mb-4 border border-slate-200 inline-block">
-                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=restaurant@upi&pn=Barkat&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`)}`} 
-                    alt="Payment QR" 
-                    className="w-40 h-40"
-                  />
-                </div>
-                
-                <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-4">
-                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
-                   <p className="text-[20px] font-semibold text-slate-800">
-                     ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
-                   </p>
-                </div>
-   
-                <a 
-                  href={`upi://pay?pa=restaurant@upi&pn=Barkat&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-3 transition-colors shadow-sm"
-                >
-                  Pay via UPI App
-                </a>
+                {tableInfo?.restaurant_upi_id ? (
+                  <>
+                    <div className="bg-white p-3 rounded mb-4 border border-slate-200 inline-block">
+                       <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=${tableInfo.restaurant_upi_id}&pn=${tableInfo.restaurant_name}&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`)}`} 
+                        alt="Payment QR" 
+                        className="w-40 h-40"
+                      />
+                    </div>
+                    
+                    <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-4">
+                       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
+                       <p className="text-[20px] font-semibold text-slate-800">
+                         ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
+                       </p>
+                    </div>
+       
+                    <a 
+                      href={`upi://pay?pa=${tableInfo.restaurant_upi_id}&pn=${encodeURIComponent(tableInfo.restaurant_name)}&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-3 transition-colors shadow-sm"
+                    >
+                      Pay via UPI App
+                    </a>
+                  </>
+                ) : (
+                  <div className="w-full bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6">
+                    <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+                    <p className="text-[13px] font-semibold text-rose-800">UPI Not Configured</p>
+                    <p className="text-[11px] text-rose-600 mt-1">This restaurant has not configured their UPI ID yet. Please pay by cash or card.</p>
+                  </div>
+                )}
   
                 <button 
                   onClick={handleNotifyPayment}
                   className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-6 hover:bg-indigo-50 transition-colors"
                 >
-                  I have paid
+                  {tableInfo?.restaurant_upi_id ? 'I have paid' : 'Request Cash/Card Payment'}
                 </button>
    
                 <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by BARKAT</p>

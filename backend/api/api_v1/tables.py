@@ -27,12 +27,17 @@ def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
     from models.restaurant import Restaurant
     restaurant = db.query(Restaurant).filter(Restaurant.id == table.restaurant_id).first()
     
+    # Fetch UPI ID
+    from services import settings_service
+    upi_id = settings_service.get_config_value(db, "upi_id", str(table.restaurant_id))
+    
     return {
         "id": str(table.id),
         "table_number": table.table_number,
         "restaurant_id": str(table.restaurant_id),
         "restaurant_name": restaurant.name if restaurant else "BARKAT",
-        "restaurant_logo": (restaurant.logo_url if restaurant.logo_url.startswith("http") else f"{settings.BASE_URL}{restaurant.logo_url}") if restaurant and restaurant.logo_url else None
+        "restaurant_logo": (restaurant.logo_url if restaurant.logo_url.startswith("http") else f"{settings.BASE_URL}{restaurant.logo_url}") if restaurant and restaurant.logo_url else None,
+        "restaurant_upi_id": upi_id
     }
 
 @router.post("/", response_model=TableRead)
