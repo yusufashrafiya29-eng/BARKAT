@@ -16,6 +16,7 @@ interface MenuItem {
   category_id: string;
   is_veg: boolean;
   is_available: boolean;
+  image_url?: string;
 }
 
 interface Category {
@@ -388,7 +389,11 @@ const CustomerMenu: React.FC = () => {
                            {/* Right floating "Image" slot & Add button */}
                            <div className="shrink-0 w-[110px] flex flex-col items-center justify-end relative">
                               <div className="w-full h-[95px] rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] flex items-center justify-center overflow-hidden">
-                                 <span className="text-slate-300 font-bold text-4xl">{item.name.charAt(0)}</span>
+                                 {item.image_url ? (
+                                   <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                 ) : (
+                                   <span className="text-slate-300 font-bold text-4xl">{item.name.charAt(0)}</span>
+                                 )}
                               </div>
                               
                               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-[85%] z-10 shadow-lg rounded-xl">

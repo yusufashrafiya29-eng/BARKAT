@@ -13,6 +13,29 @@ def require_owner(token: dict = Depends(get_current_user_token)):
         raise HTTPException(status_code=403, detail="Not authorized. Owner access required.")
     return token
 
+from schemas.user import PasswordChange
+@router.put("/me/password")
+def change_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token)
+):
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    from api.api_v1.auth import _hash_password
+    
+    user = db.query(User).filter(User.id == token.get("sub")).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not pwd_context.verify(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+    user.password_hash = _hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
 @router.get("/staff", response_model=List[UserRead])
 def get_staff_members(
     db: Session = Depends(get_db), 

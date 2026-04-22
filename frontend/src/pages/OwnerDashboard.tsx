@@ -5,7 +5,7 @@ import {
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee, ClipboardList,
   ShoppingBag, Users, Clock, QrCode, CreditCard,
-  TrendingUp, Activity, Flame
+  TrendingUp, Activity, Flame, ImagePlus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -21,6 +21,7 @@ interface MenuItem {
   category_id: string;
   is_veg: boolean;
   is_available: boolean;
+  image_url?: string;
 }
 
 interface MenuCategory {
@@ -129,7 +130,7 @@ export default function OwnerDashboard() {
           const invRes = await ownerApi.getInventory();
           setInventory(invRes);
           break;
-        case 'payments':
+        case 'settings':
           const [payRes, rzpRes] = await Promise.all([
             ownerApi.getUpiId(),
             ownerApi.getRazorpayKeys()
@@ -175,7 +176,7 @@ export default function OwnerDashboard() {
           const invRes = await ownerApi.getInventory();
           setInventory(invRes);
           break;
-        case 'payments':
+        case 'settings':
           const [payResData, rzpResData] = await Promise.all([
             ownerApi.getUpiId(),
             ownerApi.getRazorpayKeys()
@@ -198,6 +199,28 @@ export default function OwnerDashboard() {
       toast.success(`${name || 'User'} verified`);
       fetchData();
     } catch { toast.error("Verification failed"); }
+  };
+
+  const handleImageUpload = async (itemId: string, file: File) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image size must be less than 2MB");
+      return;
+    }
+    
+    setIsUploadingImage(prev => ({ ...prev, [itemId]: true }));
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    try {
+      await ownerApi.uploadMenuItemImage(itemId, formData);
+      toast.success("Image uploaded successfully");
+      fetchData(); // refresh menu to get new image URL
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Failed to upload image");
+    } finally {
+      setIsUploadingImage(prev => ({ ...prev, [itemId]: false }));
+    }
   };
 
   const handleDeleteStaff = async (id: string) => {
@@ -256,6 +279,40 @@ export default function OwnerDashboard() {
       fetchData();
     } catch {
       toast.error("Failed to save Razorpay settings");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const formData = new FormData(e.currentTarget);
+    try {
+      const res = await ownerApi.updateProfile(formData);
+      toast.success(res.message);
+      if (res.name) localStorage.setItem('restaurantName', res.name);
+      if (res.logo_url) localStorage.setItem('restaurantLogo', res.logo_url);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to update profile");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const current_password = formData.get('current_password') as string;
+    const new_password = formData.get('new_password') as string;
+    
+    try {
+      await ownerApi.changePassword({ current_password, new_password });
+      toast.success("Password changed successfully");
+      (e.target as HTMLFormElement).reset();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to change password");
     } finally {
       setFormLoading(false);
     }
@@ -370,7 +427,7 @@ export default function OwnerDashboard() {
             { id: 'tables', label: 'Floor Plan', icon: LayoutGrid },
             { id: 'staff', label: 'Staff Roster', icon: Users },
             { id: 'inventory', label: 'Inventory', icon: ShoppingBag },
-            { id: 'payments', label: 'Settings & UPI', icon: CreditCard },
+            { id: 'settings', label: 'Settings', icon: CreditCard },
           ].map(tab => (
             <button
               key={tab.id}
@@ -654,6 +711,41 @@ export default function OwnerDashboard() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {cat.menu_items?.map(item => (
                           <div key={item.id} className="surface p-4 flex flex-col relative group">
+                            
+                            {/* Image Section */}
+                            <div className="w-full h-32 rounded-xl bg-subtle/30 overflow-hidden mb-4 relative group/image">
+                              {item.image_url ? (
+                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-muted">
+                                  <ImagePlus size={24} className="mb-2 opacity-50" />
+                                  <span className="text-[10px] font-medium uppercase tracking-wider">No Photo</span>
+                                </div>
+                              )}
+                              
+                              {/* Hover Upload Overlay */}
+                              <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity">
+                                {isUploadingImage[item.id] ? (
+                                  <Loader2 size={24} className="animate-spin text-white" />
+                                ) : (
+                                  <>
+                                    <ImagePlus size={20} className="text-white mb-1" />
+                                    <span className="text-white text-[10px] font-bold uppercase tracking-wider">{item.image_url ? 'Change Photo' : 'Upload Photo'}</span>
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/jpeg, image/png, image/webp" 
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          handleImageUpload(item.id, e.target.files[0]);
+                                        }
+                                      }}
+                                    />
+                                  </>
+                                )}
+                              </label>
+                            </div>
+
                             <div className="flex justify-between items-start mb-2">
                               <h4 className="text-[14px] font-medium pr-4 text-main">{item.name}</h4>
                               <span className="text-[13px] text-muted">₹{item.price}</span>
@@ -813,9 +905,76 @@ export default function OwnerDashboard() {
                 </div>
               )}
  
-              {/* PAYMENTS TAB */}
-              {activeTab === 'payments' && (
+              {/* SETTINGS TAB */}
+              {activeTab === 'settings' && (
                 <div className="max-w-xl">
+                
+                  {/* PROFILE SETTINGS */}
+                  <div className="surface p-6 mb-6">
+                    <h3 className="text-[15px] font-medium mb-1">Restaurant Profile</h3>
+                    <p className="text-[13px] text-muted mb-6">Update your restaurant's brand identity.</p>
+
+                    <form onSubmit={handleSaveProfile} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Restaurant Name</label>
+                        <input
+                          name="name"
+                          defaultValue={localStorage.getItem('restaurantName') || ''}
+                          className="form-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Restaurant Logo (Optional)</label>
+                        <input
+                          name="logo"
+                          type="file"
+                          accept="image/*"
+                          className="w-full text-[13px] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-[12px] file:font-medium file:bg-main file:text-surface hover:file:bg-main/90"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button type="submit" disabled={formLoading} className="btn">
+                          {formLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Update Profile'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                  
+                  {/* SECURITY SETTINGS */}
+                  <div className="surface p-6 mb-6">
+                    <h3 className="text-[15px] font-medium mb-1">Security</h3>
+                    <p className="text-[13px] text-muted mb-6">Update your owner account password.</p>
+
+                    <form onSubmit={handleChangePassword} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Current Password</label>
+                        <input
+                          name="current_password"
+                          type="password"
+                          required
+                          className="form-input"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">New Password</label>
+                        <input
+                          name="new_password"
+                          type="password"
+                          required
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button type="submit" disabled={formLoading} className="btn-secondary">
+                          {formLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Change Password'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
                   <div className="surface p-6 mb-6">
                     <h3 className="text-[15px] font-medium mb-1">UPI Integration</h3>
                     <p className="text-[13px] text-muted mb-6">Configure the automated UPI ID for customer QR checkout.</p>

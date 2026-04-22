@@ -14,43 +14,43 @@ import toast from 'react-hot-toast';
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; }
-interface Category  { id: string; name: string; menu_items: MenuItem[]; }
-interface Table     { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
-interface CartItem  extends MenuItem { quantity: number; notes: string; }
+interface Category { id: string; name: string; menu_items: MenuItem[]; }
+interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
+interface CartItem extends MenuItem { quantity: number; notes: string; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
-interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'|'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
+interface Order { id: string; table_id: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  PENDING:   { bg: '#fffbeb', text: '#b45309', border: '#fcd34d', dot: '#f59e0b' },
-  ACCEPTED:  { bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', dot: '#6366f1' },
+  PENDING: { bg: '#fffbeb', text: '#b45309', border: '#fcd34d', dot: '#f59e0b' },
+  ACCEPTED: { bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', dot: '#6366f1' },
   PREPARING: { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff', dot: '#a855f7' },
-  READY:     { bg: '#ecfdf5', text: '#065f46', border: '#6ee7b7', dot: '#10b981' },
-  SERVED:    { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0', dot: '#94a3b8' },
+  READY: { bg: '#ecfdf5', text: '#065f46', border: '#6ee7b7', dot: '#10b981' },
+  SERVED: { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0', dot: '#94a3b8' },
   CANCELLED: { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e' },
 };
 
 export default function WaiterDashboard() {
-  const navigate  = useNavigate();
-  const [view, setView]               = useState<'tables'|'order'|'status'>('tables');
-  const [tables, setTables]           = useState<Table[]>([]);
-  const [categories, setCategories]   = useState<Category[]>([]);
-  const [selectedTable, setSelectedTable]   = useState<Table | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string|'all'>('all');
+  const navigate = useNavigate();
+  const [view, setView] = useState<'tables' | 'order' | 'status'>('tables');
+  const [tables, setTables] = useState<Table[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart]               = useState<CartItem[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
 
-  const [checkoutModalOpen, setCheckoutModalOpen]   = useState(false);
-  const [checkoutOrder, setCheckoutOrder]           = useState<Order | null>(null);
-  const [billDetails, setBillDetails]               = useState<any>(null);
-  const [paymentMethod, setPaymentMethod]           = useState<'CASH'|'CARD'|'UPI'>('CASH');
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutOrder, setCheckoutOrder] = useState<Order | null>(null);
+  const [billDetails, setBillDetails] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'UPI'>('CASH');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [upiId, setUpiId]             = useState<string | null>(null);
+  const [upiId, setUpiId] = useState<string | null>(null);
 
   /* ── Data fetching ─────────────────────────────────────────── */
   const fetchOrdersOnly = async () => {
@@ -62,7 +62,7 @@ export default function WaiterDashboard() {
         status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Free',
         hasPendingCustomerOrder: ordersData.some((o: any) => o.table_id === t.id && o.source === 'CUSTOMER' && o.status === 'PENDING')
       })));
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -114,8 +114,8 @@ export default function WaiterDashboard() {
         toast.success('Order updated!');
         setEditingOrderId(null);
       } else {
-        await waiterApi.placeOrder({ 
-          table_id: selectedTable.id, 
+        await waiterApi.placeOrder({
+          table_id: selectedTable.id,
           items: cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })),
           customer_name: customerName || undefined,
           customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
@@ -132,13 +132,13 @@ export default function WaiterDashboard() {
     }
   };
 
-  const handleDeleteOrder   = async (id: string) => { if (!confirm('Delete this order?')) return; try { await waiterApi.deleteOrder(id); toast.success('Deleted'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleEditOrder     = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name||'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes||'', category_id:'', is_veg:false, is_available:true })) || []); toast('✏️ Editing order'); };
-  const handleServeOrder    = async (id: string) => { try { await waiterApi.updateOrderStatus(id,'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
-  const handleAcceptOrder   = async (id: string) => { try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
-  const handleRejectOrder   = async (id: string) => { if (!confirm('Reject this order?')) return; try { await waiterApi.updateOrderStatus(id,'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
-  const handleDirectPaymentConfirm = async (id: string) => { try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
-  const handleStartCheckout = async (order: Order) => { try { const bill = await waiterApi.generateBill(order.id,'CASH',0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail||'Failed'); } };
+  const handleDeleteOrder = async (id: string) => { if (!confirm('Delete this order?')) return; try { await waiterApi.deleteOrder(id); toast.success('Deleted'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', category_id: '', is_veg: false, is_available: true })) || []); toast('✏️ Editing order'); };
+  const handleServeOrder = async (id: string) => { try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  const handleAcceptOrder = async (id: string) => { try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  const handleRejectOrder = async (id: string) => { if (!confirm('Reject this order?')) return; try { await waiterApi.updateOrderStatus(id, 'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  const handleDirectPaymentConfirm = async (id: string) => { try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  const handleStartCheckout = async (order: Order) => { try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
   const handleConfirmPayment = async () => {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
@@ -147,7 +147,7 @@ export default function WaiterDashboard() {
       toast.success('✅ Payment confirmed! Table cleared.');
       setCheckoutModalOpen(false); setCheckoutOrder(null); setBillDetails(null);
       fetchInitialData();
-    } catch (e: any) { toast.error(e.response?.data?.detail||'Payment failed'); }
+    } catch (e: any) { toast.error(e.response?.data?.detail || 'Payment failed'); }
     finally { setIsProcessingPayment(false); }
   };
 
@@ -217,9 +217,8 @@ export default function WaiterDashboard() {
           )}
           <button
             onClick={() => setView('status')}
-            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all ${
-              view === 'status' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-            }`}
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all ${view === 'status' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+              }`}
           >
             <Clock size={13} /> Orders
           </button>
@@ -284,9 +283,9 @@ export default function WaiterDashboard() {
               </div>
               <div className="flex gap-2">
                 {[
-                  { label: 'Free',     bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0', dot: '#e2e8f0' },
+                  { label: 'Free', bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0', dot: '#e2e8f0' },
                   { label: 'Occupied', bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', dot: '#4f46e5' },
-                  { label: '⚡ Pending', bg: '#fef3c7', text: '#b45309', border: '#fcd34d',  dot: '#f59e0b' },
+                  { label: '⚡ Pending', bg: '#fef3c7', text: '#b45309', border: '#fcd34d', dot: '#f59e0b' },
                 ].map(s => (
                   <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}>
                     <div className="w-2 h-2 rounded-full" style={{ background: s.dot, boxShadow: `0 0 4px ${s.dot}` }} />
@@ -305,8 +304,8 @@ export default function WaiterDashboard() {
                   <div className="flex items-center gap-3 mb-4">
                     <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full"
                       style={section === 'AC'
-                        ? { background:'#eef2ff', color:'#4338ca', border:'1px solid #c7d2fe' }
-                        : { background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0' }
+                        ? { background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }
+                        : { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }
                       }
                     >
                       {section === 'AC' ? '❄️ AC Section' : '🌿 Non-AC Section'}
@@ -316,7 +315,7 @@ export default function WaiterDashboard() {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {sectionTables.map(table => {
-                      const isPending  = (table as any).hasPendingCustomerOrder;
+                      const isPending = (table as any).hasPendingCustomerOrder;
                       const isOccupied = table.status === 'Occupied';
                       return (
                         <button
@@ -328,12 +327,12 @@ export default function WaiterDashboard() {
                             boxShadow: isPending
                               ? '0 4px 20px rgb(245 158 11 / .18), 0 1px 4px rgb(0 0 0 / .04)'
                               : isOccupied
-                              ? '0 4px 20px rgb(79 70 229 / .12), 0 1px 4px rgb(0 0 0 / .04)'
-                              : '0 1px 4px rgb(0 0 0 / .04)',
+                                ? '0 4px 20px rgb(79 70 229 / .12), 0 1px 4px rgb(0 0 0 / .04)'
+                                : '0 1px 4px rgb(0 0 0 / .04)',
                           }}
                         >
                           {isPending && (
-                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background:'#f59e0b', color:'#fff', boxShadow:'0 2px 8px rgb(245 158 11 / .5)' }}>
+                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
                               ⚡ NEW
                             </span>
                           )}
@@ -373,7 +372,7 @@ export default function WaiterDashboard() {
             {tables.every((t: any) => !t.category && !t.section) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {tables.map(table => {
-                  const isPending  = (table as any).hasPendingCustomerOrder;
+                  const isPending = (table as any).hasPendingCustomerOrder;
                   const isOccupied = table.status === 'Occupied';
                   return (
                     <button
@@ -385,13 +384,13 @@ export default function WaiterDashboard() {
                         boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : '0 1px 4px rgb(0 0 0 / .04)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase z-10" style={{ background:'#f59e0b', color:'#fff' }}>⚡ NEW</span>}
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending?'linear-gradient(135deg,#fef3c7,#fde68a)':isOccupied?'linear-gradient(135deg,#eef2ff,#e0e7ff)':'linear-gradient(135deg,#f8fafc,#f1f5f9)', color:isPending?'#b45309':isOccupied?'#4338ca':'#94a3b8', border:`1.5px solid ${isPending?'#fcd34d':isOccupied?'#c7d2fe':'#e2e8f0'}` }}>
+                      {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff' }}>⚡ NEW</span>}
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8', border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}` }}>
                         {table.table_number}
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase tracking-wide">{table.capacity} seats</p>
-                        <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase" style={{ background:isPending?'#fef3c7':isOccupied?'#eef2ff':'#f8fafc', color:isPending?'#b45309':isOccupied?'#4338ca':'#94a3b8', border:`1px solid ${isPending?'#fcd34d':isOccupied?'#c7d2fe':'#e2e8f0'}` }}>
+                        <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase" style={{ background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : '#f8fafc', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8', border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}` }}>
                           {isPending ? '⚡ Pending' : table.status}
                         </div>
                       </div>
@@ -590,7 +589,7 @@ export default function WaiterDashboard() {
                 <span className="text-[13px] text-slate-500 font-medium">Draft Total</span>
                 <span className="text-[20px] font-extrabold text-slate-900 tracking-tight">₹{totalAmount}</span>
               </div>
-              
+
               {!editingOrderId && cart.length > 0 && (
                 <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
                   <input
@@ -654,7 +653,7 @@ export default function WaiterDashboard() {
                 {activeOrders.filter(o => o.status === 'PENDING').length > 0 && (
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full" style={{ background:'#fffbeb', color:'#b45309', border:'1px solid #fcd34d' }}>
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d' }}>
                         ⚡ Pending Acceptance
                       </span>
                       <div className="flex-1 h-px bg-slate-200" />
@@ -667,11 +666,11 @@ export default function WaiterDashboard() {
                             <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'linear-gradient(90deg,#f59e0b,#d97706)' }} />
                             <div className="flex justify-between items-start mb-4 mt-1">
                               <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-[15px]" style={{ background:'linear-gradient(135deg,#fef3c7,#fde68a)', color:'#b45309', border:'1px solid #fcd34d' }}>
+                                <div className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-[15px]" style={{ background: 'linear-gradient(135deg,#fef3c7,#fde68a)', color: '#b45309', border: '1px solid #fcd34d' }}>
                                   T{tNum}
                                 </div>
                                 <div>
-                                  <p className="font-bold text-[14px] text-slate-800">Order #{order.id.slice(0,6)}</p>
+                                  <p className="font-bold text-[14px] text-slate-800">Order #{order.id.slice(0, 6)}</p>
                                   <p className="text-[11px] font-semibold text-amber-600">Customer Request</p>
                                 </div>
                               </div>
@@ -679,12 +678,12 @@ export default function WaiterDashboard() {
                             </div>
                             <div className="space-y-1 pb-4 mb-4 border-b border-dashed border-amber-200">
                               {order.items?.map((item, idx) => (
-                                <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold text-slate-800">{item.quantity}×</span> {item.menu_item?.name||'Item'}{item.notes && <span className="text-amber-600 ml-1 italic">({item.notes})</span>}</p>
+                                <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold text-slate-800">{item.quantity}×</span> {item.menu_item?.name || 'Item'}{item.notes && <span className="text-amber-600 ml-1 italic">({item.notes})</span>}</p>
                               ))}
                             </div>
                             <div className="flex gap-2">
                               <button onClick={() => handleRejectOrder(order.id)} className="flex-1 py-2 rounded-xl text-[12px] font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">Reject</button>
-                              <button onClick={() => handleAcceptOrder(order.id)} className="flex-1 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgb(245 158 11 / .4)' }}>
+                              <button onClick={() => handleAcceptOrder(order.id)} className="flex-1 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow: '0 2px 8px rgb(245 158 11 / .4)' }}>
                                 Accept & Send ✓
                               </button>
                             </div>
@@ -699,7 +698,7 @@ export default function WaiterDashboard() {
                 {activeOrders.filter(o => o.status !== 'PENDING').length > 0 && (
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full" style={{ background:'#eef2ff', color:'#4338ca', border:'1px solid #c7d2fe' }}>
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full" style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
                         🍽 Active Tickets
                       </span>
                       <div className="flex-1 h-px bg-slate-200" />
@@ -717,7 +716,7 @@ export default function WaiterDashboard() {
                                   T{tNum}
                                 </div>
                                 <div>
-                                  <p className="font-bold text-[14px] text-slate-800">#{order.id.slice(0,6)}</p>
+                                  <p className="font-bold text-[14px] text-slate-800">#{order.id.slice(0, 6)}</p>
                                   <span className="text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.text, border: `1px solid ${st.border}` }}>
                                     {order.status}
                                   </span>
@@ -727,32 +726,27 @@ export default function WaiterDashboard() {
                             </div>
                             <div className="space-y-1 pb-3 mb-3 border-b border-dashed" style={{ borderColor: st.border }}>
                               {order.items?.map((item, idx) => (
-                                <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name||'Item'}</p>
+                                <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name || 'Item'}</p>
                               ))}
                             </div>
-                            <div className="flex flex-wrap justify-end gap-2 mt-2">
-                              {order.payment_status === 'PAID' && (
-                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-                                  ✅ Payment Done — Table Settled
-                                </span>
-                              )}
+                            <div className="flex justify-end gap-2 mt-2">
                               {order.payment_status === 'VERIFYING' && !order.razorpay_order_id && (
                                 <button onClick={() => handleDirectPaymentConfirm(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 transition-all hover:bg-indigo-100">
                                   Confirm Payment
                                 </button>
                               )}
                               {order.payment_status === 'VERIFYING' && order.razorpay_order_id && (
-                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 flex items-center gap-1">
-                                  ⚡ Razorpay — Auto Confirming...
+                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                                  ⚡ Razorpay — Auto Confirming
                                 </span>
                               )}
-                              {order.status === 'READY' && order.payment_status !== 'PAID' && (
-                                <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#10b981,#059669)', boxShadow:'0 2px 8px rgb(16 185 129 / .4)' }}>
+                              {order.status === 'READY' && (
+                                <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 2px 8px rgb(16 185 129 / .4)' }}>
                                   ✓ Mark Served
                                 </button>
                               )}
-                              {order.status === 'SERVED' && order.payment_status !== 'PAID' && (
-                                <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow:'0 2px 8px rgb(79 70 229 / .4)' }}>
+                              {order.status === 'SERVED' && (
+                                <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }}>
                                   💳 Checkout
                                 </button>
                               )}
@@ -774,14 +768,14 @@ export default function WaiterDashboard() {
         <div className="fixed bottom-0 w-full h-[64px] bg-white border-t border-slate-200 flex items-center justify-around px-4 md:hidden z-50 shadow-[0_-4px_16px_rgb(0_0_0/.06)]">
           {[
             { id: 'tables', Icon: LayoutGrid, label: 'Tables' },
-            { id: 'status', Icon: Clock,      label: 'Orders', badge: activeOrders.filter(o=>o.status!=='SERVED').length },
+            { id: 'status', Icon: Clock, label: 'Orders', badge: activeOrders.filter(o => o.status !== 'SERVED').length },
           ].map(({ id, Icon, label, badge }) => (
             <button key={id} onClick={() => setView(id as any)} className="flex flex-col items-center gap-1 relative px-6">
               <div className="relative">
-                <Icon size={20} className={view===id ? 'text-indigo-600' : 'text-slate-400'} />
+                <Icon size={20} className={view === id ? 'text-indigo-600' : 'text-slate-400'} />
                 {badge && badge > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">{badge}</span>}
               </div>
-              <span className={`text-[10px] font-bold ${view===id?'text-indigo-600':'text-slate-400'}`}>{label}</span>
+              <span className={`text-[10px] font-bold ${view === id ? 'text-indigo-600' : 'text-slate-400'}`}>{label}</span>
             </button>
           ))}
         </div>
@@ -820,15 +814,15 @@ export default function WaiterDashboard() {
                   {([
                     { id: 'CASH', Icon: Wallet, label: 'Cash' },
                     { id: 'CARD', Icon: CreditCard, label: 'Card' },
-                    { id: 'UPI',  Icon: Smartphone, label: 'UPI' },
+                    { id: 'UPI', Icon: Smartphone, label: 'UPI' },
                   ] as const).map(({ id, Icon, label }) => (
                     <button
                       key={id}
                       onClick={() => setPaymentMethod(id)}
                       className="py-3 rounded-2xl flex flex-col items-center gap-1.5 text-[11px] font-bold transition-all"
                       style={paymentMethod === id
-                        ? { background:'linear-gradient(135deg,#4f46e5,#6366f1)', color:'#fff', boxShadow:'0 2px 8px rgb(79 70 229 / .4)' }
-                        : { background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0' }
+                        ? { background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }
+                        : { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }
                       }
                     >
                       <Icon size={18} />
@@ -840,7 +834,7 @@ export default function WaiterDashboard() {
 
               {/* UPI QR */}
               {paymentMethod === 'UPI' && upiId && (
-                <div className="flex flex-col items-center rounded-2xl p-4" style={{ background:'#f8fafc', border:'1px solid #e2e8f0' }}>
+                <div className="flex flex-col items-center rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BARKAT&am=${billDetails.total_amount}&cu=INR`)}`}
                     alt="UPI QR"
@@ -854,7 +848,7 @@ export default function WaiterDashboard() {
                 onClick={handleConfirmPayment}
                 disabled={isProcessingPayment}
                 className="w-full py-3.5 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                style={{ background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', boxShadow:'0 4px 16px rgb(16 185 129 / .4)' }}
+                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}
               >
                 {isProcessingPayment ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Confirm Payment</>}
               </button>

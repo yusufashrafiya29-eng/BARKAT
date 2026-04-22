@@ -61,3 +61,44 @@ def update_menu_item_details(
     if token.get("role") != "OWNER":
         raise HTTPException(status_code=403, detail="Owner access required")
     return menu_service.update_menu_item(db, item_id, item_update.model_dump(exclude_unset=True), str(restaurant_id))
+
+from fastapi import File, UploadFile
+@router.post("/items/{item_id}/upload-image", response_model=MenuItemRead)
+def upload_menu_item_image(
+    item_id: str,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Upload an image for a menu item. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    # verify item belongs to restaurant
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="No valid image provided")
+        
+    from db.supabase import supabase_client
+    import uuid
+    file_ext = image.filename.split('.')[-1]
+    file_name = f"{uuid.uuid4()}.{file_ext}"
+    
+    image_content = image.file.read()
+    res = supabase_client.storage.from_('restaurant-logos').upload(
+        path=f"menu/{file_name}",
+        file=image_content,
+        file_options={"content-type": image.content_type}
+    )
+    
+    public_url = supabase_client.storage.from_('restaurant-logos').get_public_url(f"menu/{file_name}")
+    
+    item.image_url = public_url
+    db.commit()
+    db.refresh(item)
+    return item

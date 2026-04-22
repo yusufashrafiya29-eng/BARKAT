@@ -108,5 +108,31 @@ export const ownerApi = {
   updateRazorpayKeys: async (keys: { razorpay_key_id: string, razorpay_key_secret: string }) => {
     const response = await axios.post(`${BASE_URL}/settings/razorpay`, keys, getHeaders());
     return response.data;
+  },
+
+  // Profile & Security
+  changePassword: async (payload: any) => {
+    const response = await axios.put(`${BASE_URL}/users/me/password`, payload, getHeaders());
+    return response.data;
+  },
+
+  updateProfile: async (formData: FormData) => {
+    const response = await axios.put(`${BASE_URL}/settings/restaurant-profile`, formData, {
+      headers: {
+        ...getHeaders().headers,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+
+  uploadMenuItemImage: async (itemId: string, formData: FormData) => {
+    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/upload-image`, formData, {
+      headers: {
+        ...getHeaders().headers,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
   }
 };
