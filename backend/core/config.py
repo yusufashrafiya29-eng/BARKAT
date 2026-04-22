@@ -22,12 +22,12 @@ try:
     settings = Settings()
 except ValidationError as e:
     print("\n" + "="*60)
-    print("❌  STARTUP FAILED: Missing required environment variables")
+    print("! STARTUP FAILED: Missing required environment variables")
     print("="*60)
     for error in e.errors():
         field = " -> ".join(str(x) for x in error["loc"])
-        print(f"  • {field}: {error['msg']}")
-    print("\nSet these in your Render dashboard → Environment tab:")
+        print(f"  * {field}: {error['msg']}")
+    print("\nSet these in your Render dashboard -> Environment tab:")
     print("  DATABASE_URL, JWT_SECRET, SUPABASE_URL, SUPABASE_KEY")
     print("="*60 + "\n")
     sys.exit(1)
