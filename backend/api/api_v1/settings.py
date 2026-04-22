@@ -33,14 +33,14 @@ def update_restaurant_profile(
         file_name = f"{uuid.uuid4()}.{file_ext}"
         
         logo_content = logo.file.read()
-        res = supabase_client.storage.from_('restaurant-logos').upload(
+        res = supabase_client.storage.from_('logos').upload(
             path=file_name,
             file=logo_content,
             file_options={"content-type": logo.content_type}
         )
         
         # Get public URL
-        public_url = supabase_client.storage.from_('restaurant-logos').get_public_url(file_name)
+        public_url = supabase_client.storage.from_('logos').get_public_url(file_name)
         restaurant.logo_url = public_url
         
     db.commit()

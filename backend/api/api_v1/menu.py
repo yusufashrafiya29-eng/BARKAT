@@ -103,13 +103,13 @@ def upload_menu_item_image(
     file_name = f"{uuid.uuid4()}.{file_ext}"
     
     image_content = image.file.read()
-    res = supabase_client.storage.from_('restaurant-logos').upload(
+    res = supabase_client.storage.from_('logos').upload(
         path=f"menu/{file_name}",
         file=image_content,
         file_options={"content-type": image.content_type}
     )
     
-    public_url = supabase_client.storage.from_('restaurant-logos').get_public_url(f"menu/{file_name}")
+    public_url = supabase_client.storage.from_('logos').get_public_url(f"menu/{file_name}")
     
     item.image_url = public_url
     db.commit()
