@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, ArrowRight, CheckCircle2, MessageCircle } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const SubscriptionLock: React.FC = () => {
