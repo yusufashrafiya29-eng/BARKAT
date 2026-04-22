@@ -478,16 +478,16 @@ const CustomerMenu: React.FC = () => {
                 <div className="text-center mb-6">
                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Cumulative Total</p>
                   <p className="text-3xl font-semibold tracking-tight">
-                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
+                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0)}
                   </p>
                 </div>
                 
                 <button 
                   onClick={() => setShowPaymentQR(true)}
-                  disabled={tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0) === 0}
+                  disabled={tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0) === 0}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full"
                 >
-                  <QrCode size={16} className="mr-2" /> {tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0) === 0 ? 'All Settled' : 'Pay Electronically'}
+                  <QrCode size={16} className="mr-2" /> {tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0) === 0 ? 'All Settled' : 'Pay Electronically'}
                 </button>
               </div>
             </div>
@@ -608,7 +608,7 @@ const CustomerMenu: React.FC = () => {
                 <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-6">
                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
                    <p className="text-[20px] font-semibold text-slate-800">
-                     ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
+                     ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0)}
                    </p>
                 </div>
    
