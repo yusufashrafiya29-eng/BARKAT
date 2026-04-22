@@ -61,7 +61,7 @@ interface Analytics {
   served_orders: number;
 }
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'payments';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
