@@ -78,12 +78,28 @@ def create_razorpay_order(
 @router.post("/webhook")
 async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
     """
-    Webhook to receive payment.captured events.
-    In a production scenario, you MUST verify the signature using razorpay_webhook_secret.
-    Since webhook secrets might be complex to manage dynamically per-restaurant without a central DB,
-    we will identify the restaurant via the order ID and verify the payment status.
+    Receives payment.captured events from Razorpay.
+    Verifies the webhook signature using RAZORPAY_WEBHOOK_SECRET for security.
     """
+    from core.config import settings
+    import hmac
+    import hashlib
+
     body = await request.body()
+
+    # --- Signature Verification (Security) ---
+    webhook_secret = settings.RAZORPAY_WEBHOOK_SECRET
+    if webhook_secret:
+        razorpay_signature = request.headers.get("x-razorpay-signature", "")
+        expected_signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_signature, razorpay_signature):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    # --- Process Payload ---
     try:
         payload = json.loads(body.decode('utf-8'))
     except Exception:
@@ -96,12 +112,10 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
         rp_payment_id = payment.get('id')
 
         if rp_order_id:
-            # Find orders associated with this Razorpay order
             orders = db.query(Order).filter(Order.razorpay_order_id == rp_order_id).all()
             for order in orders:
                 order.payment_status = 'PAID'
                 order.razorpay_payment_id = rp_payment_id
-            
             db.commit()
-    
+
     return {"status": "ok"}
