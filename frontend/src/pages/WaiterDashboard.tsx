@@ -18,7 +18,7 @@ interface Category  { id: string; name: string; menu_items: MenuItem[]; }
 interface Table     { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
 interface CartItem  extends MenuItem { quantity: number; notes: string; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
-interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; }
+interface Order     { id: string; table_id: string; status: 'PENDING'|'ACCEPTED'|'PREPARING'|'READY'|'SERVED'; payment_status: 'PENDING'|'PAID'|'FAILED'|'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER'|'WAITER'; is_accepted?: boolean; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
