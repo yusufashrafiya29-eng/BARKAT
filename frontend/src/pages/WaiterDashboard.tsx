@@ -836,7 +836,7 @@ export default function WaiterDashboard() {
               {paymentMethod === 'UPI' && upiId && (
                 <div className="flex flex-col items-center rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BARKAT&am=${billDetails.total_amount}&cu=INR`)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Dine Flow&am=${billDetails.total_amount}&cu=INR`)}`}
                     alt="UPI QR"
                     className="w-36 h-36 rounded-xl"
                   />

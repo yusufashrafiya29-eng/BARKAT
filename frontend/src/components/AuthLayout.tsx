@@ -40,11 +40,7 @@ const AuthLayout: React.FC = () => {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.2)', backdropFilter: 'blur(8px)' }}>
-            <UtensilsCrossed size={20} className="text-white" />
-          </div>
-          <span className="text-white font-extrabold text-[20px] tracking-tight">BARKAT</span>
+          <img src="/dineflow-logo.png" alt="Dine Flow" className="h-10 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
         </div>
 
         {/* Hero text */}
@@ -83,7 +79,7 @@ const AuthLayout: React.FC = () => {
         <div className="relative z-10">
           <div className="p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', backdropFilter: 'blur(8px)' }}>
             <p className="text-[13px] text-indigo-100 leading-relaxed italic">
-              "BARKAT transformed how we manage our restaurant. Orders are now seamless and our kitchen efficiency has doubled."
+              "Dine Flow transformed how we manage our restaurant. Orders are now seamless and our kitchen efficiency has doubled."
             </p>
             <div className="flex items-center gap-2 mt-3">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white">A</div>
@@ -104,10 +100,7 @@ const AuthLayout: React.FC = () => {
 
         {/* Mobile header (logo only) */}
         <div className="lg:hidden flex items-center gap-2.5 px-6 py-5 border-b border-slate-200 bg-white">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}>
-            <UtensilsCrossed size={16} className="text-white" />
-          </div>
-          <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">BARKAT</span>
+          <img src="/dineflow-logo.png" alt="Dine Flow" className="h-8 object-contain" />
         </div>
 
         {/* Form area */}
@@ -119,7 +112,7 @@ const AuthLayout: React.FC = () => {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-6 pb-6 px-6">
-          <p className="text-[11px] text-slate-400 font-medium">© 2025 BARKAT</p>
+          <p className="text-[11px] text-slate-400 font-medium">© 2025 Dine Flow</p>
           <span className="text-slate-200">·</span>
           <Link to="/login" className="text-[11px] text-slate-400 hover:text-slate-700 transition-colors font-medium">
             {isLogin ? 'Create account' : 'Sign in'}

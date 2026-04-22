@@ -92,7 +92,7 @@ const Dashboard: React.FC = () => {
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
   const canSeeKitchen = role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN';
 
-  const restaurantName = localStorage.getItem('restaurantName') || 'BARKAT';
+  const restaurantName = localStorage.getItem('restaurantName') || 'Dine Flow';
   const restaurantLogo = localStorage.getItem('restaurantLogo');
 
   const workspaces = [
@@ -310,7 +310,7 @@ const Dashboard: React.FC = () => {
 
           {/* Footer note */}
           <p className="text-center text-[11px] text-slate-400 mt-10 font-medium uppercase tracking-widest">
-            BARKAT Restaurant OS · Powered by YUSUF ASHRAFIYA
+            Dine Flow Restaurant OS · Powered by YUSUF ASHRAFIYA
           </p>
         </div>
       </main>

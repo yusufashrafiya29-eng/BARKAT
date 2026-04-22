@@ -39,12 +39,7 @@ export default function PublicNavbar() {
           
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center mr-3" style={{ background: 'linear-gradient(135deg,#312e81,#4f46e5)' }}>
-              <span className="text-white font-extrabold text-xl">D</span>
-            </div>
-            <span className={`text-xl font-extrabold tracking-tight ${isScrolled ? 'text-slate-900' : 'text-slate-900'}`}>
-              Dine Flow
-            </span>
+            <img src="/dineflow-logo.png" alt="Dine Flow" className="h-10 object-contain" />
           </div>
 
           {/* Desktop Menu */}

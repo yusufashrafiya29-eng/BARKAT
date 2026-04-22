@@ -631,7 +631,7 @@ const CustomerMenu: React.FC = () => {
                   Pay by Cash
                 </button>
    
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by BARKAT</p>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by Dine Flow</p>
               </div>
             )}
           </div>

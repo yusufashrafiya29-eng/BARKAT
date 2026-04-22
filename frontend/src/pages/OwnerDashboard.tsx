@@ -1023,7 +1023,7 @@ export default function OwnerDashboard() {
                         <p className="text-[12px] text-muted mb-4">Payment QR Preview</p>
                         <div className="bg-white p-2 inline-block rounded-md mx-auto">
                           <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BARKAT_RESTAURANT&cu=INR`)}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Dine_Flow&cu=INR`)}`}
                             alt="UPI QR Code"
                             className="w-32 h-32"
                           />
@@ -1254,7 +1254,7 @@ export default function OwnerDashboard() {
                   </div>
                   <div className="mt-6 text-center">
                     <p className="font-semibold text-[15px]">Scan to Order</p>
-                    <p className="text-gray-500 text-[12px] mt-1 uppercase tracking-widest">{localStorage.getItem('restaurantName') || 'BARKAT'}</p>
+                    <p className="text-gray-500 text-[12px] mt-1 uppercase tracking-widest">{localStorage.getItem('restaurantName') || 'Dine Flow'}</p>
                   </div>
                 </div>
               );
