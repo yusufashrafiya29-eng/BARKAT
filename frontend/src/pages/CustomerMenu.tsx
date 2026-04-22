@@ -133,6 +133,40 @@ const CustomerMenu: React.FC = () => {
     }
   };
 
+  const handleRazorpayPayment = async () => {
+    try {
+      const { razorpay_order_id, razorpay_key_id, amount, currency } = await customerApi.createRazorpayOrder(tableId as string);
+      
+      const options = {
+        key: razorpay_key_id,
+        amount: amount,
+        currency: currency,
+        name: tableInfo?.restaurant_name || "BARKAT",
+        description: `Payment for Table ${tableInfo?.table_number}`,
+        order_id: razorpay_order_id,
+        handler: function (_response: any) {
+          toast.success("Payment successful! Verifying...");
+          setIsVerifying(true);
+          // The webhook will mark it PAID, and our 3s polling will catch it.
+        },
+        prefill: {
+          name: customerName,
+          contact: customerPhone
+        },
+        theme: {
+          color: "#4f46e5"
+        }
+      };
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (_response: any) {
+        toast.error("Payment failed. Please try again or pay by cash.");
+      });
+      rzp.open();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Failed to initialize payment.");
+    }
+  };
+
   const addToCart = (item: MenuItem) => {
     if (!item.is_available) return;
     setCart(prev => {
@@ -537,45 +571,27 @@ const CustomerMenu: React.FC = () => {
             ) : (
               <div className="flex flex-col items-center text-center">
                 <h3 className="text-[18px] font-semibold mb-2 mt-4">Pay & Settle</h3>
-                <p className="text-[12px] text-slate-500 mb-6 leading-relaxed px-4">Pay instantly using any UPI client, then inform the staff.</p>
+                <p className="text-[12px] text-slate-500 mb-6 leading-relaxed px-4">Choose your preferred payment method.</p>
                 
-                {tableInfo?.restaurant_upi_id ? (
-                  <>
-                    <div className="bg-white p-3 rounded mb-4 border border-slate-200 inline-block">
-                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=${tableInfo.restaurant_upi_id}&pn=${tableInfo.restaurant_name}&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`)}`} 
-                        alt="Payment QR" 
-                        className="w-40 h-40"
-                      />
-                    </div>
-                    
-                    <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-4">
-                       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
-                       <p className="text-[20px] font-semibold text-slate-800">
-                         ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
-                       </p>
-                    </div>
-       
-                    <a 
-                      href={`upi://pay?pa=${tableInfo.restaurant_upi_id}&pn=${encodeURIComponent(tableInfo.restaurant_name)}&am=${tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}`}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-3 transition-colors shadow-sm"
-                    >
-                      Pay via UPI App
-                    </a>
-                  </>
-                ) : (
-                  <div className="w-full bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6">
-                    <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
-                    <p className="text-[13px] font-semibold text-rose-800">UPI Not Configured</p>
-                    <p className="text-[11px] text-rose-600 mt-1">This restaurant has not configured their UPI ID yet. Please pay by cash or card.</p>
-                  </div>
-                )}
+                <div className="w-full bg-slate-50 border border-slate-200 rounded p-4 mb-6">
+                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Due Amount</p>
+                   <p className="text-[20px] font-semibold text-slate-800">
+                     ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING').reduce((sum, o) => sum + o.total_amount, 0)}
+                   </p>
+                </div>
+   
+                <button 
+                  onClick={handleRazorpayPayment}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-3 transition-colors shadow-sm flex items-center justify-center gap-2"
+                >
+                  <Zap size={16} /> Pay Online (Razorpay)
+                </button>
   
                 <button 
                   onClick={handleNotifyPayment}
                   className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-6 hover:bg-indigo-50 transition-colors"
                 >
-                  {tableInfo?.restaurant_upi_id ? 'I have paid' : 'Request Cash/Card Payment'}
+                  Pay by Cash
                 </button>
    
                 <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by BARKAT</p>

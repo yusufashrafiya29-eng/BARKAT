@@ -77,7 +77,7 @@ export default function OwnerDashboard() {
   const [tables, setTables] = useState<Table[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [upiId, setUpiId] = useState('');
-
+  const [razorpayKeys, setRazorpayKeys] = useState({ razorpay_key_id: '', razorpay_key_secret: '' });
   // Modal States
   const [showAddModal, setShowAddModal] = useState<TabType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -130,8 +130,12 @@ export default function OwnerDashboard() {
           setInventory(invRes);
           break;
         case 'payments':
-          const payRes = await ownerApi.getUpiId();
+          const [payRes, rzpRes] = await Promise.all([
+            ownerApi.getUpiId(),
+            ownerApi.getRazorpayKeys()
+          ]);
           setUpiId(payRes.upi_id || '');
+          setRazorpayKeys(rzpRes);
           break;
       }
     } catch (err) {
@@ -172,8 +176,12 @@ export default function OwnerDashboard() {
           setInventory(invRes);
           break;
         case 'payments':
-          const payRes = await ownerApi.getUpiId();
-          setUpiId(payRes.upi_id || '');
+          const [payResData, rzpResData] = await Promise.all([
+            ownerApi.getUpiId(),
+            ownerApi.getRazorpayKeys()
+          ]);
+          setUpiId(payResData.upi_id || '');
+          setRazorpayKeys(rzpResData);
           break;
       }
     } catch (err: any) {
@@ -230,6 +238,24 @@ export default function OwnerDashboard() {
       fetchData();
     } catch {
       toast.error("Failed to save UPI settings");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleSaveRazorpay = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const keyId = formData.get('razorpay_key_id') as string;
+    const keySecret = formData.get('razorpay_key_secret') as string;
+
+    try {
+      await ownerApi.updateRazorpayKeys({ razorpay_key_id: keyId, razorpay_key_secret: keySecret });
+      toast.success("Razorpay Configuration Saved");
+      fetchData();
+    } catch {
+      toast.error("Failed to save Razorpay settings");
     } finally {
       setFormLoading(false);
     }
@@ -813,7 +839,7 @@ export default function OwnerDashboard() {
                   </div>
                   
                   {upiId && (
-                     <div className="surface p-6 text-center border-dashed">
+                     <div className="surface p-6 text-center border-dashed mb-6">
                         <p className="text-[12px] text-muted mb-4">Payment QR Preview</p>
                         <div className="bg-white p-2 inline-block rounded-md mx-auto">
                           <img
@@ -825,6 +851,38 @@ export default function OwnerDashboard() {
                         <p className="mt-4 text-[13px] text-muted font-mono">{upiId}</p>
                      </div>
                   )}
+
+                  <div className="surface p-6 mb-6">
+                    <h3 className="text-[15px] font-medium mb-1">Razorpay Integration</h3>
+                    <p className="text-[13px] text-muted mb-6">Configure Razorpay keys for online card, netbanking, and wallet payments.</p>
+ 
+                    <form onSubmit={handleSaveRazorpay} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Razorpay Key ID</label>
+                        <input
+                          name="razorpay_key_id"
+                          defaultValue={razorpayKeys.razorpay_key_id}
+                          placeholder="rzp_live_..."
+                          className="form-input"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Razorpay Key Secret</label>
+                        <input
+                          name="razorpay_key_secret"
+                          type="password"
+                          defaultValue={razorpayKeys.razorpay_key_secret}
+                          placeholder="Secret Key"
+                          className="form-input"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <button type="submit" disabled={formLoading} className="btn">
+                          {formLoading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Save Keys'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>

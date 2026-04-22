@@ -31,5 +31,12 @@ export const customerApi = {
   notifyPayment: async (tableId: string) => {
     const response = await axios.put(`${BASE_URL}/orders/table/${tableId}/verify-payment`);
     return response.data;
+  },
+
+  createRazorpayOrder: async (tableId: string) => {
+    const response = await axios.post(`${BASE_URL}/payments/create-order`, {
+      table_id: tableId
+    });
+    return response.data;
   }
 };

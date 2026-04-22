@@ -98,5 +98,15 @@ export const ownerApi = {
   updateUpiId: async (upi_id: string) => {
     const response = await axios.post(`${BASE_URL}/settings/upi`, { upi_id }, getHeaders());
     return response.data;
+  },
+
+  getRazorpayKeys: async () => {
+    const response = await axios.get(`${BASE_URL}/settings/razorpay`, getHeaders());
+    return response.data;
+  },
+
+  updateRazorpayKeys: async (keys: { razorpay_key_id: string, razorpay_key_secret: string }) => {
+    const response = await axios.post(`${BASE_URL}/settings/razorpay`, keys, getHeaders());
+    return response.data;
   }
 };
