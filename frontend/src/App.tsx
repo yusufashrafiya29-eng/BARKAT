@@ -16,11 +16,15 @@ import WaiterDashboard from './pages/WaiterDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import CustomerMenu from './pages/CustomerMenu';
 import KitchenKDS from './pages/KitchenKDS';
+import LandingPage from './pages/LandingPage';
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Landing Page (Public) */}
+        <Route path="/" element={<LandingPage />} />
+        
         {/* Customer QR Route (Public — no auth needed) */}
         <Route path="/order/table/:tableId" element={<CustomerMenu />} />
 
