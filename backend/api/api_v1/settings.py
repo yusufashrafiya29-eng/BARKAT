@@ -28,17 +28,36 @@ def update_restaurant_profile(
         
     if logo and logo.filename:
         from db.supabase import supabase_client
-        import uuid
-        file_ext = logo.filename.split('.')[-1]
-        file_name = f"{uuid.uuid4()}.{file_ext}"
-        
+        import uuid, io
+        from PIL import Image
+
+        # Read raw bytes
         logo_content = logo.file.read()
+
+        # Convert to PNG with PIL (preserves transparency)
+        try:
+            img = Image.open(io.BytesIO(logo_content))
+            if img.mode not in ("RGBA", "RGB"):
+                img = img.convert("RGBA")
+            img.thumbnail((800, 800))
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG", optimize=True)
+            buffer.seek(0)
+            final_bytes = buffer.getvalue()
+            content_type = "image/png"
+        except Exception as pil_err:
+            print(f"DEBUG settings: PIL failed ({pil_err}), using raw bytes")
+            final_bytes = logo_content
+            content_type = logo.content_type
+
+        file_name = f"logo_{uuid.uuid4().hex}.png"
+
         res = supabase_client.storage.from_('logos').upload(
             path=file_name,
-            file=logo_content,
-            file_options={"content-type": logo.content_type}
+            file=final_bytes,
+            file_options={"content-type": content_type, "upsert": "true"}
         )
-        
+
         # Get public URL
         public_url = supabase_client.storage.from_('logos').get_public_url(file_name)
         restaurant.logo_url = public_url
