@@ -127,11 +127,11 @@ const Dashboard: React.FC = () => {
             ? <img
                 src={restaurantLogo}
                 alt="Logo"
-                className="w-11 h-11 shrink-0 object-contain"
+                className="w-12 h-12 shrink-0 object-contain"
                 onError={() => setImageError(true)}
               />
             : <div
-                className="w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center"
+                className="w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}
               >
                 <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
@@ -181,16 +181,16 @@ const Dashboard: React.FC = () => {
                 ? <img
                     src={restaurantLogo}
                     alt="Logo"
-                    className="w-28 h-28 object-contain"
+                    className="w-36 h-36 object-contain"
                   />
                 : <div
-                    className="w-28 h-28 rounded-3xl flex items-center justify-center"
+                    className="w-36 h-36 rounded-3xl flex items-center justify-center"
                     style={{
                       background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 50%,#7c3aed 100%)',
                       boxShadow: '0 8px 32px rgb(79 70 229 / .25)',
                     }}
                   >
-                    <span className="text-white font-black text-[48px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
+                    <span className="text-white font-black text-[56px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
                   </div>
               }
 

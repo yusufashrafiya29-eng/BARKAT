@@ -85,7 +85,7 @@ async def signup_owner(
         image_data = await logo.read()
         
         # Generate unique filename using UUID
-        filename = f"logo_{uuid.uuid4().hex}.jpg"
+        filename = f"logo_{uuid.uuid4().hex}.png"
 
         final_bytes = image_data
         content_type = logo.content_type
@@ -95,17 +95,18 @@ async def signup_owner(
             from PIL import Image
             print("DEBUG: Processing logo with PIL...")
             img = Image.open(io.BytesIO(image_data))
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-            img.thumbnail((512, 512))
+            # Keep RGBA for transparency support in PNG
+            if img.mode not in ("RGBA", "RGB"):
+                img = img.convert("RGBA")
+            img.thumbnail((800, 800))
             
-            # Save optimized image to memory
+            # Save as PNG to preserve transparency
             buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=85)
+            img.save(buffer, format="PNG", optimize=True)
             buffer.seek(0)
             final_bytes = buffer.getvalue()
-            content_type = "image/jpeg"
-            print("DEBUG: PIL processing complete.")
+            content_type = "image/png"
+            print("DEBUG: PIL processing complete (PNG).")
         except Exception as pil_err:
             print(f"DEBUG: PIL processing failed ({pil_err}), falling back to raw upload.")
 
