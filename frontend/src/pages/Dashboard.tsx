@@ -140,40 +140,33 @@ const Dashboard: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="h-[72px] flex items-center justify-between px-6 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3.5">
-          {/* Dine Flow Platform Logo */}
-          <img
-            src="/dineflow-logo.png"
-            alt="Dine Flow"
-            className="h-12 w-auto object-contain shrink-0"
-          />
-          {/* Restaurant Logo separator */}
-          {restaurantLogo && !imageError && (
-            <>
-              <div className="w-px h-8 bg-slate-200" />
-              <img
+          {/* Restaurant Logo */}
+          {(restaurantLogo && !imageError)
+            ? <img
                 src={restaurantLogo}
                 alt="Logo"
-                className="w-10 h-10 shrink-0 object-contain"
+                className="w-12 h-12 shrink-0 object-contain"
                 onError={() => setImageError(true)}
               />
-              <div>
-                <h2 className="text-[15px] font-extrabold text-slate-900 tracking-tight leading-none">{restaurantName}</h2>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5 hidden sm:block">Restaurant Management System</p>
+            : <div
+                className="w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}
+              >
+                <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
               </div>
-            </>
-          )}
-          {!restaurantLogo && (
-            <>
-              <div className="w-px h-8 bg-slate-200" />
-              <div className="w-10 h-10 rounded-2xl shrink-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}>
-                <span className="text-white font-extrabold text-[16px]">{restaurantName.charAt(0).toUpperCase()}</span>
-              </div>
-              <div>
-                <h2 className="text-[15px] font-extrabold text-slate-900 tracking-tight leading-none">{restaurantName}</h2>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5 hidden sm:block">Restaurant Management System</p>
-              </div>
-            </>
-          )}
+          }
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[17px] font-extrabold text-slate-900 tracking-tight leading-none">{restaurantName}</h2>
+              <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
+                style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #6ee7b7' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" style={{ boxShadow: '0 0 6px #10b981' }} />
+                Live
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5 hidden sm:block">Restaurant Management System</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -316,10 +309,7 @@ const Dashboard: React.FC = () => {
             ))}
           </div>
 
-          {/* Footer note */}
-          <p className="text-center text-[11px] text-slate-400 mt-10 font-medium uppercase tracking-widest">
-            Dine Flow Restaurant OS · Powered by YUSUF ASHRAFIYA
-          </p>
+
         </div>
       </main>
     </div>
