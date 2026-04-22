@@ -20,15 +20,13 @@ def change_password(
     db: Session = Depends(get_db),
     token: dict = Depends(get_current_user_token)
 ):
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    from api.api_v1.auth import _hash_password
+    from api.api_v1.auth import _hash_password, _verify_password
     
     user = db.query(User).filter(User.id == token.get("sub")).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    if not pwd_context.verify(payload.current_password, user.password_hash):
+    if not _verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect current password")
         
     user.password_hash = _hash_password(payload.new_password)
