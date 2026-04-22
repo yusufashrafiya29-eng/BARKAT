@@ -140,20 +140,20 @@ const Dashboard: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="h-[72px] flex items-center justify-between px-6 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3.5">
-          {/* Restaurant Logo */}
+          {/* Restaurant Logo — borderless, bigger */}
           {(restaurantLogo && !imageError)
             ? <img
                 src={restaurantLogo}
                 alt="Logo"
-                className="w-12 h-12 shrink-0 object-contain"
+                className="w-16 h-16 shrink-0 object-contain"
                 onError={() => setImageError(true)}
               />
-            : <div
-                className="w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}
+            : <span
+                className="text-[28px] font-black leading-none shrink-0"
+                style={{ color: '#4338ca' }}
               >
-                <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
-              </div>
+                {restaurantName.charAt(0).toUpperCase()}
+              </span>
           }
           <div>
             <div className="flex items-center gap-2">
