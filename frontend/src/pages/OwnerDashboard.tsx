@@ -66,6 +66,7 @@ type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory
 export default function OwnerDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('analytics');
+  const [isUploadingImage, setIsUploadingImage] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   // Data States
