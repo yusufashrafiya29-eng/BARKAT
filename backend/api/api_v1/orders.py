@@ -46,7 +46,6 @@ def pull_waiter_orders(
     return db.query(Order).outerjoin(Bill, Order.id == Bill.order_id).filter(
         Order.restaurant_id == restaurant_id,
         Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
-        Order.payment_status != 'PAID',
         (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED)
     ).order_by(Order.created_at.desc()).all()
 

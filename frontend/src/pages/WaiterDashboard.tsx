@@ -730,23 +730,28 @@ export default function WaiterDashboard() {
                                 <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name||'Item'}</p>
                               ))}
                             </div>
-                            <div className="flex justify-end gap-2 mt-2">
+                            <div className="flex flex-wrap justify-end gap-2 mt-2">
+                              {order.payment_status === 'PAID' && (
+                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                                  ✅ Payment Done — Table Settled
+                                </span>
+                              )}
                               {order.payment_status === 'VERIFYING' && !order.razorpay_order_id && (
                                 <button onClick={() => handleDirectPaymentConfirm(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 transition-all hover:bg-indigo-100">
                                   Confirm Payment
                                 </button>
                               )}
                               {order.payment_status === 'VERIFYING' && order.razorpay_order_id && (
-                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-                                  ⚡ Razorpay — Auto Confirming
+                                <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 flex items-center gap-1">
+                                  ⚡ Razorpay — Auto Confirming...
                                 </span>
                               )}
-                              {order.status === 'READY' && (
+                              {order.status === 'READY' && order.payment_status !== 'PAID' && (
                                 <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#10b981,#059669)', boxShadow:'0 2px 8px rgb(16 185 129 / .4)' }}>
                                   ✓ Mark Served
                                 </button>
                               )}
-                              {order.status === 'SERVED' && (
+                              {order.status === 'SERVED' && order.payment_status !== 'PAID' && (
                                 <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background:'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow:'0 2px 8px rgb(79 70 229 / .4)' }}>
                                   💳 Checkout
                                 </button>

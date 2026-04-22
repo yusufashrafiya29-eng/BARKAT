@@ -52,6 +52,8 @@ class OrderRead(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     items: List[OrderItemRead] = []
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
 
     class Config:
         from_attributes = True
