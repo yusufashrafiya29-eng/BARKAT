@@ -123,19 +123,20 @@ const Dashboard: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="h-[72px] flex items-center justify-between px-6 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3.5">
-          <div
-            className="w-11 h-11 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center"
-            style={{
-              background: (restaurantLogo && !imageError) ? '#f8fafc' : 'linear-gradient(135deg,#4338ca,#6366f1)',
-              boxShadow: '0 0 0 2.5px #6366f140, 0 4px 14px rgb(79 70 229 / .25)',
-              border: '1px solid #e0e7ff',
-            }}
-          >
-            {(restaurantLogo && !imageError)
-              ? <img src={restaurantLogo} alt="Logo" className="w-full h-full object-cover" onError={() => setImageError(true)} />
-              : <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
-            }
-          </div>
+          {(restaurantLogo && !imageError)
+            ? <img
+                src={restaurantLogo}
+                alt="Logo"
+                className="w-11 h-11 shrink-0 object-contain"
+                onError={() => setImageError(true)}
+              />
+            : <div
+                className="w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg,#4338ca,#6366f1)' }}
+              >
+                <span className="text-white font-extrabold text-[18px]">{restaurantName.charAt(0).toUpperCase()}</span>
+              </div>
+          }
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-[17px] font-extrabold text-slate-900 tracking-tight leading-none">{restaurantName}</h2>
@@ -176,19 +177,22 @@ const Dashboard: React.FC = () => {
 
             {/* Big logo + restaurant name */}
             <div className="flex flex-col items-center gap-4 mb-8">
-              <div
-                className="w-20 h-20 rounded-3xl overflow-hidden flex items-center justify-center"
-                style={{
-                  background: restaurantLogo ? '#fff' : 'linear-gradient(135deg,#4338ca 0%,#6366f1 50%,#7c3aed 100%)',
-                  boxShadow: '0 0 0 4px #6366f120, 0 8px 32px rgb(79 70 229 / .25)',
-                  border: '2px solid #e0e7ff',
-                }}
-              >
-                {restaurantLogo
-                  ? <img src={restaurantLogo} alt="Logo" className="w-full h-full object-cover" />
-                  : <span className="text-white font-black text-[36px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
-                }
-              </div>
+              {restaurantLogo
+                ? <img
+                    src={restaurantLogo}
+                    alt="Logo"
+                    className="w-28 h-28 object-contain"
+                  />
+                : <div
+                    className="w-28 h-28 rounded-3xl flex items-center justify-center"
+                    style={{
+                      background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 50%,#7c3aed 100%)',
+                      boxShadow: '0 8px 32px rgb(79 70 229 / .25)',
+                    }}
+                  >
+                    <span className="text-white font-black text-[48px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
+                  </div>
+              }
 
               <div>
                 <h1
