@@ -43,6 +43,11 @@ export const ownerApi = {
     const response = await axios.put(`${BASE_URL}/menu/items/${itemId}`, { is_available }, getHeaders());
     return response.data;
   },
+
+  deleteMenuItem: async (itemId: string) => {
+    const response = await axios.delete(`${BASE_URL}/menu/items/${itemId}`, getHeaders());
+    return response.data;
+  },
   
   // Tables
   addTable: async (payload: any) => {

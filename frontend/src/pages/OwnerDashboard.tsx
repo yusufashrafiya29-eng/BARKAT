@@ -241,6 +241,17 @@ export default function OwnerDashboard() {
     } catch { toast.error("Update failed"); }
   };
 
+  const handleDeleteMenuItem = async (itemId: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name} from the menu?`)) return;
+    try {
+      await ownerApi.deleteMenuItem(itemId);
+      toast.success(`${name} deleted`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Delete failed");
+    }
+  };
+
   const handleDeleteTable = async (id: string, num: number) => {
     if (!window.confirm(`Delete Table ${num}?`)) return;
     try {
@@ -749,7 +760,16 @@ export default function OwnerDashboard() {
 
                             <div className="flex justify-between items-start mb-2">
                               <h4 className="text-[14px] font-medium pr-4 text-main">{item.name}</h4>
-                              <span className="text-[13px] text-muted">₹{item.price}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[13px] text-muted">₹{item.price}</span>
+                                <button 
+                                  onClick={() => handleDeleteMenuItem(item.id, item.name)}
+                                  className="text-muted hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-50"
+                                  title="Delete Item"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                             <p className="text-[13px] text-muted line-clamp-2 mb-4 leading-normal h-[40px]">{item.description}</p>
                             

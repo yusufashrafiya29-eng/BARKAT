@@ -33,3 +33,13 @@ def update_menu_item(db: Session, item_id: str, item_in: dict, restaurant_id: st
     db.commit()
     db.refresh(obj)
     return obj
+
+def delete_menu_item(db: Session, item_id: str, restaurant_id: str):
+    from fastapi import HTTPException
+    obj = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    db.delete(obj)
+    db.commit()
+    return {"message": "Menu item deleted successfully"}

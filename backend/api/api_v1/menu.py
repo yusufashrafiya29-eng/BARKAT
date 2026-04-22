@@ -62,6 +62,19 @@ def update_menu_item_details(
         raise HTTPException(status_code=403, detail="Owner access required")
     return menu_service.update_menu_item(db, item_id, item_update.model_dump(exclude_unset=True), str(restaurant_id))
 
+@router.delete("/items/{item_id}")
+def delete_menu_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Delete menu item (Owner only feature)."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    return menu_service.delete_menu_item(db, item_id, str(restaurant_id))
+
+
 from fastapi import File, UploadFile
 @router.post("/items/{item_id}/upload-image", response_model=MenuItemRead)
 def upload_menu_item_image(
