@@ -6,8 +6,8 @@ const SubscriptionLock: React.FC = () => {
   const navigate = useNavigate();
   const restaurantName = localStorage.getItem('restaurantName') || 'Your Restaurant';
   
-  const WHATSAPP_NUMBER = "919016142750"; // Provide actual number if different
-  const UPI_ID = "yusufashrafiya29-1@okhdfcbank"; // Provide actual UPI ID if different
+  const WHATSAPP_NUMBER = "919979114665";
+  const UPI_ID = "9979114665@kotak811";
   
   const handleWhatsAppClick = () => {
     const text = encodeURIComponent(`Hi Dine Flow! I'd like to renew the subscription for ${restaurantName}.`);
