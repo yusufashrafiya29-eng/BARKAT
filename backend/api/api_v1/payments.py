@@ -18,6 +18,7 @@ class CreateOrderRequest(BaseModel):
 class ConfirmPaymentRequest(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
+    razorpay_signature: str  # Required for verification
 
 from models.table import Table
 
@@ -25,11 +26,33 @@ from models.table import Table
 def confirm_razorpay_payment(req: ConfirmPaymentRequest, db: Session = Depends(get_db)):
     """
     Called directly by the frontend after Razorpay's success handler fires.
-    This is the primary confirmation path — webhook is a secondary backup.
+    Verifies the Razorpay signature to prevent fake confirmations.
     """
+    import hmac
+    import hashlib
+
+    # --- Find the orders and get the restaurant's key_secret for verification ---
     orders = db.query(Order).filter(Order.razorpay_order_id == req.razorpay_order_id).all()
     if not orders:
         raise HTTPException(status_code=404, detail="No orders found for this Razorpay order.")
+
+    # Get the restaurant's Razorpay key_secret
+    restaurant_id = str(orders[0].restaurant_id)
+    key_secret = settings_service.get_config_value(db, "razorpay_key_secret", restaurant_id)
+    if not key_secret:
+        raise HTTPException(status_code=400, detail="Razorpay not configured for this restaurant.")
+
+    # --- Verify Razorpay Signature (prevents fake payments) ---
+    message = f"{req.razorpay_order_id}|{req.razorpay_payment_id}"
+    expected_signature = hmac.new(
+        key_secret.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, req.razorpay_signature):
+        raise HTTPException(status_code=400, detail="Invalid payment signature. Possible fraud attempt.")
+
+    # --- Signature valid — Mark orders as PAID ---
     for order in orders:
         order.payment_status = 'PAID'
         order.razorpay_payment_id = req.razorpay_payment_id

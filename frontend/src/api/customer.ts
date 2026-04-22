@@ -40,10 +40,11 @@ export const customerApi = {
     return response.data;
   },
 
-  confirmRazorpayPayment: async (razorpay_order_id: string, razorpay_payment_id: string) => {
+  confirmRazorpayPayment: async (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string) => {
     const response = await axios.post(`${BASE_URL}/payments/confirm`, {
       razorpay_order_id,
-      razorpay_payment_id
+      razorpay_payment_id,
+      razorpay_signature
     });
     return response.data;
   }

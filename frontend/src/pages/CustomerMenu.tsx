@@ -154,7 +154,8 @@ const CustomerMenu: React.FC = () => {
           try {
             await customerApi.confirmRazorpayPayment(
               response.razorpay_order_id,
-              response.razorpay_payment_id
+              response.razorpay_payment_id,
+              response.razorpay_signature
             );
             // Immediately refresh orders to show PAID status
             const updatedOrders = await customerApi.getTableOrders(tableId as string);
