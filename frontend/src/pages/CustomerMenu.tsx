@@ -48,7 +48,7 @@ interface Order {
 const CustomerMenu: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   
-  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null } | null>(null);
+  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null, restaurant_upi_id: string | null } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
