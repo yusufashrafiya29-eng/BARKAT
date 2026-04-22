@@ -7,7 +7,7 @@ from services import settings_service
 router = APIRouter()
 
 @router.put("/restaurant-profile")
-def update_restaurant_profile(
+async def update_restaurant_profile(
     name: str = Form(None),
     logo: UploadFile = File(None),
     db: Session = Depends(get_db),
@@ -31,8 +31,8 @@ def update_restaurant_profile(
         import uuid, io
         from PIL import Image
 
-        # Read raw bytes
-        logo_content = logo.file.read()
+        # Read raw bytes (await is required for async UploadFile)
+        logo_content = await logo.read()
 
         # Convert to PNG with PIL (preserves transparency)
         try:
