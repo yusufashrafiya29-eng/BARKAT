@@ -56,7 +56,7 @@ def create_razorpay_order(
         rp_order = client.order.create({
             "amount": amount_in_paise,
             "currency": "INR",
-            "receipt": f"receipt_table_{req.table_id}"
+            "receipt": str(req.table_id)
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {str(e)}")
