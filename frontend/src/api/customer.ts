@@ -26,5 +26,10 @@ export const customerApi = {
   getTableOrders: async (tableId: string) => {
     const response = await axios.get(`${BASE_URL}/orders/table/${tableId}`);
     return response.data;
+  },
+
+  notifyPayment: async (tableId: string) => {
+    const response = await axios.put(`${BASE_URL}/orders/table/${tableId}/verify-payment`);
+    return response.data;
   }
 };

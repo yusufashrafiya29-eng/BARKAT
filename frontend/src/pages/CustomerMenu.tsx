@@ -39,7 +39,7 @@ interface OrderItem {
 interface Order {
   id: string;
   status: string;
-  payment_status: 'PENDING' | 'PAID' | 'FAILED';
+  payment_status: 'PENDING' | 'PAID' | 'VERIFYING' | 'FAILED';
   total_amount: number;
   created_at: string;
   items?: OrderItem[];
@@ -116,13 +116,22 @@ const CustomerMenu: React.FC = () => {
   // Watch for changes in order statuses
   useEffect(() => {
     // If we are currently resolving a payment and it goes through successfully:
-    const hasUnpaid = tableOrders.some(o => o.status !== 'CANCELLED' && o.payment_status === 'PENDING');
+    const hasUnpaid = tableOrders.some(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING'));
     if (!hasUnpaid && isVerifying) {
       setIsVerifying(false);
       setShowPaymentQR(false);
       toast.success('Payment Confirmed!');
     }
   }, [tableOrders, isVerifying]);
+
+  const handleNotifyPayment = async () => {
+    setIsVerifying(true);
+    try {
+        await customerApi.notifyPayment(tableId as string);
+    } catch (e) {
+        toast.error('Could not ping waiter. Keep screen open.');
+    }
+  };
 
   const addToCart = (item: MenuItem) => {
     if (!item.is_available) return;
@@ -553,7 +562,7 @@ const CustomerMenu: React.FC = () => {
                 </a>
   
                 <button 
-                  onClick={() => setIsVerifying(true)}
+                  onClick={handleNotifyPayment}
                   className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-xl text-[14px] text-center mb-6 hover:bg-indigo-50 transition-colors"
                 >
                   I have paid

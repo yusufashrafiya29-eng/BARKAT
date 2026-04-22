@@ -731,7 +731,7 @@ export default function WaiterDashboard() {
                               ))}
                             </div>
                             <div className="flex justify-end gap-2 mt-2">
-                              {order.payment_status === 'PENDING' && (
+                              {order.payment_status === 'VERIFYING' && (
                                 <button onClick={() => handleDirectPaymentConfirm(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 transition-all hover:bg-indigo-100">
                                   Confirm Payment
                                 </button>

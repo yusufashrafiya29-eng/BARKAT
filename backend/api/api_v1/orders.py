@@ -46,12 +46,22 @@ def pull_waiter_orders(
     return db.query(Order).outerjoin(Bill, Order.id == Bill.order_id).filter(
         Order.restaurant_id == restaurant_id,
         Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
+        Order.payment_status != 'PAID',
         (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED)
     ).order_by(Order.created_at.desc()).all()
 
 @router.get("/table/{table_id}", response_model=List[OrderRead])
 def get_table_orders(table_id: UUID, db: Session = Depends(get_db)):
     return order_service.get_orders_by_table(db, table_id)
+
+@router.put("/table/{table_id}/verify-payment")
+def verify_table_payments(table_id: UUID, db: Session = Depends(get_db)):
+    from models.order import Order
+    orders = db.query(Order).filter(Order.table_id == table_id, Order.payment_status == 'PENDING').all()
+    for o in orders:
+        o.payment_status = 'VERIFYING'
+    db.commit()
+    return {"message": "Updated to VERIFYING"}
 
 @router.put("/{order_id}/accept", response_model=OrderRead)
 def accept_customer_order(
