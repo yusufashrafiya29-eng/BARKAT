@@ -43,7 +43,8 @@ def pull_waiter_orders(
     """Fetches PENDING and PREPARING orders for Waiter displays including unaccepted customer orders."""
     from models.order import Order, OrderStatus
     from models.billing import Bill, PaymentStatus
-    return db.query(Order).outerjoin(Bill, Order.id == Bill.order_id).filter(
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).outerjoin(Bill, Order.id == Bill.order_id).filter(
         Order.restaurant_id == restaurant_id,
         Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
         (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED)
@@ -139,7 +140,8 @@ def get_owner_order_history(
     from api.api_v1.users import require_owner
     require_owner(token)
 
-    orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).order_by(Order.created_at.desc()).limit(150).all()
+    from sqlalchemy.orm import joinedload
+    orders = db.query(Order).options(joinedload(Order.items)).filter(Order.restaurant_id == restaurant_id).order_by(Order.created_at.desc()).limit(150).all()
     
     # Pre-fetch menu items to avoid N+1 queries
     menu_items = db.query(MenuItem).all() # Just fetching all here is fine since it's cached by SQLAlchemy or we can filter by restaurant

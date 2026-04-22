@@ -76,7 +76,8 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     return new_order
 
 def get_orders_by_table(db: Session, table_id: UUID):
-    return db.query(Order).filter(Order.table_id == table_id).order_by(Order.created_at.desc()).all()
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).filter(Order.table_id == table_id).order_by(Order.created_at.desc()).all()
 
 def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, restaurant_id: str) -> Order:
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
@@ -100,7 +101,8 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
 
 def get_active_kitchen_orders(db: Session, restaurant_id: str):
     """Fetches ACCEPTED and PREPARING orders using strict FIFO (First In First Out) ordering."""
-    return db.query(Order).filter(
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).filter(
         Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING]),
         Order.restaurant_id == restaurant_id
     ).order_by(Order.created_at.asc()).all()
