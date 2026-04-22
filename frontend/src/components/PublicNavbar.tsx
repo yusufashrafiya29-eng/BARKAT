@@ -38,15 +38,12 @@ export default function PublicNavbar() {
         <div className="flex justify-between items-center h-20">
           
           {/* Logo */}
-          <div className="flex-shrink-0 flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+          <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
             <img
-              src="/dineflow-icon.png"
+              src="/dineflow-logo.png"
               alt="Dine Flow"
-              className="w-9 h-9 object-contain"
+              className="h-14 w-auto object-contain"
             />
-            <span className={`text-[20px] font-extrabold tracking-tight ${isScrolled ? 'text-slate-900' : 'text-slate-900'}`}>
-              Dine Flow
-            </span>
           </div>
 
           {/* Desktop Menu */}

@@ -20,6 +20,14 @@ const SubscriptionLock: React.FC = () => {
         
         {/* Header */}
         <div className="bg-red-50 p-8 text-center border-b border-red-100">
+          {/* Platform Logo */}
+          <div className="flex justify-center mb-5">
+            <img
+              src="/dineflow-logo.png"
+              alt="Dine Flow"
+              className="h-16 w-auto object-contain"
+            />
+          </div>
           <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShieldAlert size={32} className="text-red-600" />
           </div>

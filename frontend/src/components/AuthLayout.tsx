@@ -39,13 +39,12 @@ const AuthLayout: React.FC = () => {
         </div>
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10">
           <img
-            src="/dineflow-icon.png"
+            src="/dineflow-logo.png"
             alt="Dine Flow"
-            className="w-10 h-10 object-contain brightness-0 invert"
+            className="h-16 w-auto object-contain brightness-0 invert"
           />
-          <span className="text-white font-extrabold text-[20px] tracking-tight">Dine Flow</span>
         </div>
 
         {/* Hero text */}
@@ -103,10 +102,13 @@ const AuthLayout: React.FC = () => {
       {/* ── RIGHT PANEL: Auth Form ───────────────────────── */}
       <div className="flex-1 flex flex-col min-h-screen">
 
-        {/* Mobile header (logo only) */}
-        <div className="lg:hidden flex items-center gap-2.5 px-6 py-5 border-b border-slate-200 bg-white">
-          <img src="/dineflow-icon.png" alt="Dine Flow" className="w-8 h-8 object-contain" />
-          <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">Dine Flow</span>
+        {/* Mobile header */}
+        <div className="lg:hidden flex items-center px-6 py-4 border-b border-slate-200 bg-white">
+          <img
+            src="/dineflow-logo.png"
+            alt="Dine Flow"
+            className="h-12 w-auto object-contain"
+          />
         </div>
 
         {/* Form area */}
