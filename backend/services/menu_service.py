@@ -3,8 +3,13 @@ from models.menu import Category, MenuItem
 from schemas.menu import CategoryCreate, MenuItemCreate
 
 def get_all_active_categories(db: Session, restaurant_id: str):
-    # This automatically includes menu_items via SQLAlchemy relationships!
-    return db.query(Category).filter(Category.is_active == True, Category.restaurant_id == restaurant_id).all()
+    from sqlalchemy.orm import contains_eager
+    return db.query(Category).outerjoin(MenuItem, 
+        (MenuItem.category_id == Category.id) & (MenuItem.is_deleted == False)
+    ).options(contains_eager(Category.menu_items)).filter(
+        Category.is_active == True, 
+        Category.restaurant_id == restaurant_id
+    ).all()
 
 def create_category(db: Session, cat_in: CategoryCreate, restaurant_id: str) -> Category:
     obj = Category(**cat_in.model_dump(), restaurant_id=restaurant_id)
@@ -40,6 +45,7 @@ def delete_menu_item(db: Session, item_id: str, restaurant_id: str):
     if not obj:
         raise HTTPException(status_code=404, detail="Menu item not found")
         
-    db.delete(obj)
+    obj.is_deleted = True
+    obj.is_available = False # Mark as out of stock too
     db.commit()
-    return {"message": "Menu item deleted successfully"}
+    return {"message": "Menu item removed from menu"}

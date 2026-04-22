@@ -32,6 +32,7 @@ class MenuItem(Base):
     # Required Improvements
     is_veg = Column(Boolean, default=False)
     is_available = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
     preparation_time = Column(Integer, nullable=True) # minutes
     image_url = Column(String, nullable=True)
 
