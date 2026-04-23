@@ -80,11 +80,14 @@ export default function OwnerDashboard() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [upiId, setUpiId] = useState('');
   const [razorpayKeys, setRazorpayKeys] = useState({ razorpay_key_id: '', razorpay_key_secret: '' });
-  // Modal States
   const [showAddModal, setShowAddModal] = useState<TabType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [menuAddType, setMenuAddType] = useState('item');
+
+  // Subscription State
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -92,6 +95,24 @@ export default function OwnerDashboard() {
       toast.error("Unauthorized");
       navigate('/login');
     } else {
+      // Fetch subscription info once on mount
+      import('../api/auth').then(({ authApi }) => {
+        authApi.getMe().then(({ data }) => {
+          if (data) {
+            const status = data.subscription_status;
+            const trialEnd = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
+            const subEnd = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
+            const now = new Date();
+            const endDate = status === 'active' ? subEnd : trialEnd;
+            if (endDate) {
+              const diff = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              setDaysRemaining(Math.max(0, diff));
+            }
+            setSubscriptionStatus(status || 'trial');
+          }
+        }).catch(() => {});
+      });
+
       fetchData();
       const interval = setInterval(() => {
         silentlyFetchData();
@@ -453,6 +474,38 @@ export default function OwnerDashboard() {
           ))}
         </nav>
  
+        {/* Subscription Widget */}
+        <div className="mx-3 mb-3 p-3 rounded-xl border border-slate-700 bg-slate-800/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-2 h-2 rounded-full shrink-0 ${
+              subscriptionStatus === 'active' ? 'bg-emerald-400' :
+              daysRemaining && daysRemaining > 3 ? 'bg-amber-400' : 'bg-red-400'
+            }`} style={{ boxShadow: subscriptionStatus === 'active' ? '0 0 6px #34d399' : '0 0 6px #fbbf24' }} />
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+              {subscriptionStatus === 'active' ? 'Subscription Active' : 'Free Trial'}
+            </span>
+          </div>
+          {daysRemaining !== null && (
+            <p className="text-[12px] text-slate-400 mb-2">
+              <span className={`font-extrabold ${
+                daysRemaining > 3 ? 'text-amber-400' : 'text-red-400'
+              }`}>{daysRemaining} days</span> remaining
+            </p>
+          )}
+          {subscriptionStatus !== 'active' && (
+            <button
+              onClick={() => {
+                const msg = encodeURIComponent('Hi Dine Flow! I want to upgrade my subscription.');
+                window.open(`https://wa.me/919979114665?text=${msg}`, '_blank');
+              }}
+              className="w-full py-1.5 rounded-lg text-[11px] font-bold text-white transition-all"
+              style={{ background: '#25D366' }}
+            >
+              Upgrade Now
+            </button>
+          )}
+        </div>
+
         <div className="p-3 border-t border-slate-800 space-y-0.5">
           <button 
             onClick={() => navigate('/dashboard')}
