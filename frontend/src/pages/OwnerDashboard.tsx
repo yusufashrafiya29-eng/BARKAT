@@ -90,7 +90,10 @@ export default function OwnerDashboard() {
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   // Sidebar theme: auto-detected from logo brightness
-  const [sidebarDark, setSidebarDark] = useState(false); // default light
+  const [sidebarDark, setSidebarDark] = useState(false);
+  const [sidebarLogoUrl, setSidebarLogoUrl] = useState<string | null>(
+    localStorage.getItem('restaurantLogo')
+  );
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -155,9 +158,11 @@ export default function OwnerDashboard() {
     img.src = imgUrl;
   };
 
-  // Run logo analysis on mount
-  const logoUrl = localStorage.getItem('restaurantLogo');
-  if (logoUrl) analyzeLogoLuminance(logoUrl);
+  // Run logo analysis when sidebarLogoUrl changes (mount + logo update)
+  React.useEffect(() => {
+    if (sidebarLogoUrl) analyzeLogoLuminance(sidebarLogoUrl);
+    else setSidebarDark(false); // no logo → default light
+  }, [sidebarLogoUrl]);
 
   const silentlyFetchData = async () => {
     try {
@@ -363,7 +368,11 @@ export default function OwnerDashboard() {
       const res = await ownerApi.updateProfile(formData);
       toast.success(res.message);
       if (res.name) localStorage.setItem('restaurantName', res.name);
-      if (res.logo_url) localStorage.setItem('restaurantLogo', res.logo_url);
+      if (res.logo_url) {
+        localStorage.setItem('restaurantLogo', res.logo_url);
+        // Re-analyze brightness for new logo → sidebar theme auto-switches
+        setSidebarLogoUrl(res.logo_url);
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to update profile");
     } finally {
@@ -464,9 +473,9 @@ export default function OwnerDashboard() {
         <div className="px-5 pt-6 pb-5" style={{ borderBottom: `1px solid ${sidebarDark ? '#1e293b' : '#f1f5f9'}` }}>
           <div className="flex items-center gap-3">
             {/* Logo */}
-            {localStorage.getItem('restaurantLogo') ? (
+            {sidebarLogoUrl ? (
               <img
-                src={localStorage.getItem('restaurantLogo') || ''}
+                src={sidebarLogoUrl}
                 alt="Logo"
                 className="w-14 h-14 shrink-0 object-contain"
               />
