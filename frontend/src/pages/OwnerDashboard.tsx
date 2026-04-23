@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, LogOut, Loader2,
@@ -159,7 +159,7 @@ export default function OwnerDashboard() {
   };
 
   // Run logo analysis when sidebarLogoUrl changes (mount + logo update)
-  React.useEffect(() => {
+  useEffect(() => {
     if (sidebarLogoUrl) analyzeLogoLuminance(sidebarLogoUrl);
     else setSidebarDark(false); // no logo → default light
   }, [sidebarLogoUrl]);
@@ -325,7 +325,7 @@ export default function OwnerDashboard() {
     } catch { toast.error("Delete failed"); }
   };
 
-  const handleSaveUpi = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveUpi = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -342,7 +342,7 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleSaveRazorpay = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveRazorpay = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -360,7 +360,7 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -380,7 +380,7 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleChangePassword = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -404,7 +404,7 @@ export default function OwnerDashboard() {
   };
 
   // Form Submission Handlers
-  const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormLoading(true);
     const formData = new FormData(e.currentTarget);
