@@ -23,8 +23,8 @@ const StaffSignup: React.FC = () => {
     setLoading(true);
     try {
       await authApi.signupStaff(formData);
-      toast.success('🎉 Registration successful! Check your email for the OTP.');
-      navigate('/verify', { state: { email: formData.email } });
+      toast.success('Registration successful! Please verify your email OTP.');
+      navigate('/verify', { state: { email: formData.email, pendingApproval: true } });
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {

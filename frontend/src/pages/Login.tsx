@@ -26,7 +26,12 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Invalid credentials');
+      const detail = error.response?.data?.detail || '';
+      if (error.response?.status === 403 && detail.includes('owner approval')) {
+        toast.error('⏳ Aapka account pending approval hai. Owner se contact karein.', { duration: 5000 });
+      } else {
+        toast.error(detail || 'Invalid credentials');
+      }
     } finally {
       setLoading(false);
     }

@@ -55,7 +55,8 @@ def verify_staff_member(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    user.is_verified = True
+    user.is_approved = True
+    user.is_verified = True  # Also mark as verified in case OTP was skipped
     db.commit()
     db.refresh(user)
     return user
@@ -104,7 +105,8 @@ def create_staff_member(
         restaurant_id=str(restaurant_id),
         restaurant_email=payload.restaurant_email,
         password_hash=_hash_password(payload.password),
-        is_verified=True # Automatically verified since owner creates it!
+        is_verified=True,   # Owner-created staff skips OTP
+        is_approved=True    # Owner-created staff is instantly approved
     )
     db.add(new_user)
     db.commit()

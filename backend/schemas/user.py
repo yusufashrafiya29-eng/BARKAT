@@ -12,6 +12,7 @@ class UserBase(BaseModel):
     role: UserRole = UserRole.WAITER
     is_active: bool = True
     is_verified: bool = False
+    is_approved: bool = False
     restaurant_name: Optional[str] = None
     restaurant_email: Optional[str] = None
 

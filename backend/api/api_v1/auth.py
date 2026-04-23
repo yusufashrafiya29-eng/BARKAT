@@ -159,7 +159,8 @@ async def signup_owner(
         role=UserRole.OWNER,
         restaurant_id=restaurant.id,
         password_hash=_hash_password(password),
-        is_verified=False
+        is_verified=False,
+        is_approved=True  # Owner is auto-approved
     )
     db.add(new_user)
     db.commit()
@@ -207,7 +208,8 @@ def signup_staff(payload: StaffSignupRequest, db: Session = Depends(get_db)):
         restaurant_id=owner.restaurant_id,
         restaurant_email=payload.restaurant_email,
         password_hash=_hash_password(payload.password),
-        is_verified=False
+        is_verified=False,
+        is_approved=False  # Must wait for owner approval
     )
     db.add(new_user)
     db.commit()
@@ -241,6 +243,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         return GenericResponse(
             message="OTP verification required",
             data={"email": local_user.email, "is_verified": False}
+        )
+
+    # Staff must be approved by owner before login
+    if local_user.role != UserRole.OWNER and not local_user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Awaiting owner approval. Please contact your restaurant owner to activate your account."
         )
 
     access_token = _make_local_token(str(local_user.id), local_user.email, local_user.role.value)
