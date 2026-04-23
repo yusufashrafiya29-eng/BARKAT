@@ -397,19 +397,18 @@ export default function OwnerDashboard() {
         {/* ── Brand Header ─────────────────────────────────── */}
         <div className="px-5 pt-6 pb-5 border-b border-slate-800">
           <div className="flex items-center gap-3.5">
-            {/* Logo */}
-            <div
-              className="w-12 h-12 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#312e81,#4f46e5)', boxShadow: '0 0 0 2px #6366f130, 0 4px 16px rgb(99 102 241 / .35)' }}
-            >
-              {localStorage.getItem('restaurantLogo') ? (
-                <img src={localStorage.getItem('restaurantLogo') || ''} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-white font-extrabold text-[20px]">
-                  {(localStorage.getItem('restaurantName') || 'R').charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
+            {/* Logo — borderless, bigger */}
+            {localStorage.getItem('restaurantLogo') ? (
+              <img
+                src={localStorage.getItem('restaurantLogo') || ''}
+                alt="Logo"
+                className="w-16 h-16 shrink-0 object-contain"
+              />
+            ) : (
+              <span className="text-[32px] font-black leading-none shrink-0 text-white">
+                {(localStorage.getItem('restaurantName') || 'R').charAt(0).toUpperCase()}
+              </span>
+            )}
             {/* Name + badge */}
             <div className="overflow-hidden min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
