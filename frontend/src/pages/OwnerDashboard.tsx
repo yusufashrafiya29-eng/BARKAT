@@ -89,6 +89,8 @@ export default function OwnerDashboard() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  // Sidebar theme: auto-detected from logo brightness
+  const [sidebarDark, setSidebarDark] = useState(false); // default light
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -121,6 +123,41 @@ export default function OwnerDashboard() {
       return () => clearInterval(interval);
     }
   }, [navigate, activeTab]);
+
+  // Auto-detect sidebar theme from logo brightness
+  const analyzeLogoLuminance = (imgUrl: string) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 60; canvas.height = 60;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, 60, 60);
+        const { data } = ctx.getImageData(0, 0, 60, 60);
+        let total = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 30) { // skip transparent pixels
+            // Perceived brightness (Rec.601 formula)
+            total += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            count++;
+          }
+        }
+        if (count === 0) return;
+        const avg = total / count;
+        // Bright logo (avg > 128) → dark sidebar so logo pops
+        // Dark logo (avg ≤ 128) → light sidebar
+        setSidebarDark(avg > 128);
+      } catch { /* CORS blocked — keep default light */ }
+    };
+    img.onerror = () => setSidebarDark(false);
+    img.src = imgUrl;
+  };
+
+  // Run logo analysis on mount
+  const logoUrl = localStorage.getItem('restaurantLogo');
+  if (logoUrl) analyzeLogoLuminance(logoUrl);
 
   const silentlyFetchData = async () => {
     try {
@@ -414,12 +451,19 @@ export default function OwnerDashboard() {
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-800">
-      {/* Sleek Vercel-like Sidebar */}
-      <aside className="w-64 border-r border-slate-200 bg-white text-slate-700 flex flex-col sticky top-0 h-screen z-50">
-        {/* ── Brand Header ─────────────────────────────────── */}
-        <div className="px-5 pt-6 pb-5 border-b border-slate-100">
+      {/* Auto-themed Sidebar */}
+      <aside
+        className="w-64 border-r flex flex-col sticky top-0 h-screen z-50 transition-colors duration-500"
+        style={{
+          background: sidebarDark ? '#0F172A' : '#ffffff',
+          borderColor: sidebarDark ? '#1e293b' : '#e2e8f0',
+          color: sidebarDark ? '#cbd5e1' : '#374151',
+        }}
+      >
+        {/* Brand Header */}
+        <div className="px-5 pt-6 pb-5" style={{ borderBottom: `1px solid ${sidebarDark ? '#1e293b' : '#f1f5f9'}` }}>
           <div className="flex items-center gap-3">
-            {/* Logo — borderless, any PNG works on white bg */}
+            {/* Logo */}
             {localStorage.getItem('restaurantLogo') ? (
               <img
                 src={localStorage.getItem('restaurantLogo') || ''}
@@ -437,12 +481,15 @@ export default function OwnerDashboard() {
             <div className="overflow-hidden min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" style={{boxShadow:'0 0 6px #10b981'}} />
-                <h1 className="text-[14px] font-extrabold text-slate-900 tracking-tight truncate leading-none">
+                <h1 className="text-[14px] font-extrabold tracking-tight truncate leading-none"
+                  style={{ color: sidebarDark ? '#f1f5f9' : '#0f172a' }}>
                   {localStorage.getItem('restaurantName') || 'My Restaurant'}
                 </h1>
               </div>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
-                style={{ background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}
+                style={sidebarDark
+                  ? { background: '#4f46e520', color: '#818cf8', border: '1px solid #4f46e530' }
+                  : { background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}
               >
                 Owner Portal
               </span>
@@ -450,7 +497,8 @@ export default function OwnerDashboard() {
           </div>
         </div>
 
-        <div className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest"
+          style={{ color: sidebarDark ? '#475569' : '#9ca3af' }}>
           Overview
         </div>
 
@@ -467,34 +515,44 @@ export default function OwnerDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 font-normal'
-              }`}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all"
+              style={activeTab === tab.id
+                ? { background: '#6366f1', color: '#fff', fontWeight: 600 }
+                : { color: sidebarDark ? '#94a3b8' : '#6b7280', background: 'transparent', fontWeight: 400 }
+              }
+              onMouseEnter={e => {
+                if (activeTab !== tab.id)
+                  (e.currentTarget as HTMLElement).style.background = sidebarDark ? '#1e293b' : '#f8fafc';
+              }}
+              onMouseLeave={e => {
+                if (activeTab !== tab.id)
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+              }}
             >
-              <tab.icon size={15} className={activeTab === tab.id ? 'text-indigo-600' : 'text-slate-400'} />
+              <tab.icon size={15} style={{ color: activeTab === tab.id ? '#fff' : (sidebarDark ? '#64748b' : '#9ca3af') }} />
               {tab.label}
             </button>
           ))}
         </nav>
 
         {/* Subscription Widget */}
-        <div className="mx-3 mb-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+        <div className="mx-3 mb-3 p-3 rounded-xl"
+          style={{ border: `1px solid ${sidebarDark ? '#1e293b' : '#e2e8f0'}`, background: sidebarDark ? '#0f172a' : '#f8fafc' }}>
           <div className="flex items-center gap-2 mb-1.5">
             <div className={`w-2 h-2 rounded-full shrink-0 ${
               subscriptionStatus === 'active' ? 'bg-emerald-500' :
               daysRemaining && daysRemaining > 3 ? 'bg-amber-500' : 'bg-red-500'
             }`} />
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+            <span className="text-[11px] font-bold uppercase tracking-wider"
+              style={{ color: sidebarDark ? '#94a3b8' : '#6b7280' }}>
               {subscriptionStatus === 'active' ? 'Subscription Active' : 'Free Trial'}
             </span>
           </div>
           {daysRemaining !== null && (
-            <p className="text-[12px] text-slate-500 mb-2">
-              <span className={`font-extrabold ${
-                daysRemaining > 3 ? 'text-amber-600' : 'text-red-600'
-              }`}>{daysRemaining} days</span> remaining
+            <p className="text-[12px] mb-2" style={{ color: sidebarDark ? '#64748b' : '#9ca3af' }}>
+              <span className={`font-extrabold ${daysRemaining > 3 ? 'text-amber-500' : 'text-red-500'}`}>
+                {daysRemaining} days
+              </span> remaining
             </p>
           )}
           {subscriptionStatus !== 'active' && (
@@ -508,23 +566,30 @@ export default function OwnerDashboard() {
           )}
         </div>
 
-        <div className="p-3 border-t border-slate-100 space-y-0.5">
+        <div className="p-3 space-y-0.5" style={{ borderTop: `1px solid ${sidebarDark ? '#1e293b' : '#f1f5f9'}` }}>
           <button
             onClick={() => navigate('/dashboard')}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors"
+            style={{ color: sidebarDark ? '#64748b' : '#6b7280' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = sidebarDark ? '#1e293b' : '#f8fafc'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
             <LayoutGrid size={15} />
             Back to Dashboard
           </button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors"
+            style={{ color: sidebarDark ? '#64748b' : '#6b7280' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2'; (e.currentTarget as HTMLElement).style.color = '#dc2626'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = sidebarDark ? '#64748b' : '#6b7280'; }}
           >
             <LogOut size={15} />
             Sign Out
           </button>
         </div>
       </aside>
+
  
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50">
