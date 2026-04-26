@@ -101,43 +101,5 @@ export const waiterApi = {
   getReservations: async () => {
     const response = await axios.get(`${BASE_URL}/reservations/`, getHeaders());
     return response.data;
-  },
-
-  simulateAggregatorOrder: async (source: 'ZOMATO' | 'SWIGGY') => {
-    // This calls the webhook endpoint directly for demonstration purposes
-    const restaurantId = localStorage.getItem('restaurantId');
-    if (!restaurantId) throw new Error("No restaurant ID found");
-    
-    // We need to fetch a random menu item to simulate order
-    const menuRes = await axios.get(`${BASE_URL}/menu/categories`, getHeaders());
-    let menuItems = [];
-    if (menuRes.data && menuRes.data.length > 0) {
-      menuItems = menuRes.data.flatMap((c: any) => c.menu_items).filter((i: any) => i.is_available);
-    }
-    if (menuItems.length === 0) throw new Error("No menu items available to simulate");
-    
-    // Pick 1-2 random items
-    const numItems = Math.floor(Math.random() * 2) + 1;
-    const items = [];
-    for (let i = 0; i < numItems; i++) {
-      const item = menuItems[Math.floor(Math.random() * menuItems.length)];
-      items.push({
-        menu_item_id: item.id,
-        quantity: Math.floor(Math.random() * 2) + 1,
-        notes: Math.random() > 0.7 ? "Extra spicy" : null
-      });
-    }
-
-    const payload = {
-      restaurant_id: restaurantId,
-      source: source,
-      external_order_id: `EXT-${Math.floor(Math.random() * 1000000)}`,
-      customer_name: source === 'ZOMATO' ? "Zomato Customer" : "Swiggy Customer",
-      customer_phone: "9999999999",
-      items: items
-    };
-
-    const response = await axios.post(`${BASE_URL}/aggregators/webhook/order`, payload);
-    return response.data;
   }
 };

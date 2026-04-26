@@ -19,7 +19,7 @@ interface Category { id: string; name: string; menu_items: MenuItem[]; }
 interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
 interface CartItem extends MenuItem { quantity: number; notes: string; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
-interface Order { id: string; table_id: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER' | 'ZOMATO' | 'SWIGGY'; is_accepted?: boolean; razorpay_order_id?: string | null; }
+interface Order { id: string; table_id: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -677,17 +677,9 @@ export default function WaiterDashboard() {
                 <h2 className="text-[26px] font-extrabold tracking-tight text-slate-900">Order Queue</h2>
                 <p className="text-[13px] text-slate-500 mt-0.5 font-medium">{activeOrders.length} active tickets</p>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => waiterApi.simulateAggregatorOrder('ZOMATO').then(() => { toast.success('Zomato Order Simulated!'); fetchInitialData(); }).catch(e => toast.error(e.message))} className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #e11d48, #be123c)' }}>
-                  Zomato Test
-                </button>
-                <button onClick={() => waiterApi.simulateAggregatorOrder('SWIGGY').then(() => { toast.success('Swiggy Order Simulated!'); fetchInitialData(); }).catch(e => toast.error(e.message))} className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
-                  Swiggy Test
-                </button>
-                <button onClick={fetchInitialData} className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
-                  <RefreshCcw size={13} /> Refresh
-                </button>
-              </div>
+              <button onClick={fetchInitialData} className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                <RefreshCcw size={13} /> Refresh
+              </button>
             </div>
 
             {loading ? (
@@ -722,13 +714,7 @@ export default function WaiterDashboard() {
                                 </div>
                                 <div>
                                   <p className="font-bold text-[14px] text-slate-800">Order #{order.id.slice(0, 6)}</p>
-                                  {order.source === 'ZOMATO' ? (
-                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md" style={{ background: '#ffe4e6', color: '#e11d48' }}>Zomato</span>
-                                  ) : order.source === 'SWIGGY' ? (
-                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md" style={{ background: '#ffedd5', color: '#ea580c' }}>Swiggy</span>
-                                  ) : (
-                                    <p className="text-[11px] font-semibold text-amber-600">Customer Request</p>
-                                  )}
+                                  <p className="text-[11px] font-semibold text-amber-600">Customer Request</p>
                                 </div>
                               </div>
                               <span className="font-extrabold text-[16px] text-slate-800">₹{order.total_amount}</span>
@@ -774,17 +760,9 @@ export default function WaiterDashboard() {
                                 </div>
                                 <div>
                                   <p className="font-bold text-[14px] text-slate-800">#{order.id.slice(0, 6)}</p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.text, border: `1px solid ${st.border}` }}>
-                                      {order.status}
-                                    </span>
-                                    {order.source === 'ZOMATO' && (
-                                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md" style={{ background: '#e11d48', color: '#fff' }}>Zomato</span>
-                                    )}
-                                    {order.source === 'SWIGGY' && (
-                                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md" style={{ background: '#ea580c', color: '#fff' }}>Swiggy</span>
-                                    )}
-                                  </div>
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: st.bg, color: st.text, border: `1px solid ${st.border}` }}>
+                                    {order.status}
+                                  </span>
                                 </div>
                               </div>
                               <span className="font-extrabold text-[16px] text-slate-800">₹{order.total_amount}</span>
