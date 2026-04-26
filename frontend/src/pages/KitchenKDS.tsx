@@ -17,6 +17,7 @@ interface Order {
   id: string;
   table_id: string;
   status: string;
+  source?: string;
   items: OrderItem[];
   created_at: string;
 }
