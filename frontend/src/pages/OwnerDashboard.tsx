@@ -5,12 +5,13 @@ import {
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee, ClipboardList,
   ShoppingBag, Users, Clock, QrCode, CreditCard,
-  TrendingUp, Activity, Flame, ImagePlus, FileText, Download
+  TrendingUp, Activity, Flame, ImagePlus, FileText, Download, Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
 import { waiterApi } from '../api/waiter';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import CashRegisterTab from '../components/CashRegisterTab';
 
 // Interfaces
 interface MenuItem {
@@ -77,7 +78,7 @@ interface Reservation {
   table_id: string | null;
 }
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -570,6 +571,7 @@ export default function OwnerDashboard() {
             { id: 'orders', label: 'Order History', icon: ClipboardList },
             { id: 'reservations', label: 'Bookings', icon: Clock },
             { id: 'reports', label: 'CA Reports', icon: FileText },
+            { id: 'cash_register', label: 'Cash Register', icon: Banknote },
             { id: 'menu', label: 'Menu Catalog', icon: Package },
             { id: 'tables', label: 'Floor Plan', icon: LayoutGrid },
             { id: 'staff', label: 'Staff Roster', icon: Users },
@@ -1021,6 +1023,11 @@ export default function OwnerDashboard() {
                     </tbody>
                   </table>
                 </div>
+              )}
+
+              {/* CASH REGISTER TAB */}
+              {activeTab === 'cash_register' && (
+                <CashRegisterTab />
               )}
  
               {/* TABLES TAB */}

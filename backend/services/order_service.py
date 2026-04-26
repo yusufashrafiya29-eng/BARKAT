@@ -144,9 +144,11 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
             for recipe in recipes:
                 stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
                 if stock_item:
-                    # Deduct quantity based on recipe quantity * order item quantity
                     stock_item.quantity -= (recipe.quantity * item.quantity)
-                    # Don't let it go below 0 (optional, but standard for pos is to allow negatives or stop at 0. We'll allow negatives to show out of sync inventory)
+
+        # Auto-record sale in active cash shift (if one is open)
+        from services.cash_service import record_sale
+        record_sale(db, restaurant_id, order.total_amount)
     
     order.payment_status = new_payment_status
     db.commit()
