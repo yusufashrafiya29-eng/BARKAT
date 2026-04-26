@@ -47,5 +47,21 @@ export const customerApi = {
       razorpay_signature
     });
     return response.data;
+  },
+
+  // Public Reservations
+  createPublicReservation: async (restaurantId: string, payload: any) => {
+    const response = await axios.post(`${BASE_URL}/reservations/public/${restaurantId}`, payload);
+    return response.data;
+  },
+
+  initReservationPayment: async (reservationId: string) => {
+    const response = await axios.post(`${BASE_URL}/reservations/${reservationId}/pay`);
+    return response.data;
+  },
+
+  verifyReservationPayment: async (reservationId: string, paymentData: any) => {
+    const response = await axios.post(`${BASE_URL}/reservations/${reservationId}/verify-payment`, paymentData);
+    return response.data;
   }
 };

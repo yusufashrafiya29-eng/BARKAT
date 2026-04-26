@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from typing import Optional
 from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user_token, get_current_restaurant
 from schemas.settings import UPIConfig, RazorpayConfig
@@ -10,8 +11,9 @@ router = APIRouter()
 async def update_restaurant_profile(
     name: str = Form(None),
     logo: UploadFile = File(None),
-    gstin: str = Form(None),
-    fssai: str = Form(None),
+    gstin: Optional[str] = Form(None),
+    fssai: Optional[str] = Form(None),
+    advance_booking_fee: Optional[float] = Form(None),
     db: Session = Depends(get_db),
     token: dict = Depends(get_current_user_token),
     restaurant_id=Depends(get_current_restaurant)
@@ -31,6 +33,8 @@ async def update_restaurant_profile(
         restaurant.gstin = gstin
     if fssai is not None:
         restaurant.fssai = fssai
+    if advance_booking_fee is not None:
+        restaurant.advance_booking_fee = advance_booking_fee
         
     if logo and logo.filename:
         from db.supabase import supabase_client

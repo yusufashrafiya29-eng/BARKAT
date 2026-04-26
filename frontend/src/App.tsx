@@ -18,6 +18,7 @@ import CustomerMenu from './pages/CustomerMenu';
 import KitchenKDS from './pages/KitchenKDS';
 import LandingPage from './pages/LandingPage';
 import SubscriptionLock from './pages/SubscriptionLock';
+import PublicBooking from './pages/PublicBooking';
 
 const App: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ const App: React.FC = () => {
         
         {/* Customer QR Route (Public — no auth needed) */}
         <Route path="/order/table/:tableId" element={<CustomerMenu />} />
+        <Route path="/book/:restaurantId" element={<PublicBooking />} />
 
         {/* Auth Layout Routes (Login / Signup) */}
         <Route element={<AuthLayout />}>

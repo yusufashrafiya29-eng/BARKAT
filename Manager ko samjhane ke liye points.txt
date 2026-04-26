@@ -1,0 +1,11 @@
+Manager ko samjhane ke liye points
+
+Sir, aapne jo 'desktop ki IC me data reh jane' ki baat ki, wo actually purane (legacy) softwares ka problem hai. Traditional POS systems (jaise purane versions) me kya hota tha ki poora database aapke local computer ki hard drive (IC) par save hota tha.
+
+Hamara BARKAT system ek modern Cloud-Based SaaS hai, aur isi wajah se ye zyada secure hai. Isme humara data management bilkul alag aur advanced hai
+
+Zero Local Storage (Koi Data IC me nahi rehta) BARKAT me aapka koi bhi sensitive financial data ya customer records local PC ki IC (hard drive) par permanently save nahi hota. Sab kuch high-security cloud servers (AWSSupabase) par real-time me encrypted form me save hota hai.
+Hardware Theft Proof (Chori ka koi darr nahi) Agar kal ko kisi ne restaurant ka PC chura liya, ya computer me aag lag gayi ya virus aa gaya, toh aapka ek bhi rupay ka data leak ya loss nahi hoga. Naya PC laao, login karo, aur sab kuch waisa ka waisa wapas mil jayega. Purane systems me local IC me data hone se leak hone ka pura risk rehta tha.
+Session Auto-Clear (100% Privacy) Jab aapka staff system se log out karta hai, toh browser ka local cache turant wipe (delete) ho jata hai. Yani system band karne ke baad IC (memory) me koi leftover data nahi bachta jisse koi misuse kar sake.
+Anywhere Access Kyunki data IC me bandh kar nahi rakha gaya hai, aap as an owner apne phone se ghar baithe bhi live sales aur reports dekh sakte ho. Local IC wale systems me aapko restaurant aakar hi sab check karna padta hai.
+In short Sir, BARKAT data ko local hardware me store karne ke bajaye bank-level cloud security use karta hai, jisse 'data piche reh jane' ya 'hardware kharab hone' ka koi risk hi nahi bachta.

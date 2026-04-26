@@ -139,5 +139,21 @@ export const ownerApi = {
       }
     });
     return response.data;
+  },
+
+  // Reservations
+  getReservations: async () => {
+    const response = await axios.get(`${BASE_URL}/reservations/`, getHeaders());
+    return response.data;
+  },
+
+  addManualReservation: async (payload: any) => {
+    const response = await axios.post(`${BASE_URL}/reservations/manual`, payload, getHeaders());
+    return response.data;
+  },
+
+  updateReservationStatus: async (resId: string, status: string, tableId?: string) => {
+    const response = await axios.put(`${BASE_URL}/reservations/${resId}/status`, { status, table_id: tableId }, getHeaders());
+    return response.data;
   }
 };

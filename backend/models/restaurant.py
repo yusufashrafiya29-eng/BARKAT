@@ -14,6 +14,7 @@ class Restaurant(Base):
     # Tax & Compliance fields
     gstin = Column(String, nullable=True)
     fssai = Column(String, nullable=True)
+    advance_booking_fee = Column(Float, nullable=False, default=0.0)
     
     # Subscription fields
     subscription_status = Column(String, default="trial") # "trial", "active", "expired"

@@ -62,7 +62,20 @@ interface Analytics {
   served_orders: number;
 }
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports';
+interface Reservation {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  reservation_date: string;
+  reservation_time: string;
+  guest_count: number;
+  status: string;
+  payment_status: string;
+  advance_amount: number;
+  table_id: string | null;
+}
+
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -79,6 +92,7 @@ export default function OwnerDashboard() {
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [upiId, setUpiId] = useState('');
   const [razorpayKeys, setRazorpayKeys] = useState({ razorpay_key_id: '', razorpay_key_secret: '' });
   const [showAddModal, setShowAddModal] = useState<TabType | null>(null);
@@ -104,6 +118,7 @@ export default function OwnerDashboard() {
             if (data.restaurant_gstin) localStorage.setItem('restaurantGstin', data.restaurant_gstin);
             if (data.restaurant_fssai) localStorage.setItem('restaurantFssai', data.restaurant_fssai);
             if (data.restaurant_name) localStorage.setItem('restaurantName', data.restaurant_name);
+            if (data.advance_booking_fee !== undefined) localStorage.setItem('advanceBookingFee', String(data.advance_booking_fee));
             const status = data.subscription_status;
             const trialEnd = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
             const subEnd = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
@@ -159,6 +174,13 @@ export default function OwnerDashboard() {
           const invRes = await ownerApi.getInventory();
           setInventory(invRes);
           break;
+        case 'reports':
+          // Nothing to fetch silently for reports tab
+          break;
+        case 'reservations':
+          const resvRes = await ownerApi.getReservations();
+          setReservations(resvRes);
+          break;
         case 'settings':
           const [payRes, rzpRes] = await Promise.all([
             ownerApi.getUpiId(),
@@ -204,6 +226,12 @@ export default function OwnerDashboard() {
         case 'inventory':
           const invRes = await ownerApi.getInventory();
           setInventory(invRes);
+          break;
+        case 'reports':
+          break;
+        case 'reservations':
+          const resvRes2 = await ownerApi.getReservations();
+          setReservations(resvRes2);
           break;
         case 'settings':
           const [payResData, rzpResData] = await Promise.all([
@@ -337,6 +365,7 @@ export default function OwnerDashboard() {
       }
       if (formData.get('gstin')) localStorage.setItem('restaurantGstin', formData.get('gstin') as string);
       if (formData.get('fssai')) localStorage.setItem('restaurantFssai', formData.get('fssai') as string);
+      if (formData.get('advance_booking_fee')) localStorage.setItem('advanceBookingFee', formData.get('advance_booking_fee') as string);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to update profile");
     } finally {
@@ -411,6 +440,15 @@ export default function OwnerDashboard() {
             tax_rate: parseFloat((data.tax_rate as string) || "5.0")
           });
         }
+      } else if (showAddModal === 'reservations') {
+        await ownerApi.addManualReservation({
+          customer_name: formData.get('customer_name'),
+          customer_phone: formData.get('customer_phone'),
+          reservation_date: formData.get('reservation_date'),
+          reservation_time: formData.get('reservation_time') + ":00",
+          guest_count: parseInt(formData.get('guest_count') as string),
+        });
+        toast.success("Reservation added");
       }
 
       toast.success("Entity created");
@@ -475,6 +513,7 @@ export default function OwnerDashboard() {
           {[
             { id: 'analytics', label: 'Performance', icon: BarChart3 },
             { id: 'orders', label: 'Order History', icon: ClipboardList },
+            { id: 'reservations', label: 'Bookings', icon: Clock },
             { id: 'reports', label: 'CA Reports', icon: FileText },
             { id: 'menu', label: 'Menu Catalog', icon: Package },
             { id: 'tables', label: 'Floor Plan', icon: LayoutGrid },
@@ -934,28 +973,44 @@ export default function OwnerDashboard() {
                     </button>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {tables.map(table => (
-                      <div key={table.id} className="surface p-5 flex flex-col relative group">
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-[18px] font-semibold">T{table.table_number}</span>
-                          <button 
-                            onClick={() => handleDeleteTable(table.id, table.table_number)} 
-                            className="text-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                    {tables.map(table => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const tableReservations = reservations.filter(r => 
+                        r.table_id === table.id && 
+                        (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
+                        r.reservation_date.startsWith(today)
+                      );
+                      const isReserved = tableReservations.length > 0;
+                      
+                      return (
+                        <div key={table.id} className={`surface p-5 flex flex-col relative group transition-all ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50' : ''}`}>
+                          <div className="flex justify-between items-start mb-4">
+                            <span className="text-[18px] font-semibold">T{table.table_number}</span>
+                            <button 
+                              onClick={() => handleDeleteTable(table.id, table.table_number)} 
+                              className="text-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="mt-auto">
+                            <p className="text-[12px] text-muted mb-1">{table.capacity} Seats</p>
+                            <span className="text-[10px] font-medium text-muted bg-subtle px-1.5 py-0.5 rounded border border-subtle">
+                              {table.category}
+                            </span>
+                            {isReserved && (
+                              <div className="mt-3 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded w-fit uppercase tracking-wider">
+                                Reserved for {tableReservations[0].reservation_time.substring(0, 5)}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-auto">
-                          <p className="text-[12px] text-muted mb-1">{table.capacity} Seats</p>
-                          <span className="text-[10px] font-medium text-muted bg-subtle px-1.5 py-0.5 rounded border border-subtle">
-                            {table.category}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
  
               {/* STAFF TAB */}
               {activeTab === 'staff' && (() => {
@@ -1110,6 +1165,81 @@ export default function OwnerDashboard() {
                 </div>
               )}
  
+              {/* RESERVATIONS TAB */}
+              {activeTab === 'reservations' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div>
+                      <h3 className="text-[18px] font-bold text-slate-800">Table Reservations</h3>
+                      <p className="text-[13px] text-slate-500">Manage upcoming and past bookings</p>
+                    </div>
+                    <button 
+                      onClick={() => setShowAddModal('reservations')}
+                      className="btn flex items-center gap-2"
+                    >
+                      <Plus size={16} /> New Booking
+                    </button>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium">
+                        <tr>
+                          <th className="py-3 px-4">Date & Time</th>
+                          <th className="py-3 px-4">Customer Info</th>
+                          <th className="py-3 px-4 text-center">Guests</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4 text-right">Advance Paid</th>
+                          <th className="py-3 px-4 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {reservations.length === 0 ? (
+                          <tr><td colSpan={6} className="text-center py-8 text-slate-500">No reservations found</td></tr>
+                        ) : reservations.map(res => (
+                          <tr key={res.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <span className="font-semibold block">{new Date(res.reservation_date).toLocaleDateString()}</span>
+                              <span className="text-[11px] text-slate-500">{res.reservation_time}</span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-slate-800 block">{res.customer_name}</span>
+                              <span className="text-[11px] text-slate-500">{res.customer_phone}</span>
+                            </td>
+                            <td className="py-3 px-4 text-center font-bold">{res.guest_count}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                res.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' :
+                                res.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                                res.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' :
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {res.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right font-medium">
+                              ₹{res.advance_amount} 
+                              <span className={`block text-[10px] uppercase ${res.payment_status === 'PAID' ? 'text-emerald-500' : 'text-slate-400'}`}>{res.payment_status}</span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              {res.status === 'PENDING' && (
+                                <div className="flex justify-center gap-2">
+                                  <button onClick={() => ownerApi.updateReservationStatus(res.id, 'CONFIRMED').then(() => fetchData())} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[11px] font-bold hover:bg-emerald-100">Accept</button>
+                                  <button onClick={() => ownerApi.updateReservationStatus(res.id, 'CANCELLED').then(() => fetchData())} className="px-2 py-1 bg-rose-50 text-rose-600 rounded text-[11px] font-bold hover:bg-rose-100">Reject</button>
+                                </div>
+                              )}
+                              {res.status === 'CONFIRMED' && (
+                                <button onClick={() => ownerApi.updateReservationStatus(res.id, 'COMPLETED').then(() => fetchData())} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[11px] font-bold hover:bg-slate-200">Mark Completed</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* SETTINGS TAB */}
               {activeTab === 'settings' && (
                 <div className="max-w-xl">
@@ -1155,6 +1285,19 @@ export default function OwnerDashboard() {
                             name="fssai"
                             defaultValue={localStorage.getItem('restaurantFssai') || ''}
                             placeholder="14-digit number"
+                            className="form-input"
+                          />
+                        </div>
+                        <div className="space-y-1.5 col-span-2">
+                          <label className="text-[12px] font-medium text-main flex justify-between">
+                            Advance Booking Fee (₹)
+                            <span className="text-slate-400 font-normal">For online reservations</span>
+                          </label>
+                          <input
+                            name="advance_booking_fee"
+                            type="number"
+                            defaultValue={localStorage.getItem('advanceBookingFee') || '0'}
+                            placeholder="e.g. 500"
                             className="form-input"
                           />
                         </div>
@@ -1428,6 +1571,33 @@ export default function OwnerDashboard() {
                   </div>
                 </>
               )}
+ 
+                  {showAddModal === 'reservations' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Customer Name</label>
+                        <input name="customer_name" required className="form-input" placeholder="e.g. John Doe" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Phone Number</label>
+                        <input name="customer_phone" required className="form-input" placeholder="e.g. +919876543210" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">Date</label>
+                          <input name="reservation_date" type="date" required className="form-input" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">Time</label>
+                          <input name="reservation_time" type="time" required className="form-input" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Number of Guests</label>
+                        <input name="guest_count" type="number" min="1" required className="form-input" defaultValue="2" />
+                      </div>
+                    </>
+                  )}
  
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowAddModal(null)} className="btn-secondary flex-1">Cancel</button>
