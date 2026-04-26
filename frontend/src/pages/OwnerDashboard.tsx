@@ -118,6 +118,7 @@ export default function OwnerDashboard() {
             if (data.restaurant_gstin) localStorage.setItem('restaurantGstin', data.restaurant_gstin);
             if (data.restaurant_fssai) localStorage.setItem('restaurantFssai', data.restaurant_fssai);
             if (data.restaurant_name) localStorage.setItem('restaurantName', data.restaurant_name);
+            if (data.restaurant_id) localStorage.setItem('restaurantId', data.restaurant_id);
             if (data.advance_booking_fee !== undefined) localStorage.setItem('advanceBookingFee', String(data.advance_booking_fee));
             const status = data.subscription_status;
             const trialEnd = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
@@ -964,7 +965,21 @@ export default function OwnerDashboard() {
               {/* TABLES TAB */}
               {activeTab === 'tables' && (
                 <div className="space-y-6">
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        const rId = localStorage.getItem('restaurantId');
+                        if (rId) {
+                          navigator.clipboard.writeText(`${window.location.origin}/book/${rId}`);
+                          toast.success("Booking link copied to clipboard!");
+                        } else {
+                          toast.error("Restaurant ID not found");
+                        }
+                      }}
+                      className="btn-secondary text-[12px] bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                    >
+                      <ClipboardList size={14} className="mr-2" /> Copy Booking Link
+                    </button>
                     <button
                       onClick={() => setShowQRModal(true)}
                       className="btn-secondary text-[12px]"
