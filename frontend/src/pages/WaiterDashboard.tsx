@@ -41,6 +41,7 @@ export default function WaiterDashboard() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -55,8 +56,9 @@ export default function WaiterDashboard() {
   /* ── Data fetching ─────────────────────────────────────────── */
   const fetchOrdersOnly = async () => {
     try {
-      const ordersData = await waiterApi.getAllOrders();
+      const [ordersData, resData] = await Promise.all([waiterApi.getAllOrders(), waiterApi.getReservations()]);
       setActiveOrders(ordersData);
+      setReservations(resData || []);
       setTables(prev => prev.map((t: any) => ({
         ...t,
         status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Free',
@@ -74,8 +76,8 @@ export default function WaiterDashboard() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [tablesData, menuData, ordersData, upiData] = await Promise.all([
-        waiterApi.getTables(), waiterApi.getMenu(), waiterApi.getAllOrders(), waiterApi.getUpiId()
+      const [tablesData, menuData, ordersData, upiData, resData] = await Promise.all([
+        waiterApi.getTables(), waiterApi.getMenu(), waiterApi.getAllOrders(), waiterApi.getUpiId(), waiterApi.getReservations()
       ]);
       setTables(tablesData.map((t: any) => ({
         ...t,
@@ -84,6 +86,7 @@ export default function WaiterDashboard() {
       })));
       setCategories(menuData);
       setActiveOrders(ordersData);
+      setReservations(resData || []);
       if (upiData?.upi_id) setUpiId(upiData.upi_id);
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Failed to load dashboard');
@@ -317,18 +320,29 @@ export default function WaiterDashboard() {
                     {sectionTables.map(table => {
                       const isPending = (table as any).hasPendingCustomerOrder;
                       const isOccupied = table.status === 'Occupied';
+                      
+                      const today = new Date().toISOString().split('T')[0];
+                      const tableReservations = reservations.filter(r => 
+                        r.table_id === table.id && 
+                        (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
+                        r.reservation_date.startsWith(today)
+                      );
+                      const isReserved = tableReservations.length > 0;
+                      
                       return (
                         <button
                           key={table.id}
                           onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                          className="relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1"
+                          className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
                           style={{
-                            border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}`,
+                            border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
                             boxShadow: isPending
                               ? '0 4px 20px rgb(245 158 11 / .18), 0 1px 4px rgb(0 0 0 / .04)'
                               : isOccupied
                                 ? '0 4px 20px rgb(79 70 229 / .12), 0 1px 4px rgb(0 0 0 / .04)'
-                                : '0 1px 4px rgb(0 0 0 / .04)',
+                                : isReserved
+                                  ? '0 4px 20px rgb(245 158 11 / .12)'
+                                  : '0 1px 4px rgb(0 0 0 / .04)',
                           }}
                         >
                           {isPending && (
@@ -340,9 +354,9 @@ export default function WaiterDashboard() {
                           <div
                             className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] transition-transform duration-200 group-hover:scale-105"
                             style={{
-                              background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
-                              color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8',
-                              border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}`,
+                              background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
+                              color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
+                              border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
                             }}
                           >
                             {table.table_number}
@@ -352,12 +366,12 @@ export default function WaiterDashboard() {
                             <div
                               className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
                               style={{
-                                background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : '#f8fafc',
-                                color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8',
-                                border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}`,
+                                background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : isReserved ? '#fffbeb' : '#f8fafc',
+                                color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#d97706' : '#94a3b8',
+                                border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
                               }}
                             >
-                              {isPending ? '⚡ Pending' : table.status}
+                              {isPending ? '⚡ Pending' : isOccupied ? table.status : isReserved ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
                             </div>
                           </div>
                         </button>
@@ -374,24 +388,33 @@ export default function WaiterDashboard() {
                 {tables.map(table => {
                   const isPending = (table as any).hasPendingCustomerOrder;
                   const isOccupied = table.status === 'Occupied';
+                  
+                  const today = new Date().toISOString().split('T')[0];
+                  const tableReservations = reservations.filter(r => 
+                    r.table_id === table.id && 
+                    (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
+                    r.reservation_date.startsWith(today)
+                  );
+                  const isReserved = tableReservations.length > 0;
+                  
                   return (
                     <button
                       key={table.id}
                       onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className="relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1"
+                      className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
                       style={{
-                        border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}`,
-                        boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : '0 1px 4px rgb(0 0 0 / .04)',
+                        border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
+                        boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : isReserved ? '0 4px 20px rgb(245 158 11 / .12)' : '0 1px 4px rgb(0 0 0 / .04)',
                       }}
                     >
                       {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff' }}>⚡ NEW</span>}
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8', border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}` }}>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
                         {table.table_number}
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase tracking-wide">{table.capacity} seats</p>
-                        <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase" style={{ background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : '#f8fafc', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : '#94a3b8', border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : '#e2e8f0'}` }}>
-                          {isPending ? '⚡ Pending' : table.status}
+                        <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase" style={{ background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : isReserved ? '#fffbeb' : '#f8fafc', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#d97706' : '#94a3b8', border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}` }}>
+                          {isPending ? '⚡ Pending' : isOccupied ? table.status : isReserved ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
                         </div>
                       </div>
                     </button>

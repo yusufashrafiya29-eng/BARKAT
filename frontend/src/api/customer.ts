@@ -50,6 +50,11 @@ export const customerApi = {
   },
 
   // Public Reservations
+  getPublicRestaurantInfo: async (restaurantId: string) => {
+    const response = await axios.get(`${BASE_URL}/reservations/public/restaurant/${restaurantId}`);
+    return response.data;
+  },
+
   createPublicReservation: async (restaurantId: string, payload: any) => {
     const response = await axios.post(`${BASE_URL}/reservations/public/${restaurantId}`, payload);
     return response.data;

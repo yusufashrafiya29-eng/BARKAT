@@ -96,5 +96,10 @@ export const waiterApi = {
   getUpiId: async () => {
     const response = await axios.get(`${BASE_URL}/settings/upi`, getHeaders());
     return response.data;
+  },
+
+  getReservations: async () => {
+    const response = await axios.get(`${BASE_URL}/reservations/`, getHeaders());
+    return response.data;
   }
 };

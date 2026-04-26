@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { customerApi } from '../api/customer';
 import toast from 'react-hot-toast';
@@ -9,6 +9,17 @@ export default function PublicBooking() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [reservationData, setReservationData] = useState<any>(null);
+  const [restaurant, setRestaurant] = useState<any>(null);
+  const [initLoading, setInitLoading] = useState(true);
+
+  useEffect(() => {
+    if (restaurantId) {
+      customerApi.getPublicRestaurantInfo(restaurantId)
+        .then(data => setRestaurant(data))
+        .catch(() => toast.error("Restaurant not found"))
+        .finally(() => setInitLoading(false));
+    }
+  }, [restaurantId]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -78,6 +89,14 @@ export default function PublicBooking() {
     }
   };
 
+  if (initLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -103,12 +122,27 @@ export default function PublicBooking() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-        <div className="bg-indigo-600 p-8 text-center text-white relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 py-12">
+      {/* Restaurant Header */}
+      {restaurant && (
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {restaurant.logo_url ? (
+            <img src={restaurant.logo_url} alt={restaurant.name} className="w-24 h-24 rounded-2xl shadow-xl mx-auto mb-4 object-cover border-4 border-white" />
+          ) : (
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-xl mx-auto mb-4 flex items-center justify-center border-4 border-white">
+              <span className="text-3xl font-black text-white">{restaurant.name.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          <h1 className="text-3xl font-black text-slate-800">{restaurant.name}</h1>
+          <p className="text-slate-500 font-medium mt-1">Table Reservation</p>
+        </div>
+      )}
+
+      <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl shadow-indigo-100 border border-white overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-8 text-center text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-          <h1 className="text-2xl font-black relative z-10">Reserve a Table</h1>
+          <h2 className="text-2xl font-black relative z-10">Reserve Your Table</h2>
           <p className="text-indigo-100 mt-2 text-sm font-medium relative z-10">Select your date and time below</p>
         </div>
         
@@ -152,11 +186,15 @@ export default function PublicBooking() {
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-all active:scale-[0.98] flex justify-center items-center">
+          <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all active:scale-[0.98] flex justify-center items-center shadow-lg shadow-slate-900/20">
             {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Confirm Booking'}
           </button>
           
-          <p className="text-center text-xs text-slate-400 mt-4 font-medium">An advance booking fee may apply</p>
+          {restaurant?.advance_booking_fee > 0 && (
+            <p className="text-center text-xs text-amber-600 bg-amber-50 py-2 rounded-lg font-semibold border border-amber-100">
+              ₹{restaurant.advance_booking_fee} advance booking fee required
+            </p>
+          )}
         </form>
       </div>
     </div>

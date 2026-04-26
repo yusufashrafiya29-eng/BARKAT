@@ -54,6 +54,20 @@ def create_manual_reservation(
     
     return new_res
 
+@router.get("/public/restaurant/{restaurant_id}")
+def get_public_restaurant_info(restaurant_id: UUID, db: Session = Depends(get_db)):
+    """Fetch public restaurant branding info for the booking page"""
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    return {
+        "id": str(restaurant.id),
+        "name": restaurant.name,
+        "logo_url": restaurant.logo_url,
+        "advance_booking_fee": restaurant.advance_booking_fee
+    }
+
 @router.post("/public/{restaurant_id}", response_model=ReservationRead)
 def create_public_reservation(
     restaurant_id: UUID,
