@@ -9,7 +9,6 @@ from models.restaurant import Restaurant
 from models.menu import MenuItem
 from models.order import Order, OrderItem, OrderStatus
 from models.table import Table
-from services.auth_service import get_current_user
 
 router = APIRouter()
 
