@@ -98,6 +98,7 @@ export default function OwnerDashboard() {
   const [showAddModal, setShowAddModal] = useState<TabType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [acceptingReservationId, setAcceptingReservationId] = useState<string | null>(null);
+  const [selectedTableIdForReservation, setSelectedTableIdForReservation] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [menuAddType, setMenuAddType] = useState('item');
 
@@ -467,14 +468,16 @@ export default function OwnerDashboard() {
 
   const handleAcceptReservation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!acceptingReservationId) return;
+    if (!acceptingReservationId || !selectedTableIdForReservation) {
+      toast.error('Please select a table');
+      return;
+    }
     setFormLoading(true);
     try {
-      const formData = new FormData(e.currentTarget);
-      const tableId = formData.get('table_id') as string;
-      await ownerApi.updateReservationStatus(acceptingReservationId, 'CONFIRMED', tableId);
+      await ownerApi.updateReservationStatus(acceptingReservationId, 'CONFIRMED', selectedTableIdForReservation);
       toast.success('Reservation accepted and table assigned!');
       setAcceptingReservationId(null);
+      setSelectedTableIdForReservation(null);
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to accept reservation');
@@ -1457,24 +1460,88 @@ export default function OwnerDashboard() {
       {/* ACCEPT RESERVATION MODAL */}
       {acceptingReservationId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-main/80 backdrop-blur-sm" onClick={() => !formLoading && setAcceptingReservationId(null)}></div>
-          <div className="relative w-full max-w-sm surface p-6 animate-in zoom-in-95 duration-150">
-            <h3 className="text-[16px] font-semibold mb-6">Assign Table to Booking</h3>
-            <form onSubmit={handleAcceptReservation} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-main">Select Table</label>
-                <select name="table_id" required className="form-input">
-                  <option value="">Choose an available table...</option>
-                  {tables.map(t => (
-                    <option key={t.id} value={t.id}>
-                      Table {t.table_number} ({t.capacity} seats) - {t.category}
-                    </option>
-                  ))}
-                </select>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !formLoading && setAcceptingReservationId(null)}></div>
+          <div className="relative w-full max-w-4xl surface p-6 sm:p-8 animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            <h3 className="text-[20px] font-bold mb-1">Assign Table to Booking</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Select an available table for the customer</p>
+            
+            <form onSubmit={handleAcceptReservation} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto pr-2 pb-4 space-y-8">
+                {['AC', 'Non-AC'].map(section => {
+                  const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);
+                  if (sectionTables.length === 0) return null;
+                  return (
+                    <div key={section}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full"
+                          style={section === 'AC'
+                            ? { background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }
+                            : { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }
+                          }
+                        >
+                          {section === 'AC' ? '❄️ AC Section' : '🌿 Non-AC Section'}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-200" />
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        {sectionTables.map(table => {
+                          const today = new Date().toISOString().split('T')[0];
+                          const tableReservations = reservations.filter(r => 
+                            r.table_id === table.id && 
+                            (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
+                            r.reservation_date.startsWith(today)
+                          );
+                          const isReserved = tableReservations.length > 0;
+                          const isSelected = selectedTableIdForReservation === table.id;
+                          
+                          return (
+                            <button
+                              key={table.id}
+                              type="button"
+                              onClick={() => setSelectedTableIdForReservation(table.id)}
+                              className={`relative group bg-white rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-all duration-200`}
+                              style={{
+                                border: `2px solid ${isSelected ? '#4f46e5' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
+                                boxShadow: isSelected ? '0 4px 15px rgba(79, 70, 229, 0.2)' : '0 1px 4px rgb(0 0 0 / .04)',
+                                background: isSelected ? '#eef2ff' : isReserved ? '#fffbeb' : '#ffffff',
+                              }}
+                            >
+                              {isSelected && (
+                                <span className="absolute -top-2.5 right-[-5px] w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[12px] font-bold z-10 shadow-md">✓</span>
+                              )}
+                              <div
+                                className="w-12 h-12 rounded-xl flex items-center justify-center font-extrabold text-[16px] transition-transform duration-200"
+                                style={{
+                                  background: isSelected ? '#4338ca' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
+                                  color: isSelected ? '#ffffff' : isReserved ? '#b45309' : '#94a3b8',
+                                  border: `1.5px solid ${isSelected ? '#4338ca' : isReserved ? '#fde68a' : '#e2e8f0'}`,
+                                }}
+                              >
+                                {table.table_number}
+                              </div>
+                              <div className="text-center">
+                                <p className={`text-[10px] font-bold mb-1 uppercase tracking-wide ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>{table.capacity} seats</p>
+                                <div
+                                  className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide"
+                                  style={{
+                                    background: isSelected ? '#c7d2fe' : isReserved ? '#fef3c7' : '#f8fafc',
+                                    color: isSelected ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
+                                  }}
+                                >
+                                  {isReserved ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}` : 'FREE'}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setAcceptingReservationId(null)} className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" disabled={formLoading} className="btn flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+              <div className="pt-5 mt-auto border-t border-slate-200 flex gap-3">
+                <button type="button" onClick={() => { setAcceptingReservationId(null); setSelectedTableIdForReservation(null); }} className="btn-secondary flex-1 py-3 text-[14px]">Cancel</button>
+                <button type="submit" disabled={formLoading || !selectedTableIdForReservation} className="btn flex-1 bg-indigo-600 hover:bg-indigo-700 text-white border-0 py-3 text-[14px] disabled:opacity-50 disabled:cursor-not-allowed">
                   {formLoading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : 'Confirm Booking'}
                 </button>
               </div>
