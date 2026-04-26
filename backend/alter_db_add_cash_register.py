@@ -30,7 +30,7 @@ def run():
                 closed_at TIMESTAMPTZ
             );
         """))
-        print("✅ cash_shifts table ready.")
+        print("[OK] cash_shifts table ready.")
 
         # ── cash_transactions ─────────────────────────────────────────────────
         conn.execute(text("""
@@ -45,10 +45,10 @@ def run():
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         """))
-        print("✅ cash_transactions table ready.")
+        print("[OK] cash_transactions table ready.")
 
         conn.commit()
-        print("✅ Cash Register migration complete.")
+        print("[OK] Cash Register migration complete.")
 
 if __name__ == "__main__":
     run()
