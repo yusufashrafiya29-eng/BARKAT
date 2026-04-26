@@ -17,6 +17,7 @@ class OrderItemRead(BaseModel):
     price_at_order_time: float
     subtotal: float
     notes: Optional[str] = None
+    status: str = "PENDING"
 
     class Config:
         from_attributes = True
@@ -68,3 +69,6 @@ class PaymentStatusUpdate(BaseModel):
 
 class OrderUpdateItems(BaseModel):
     items: List[OrderItemCreate]
+
+class OrderItemStatusUpdate(BaseModel):
+    status: str

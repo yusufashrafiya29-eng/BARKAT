@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChefHat, Clock, AlertCircle, Loader2, Flame, CheckCircle2, ArrowLeft, ShoppingCart, Shield } from 'lucide-react';
+import { ChefHat, Clock, AlertCircle, Loader2, Flame, CheckCircle2, ArrowLeft, ShoppingCart, Shield, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { kitchenApi } from '../api/kitchen';
 import { waiterApi } from '../api/waiter';
@@ -10,6 +10,7 @@ interface OrderItem {
   menu_item_id: string;
   quantity: number;
   notes?: string;
+  status: string;
 }
 
 interface Order {
@@ -24,16 +25,24 @@ export default function KitchenKDS() {
   const navigate = useNavigate();
   const [orders, setOrders]   = useState<Order[]>([]);
   const [menuMap, setMenuMap] = useState<Record<string, string>>({});
+  const [stationMap, setStationMap] = useState<Record<string, string>>({});
   const [tableMap, setTableMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(new Date());
+  
+  const [selectedStation, setSelectedStation] = useState<string>('Kitchen');
 
   const fetchMetadata = useCallback(async () => {
     try {
       const [menuRes, tablesRes] = await Promise.all([waiterApi.getMenu(), waiterApi.getTables()]);
       const nm: Record<string, string> = {};
-      menuRes.forEach((c: any) => c.menu_items?.forEach((i: any) => { nm[i.id] = i.name; }));
+      const sm: Record<string, string> = {};
+      menuRes.forEach((c: any) => c.menu_items?.forEach((i: any) => { 
+        nm[i.id] = i.name; 
+        sm[i.id] = c.station || 'Kitchen';
+      }));
       setMenuMap(nm);
+      setStationMap(sm);
       const tm: Record<string, number> = {};
       tablesRes.forEach((t: any) => { tm[t.id] = t.table_number; });
       setTableMap(tm);
@@ -55,7 +64,7 @@ export default function KitchenKDS() {
     return () => clearInterval(interval);
   }, [fetchMetadata, fetchOrders]);
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  const handleOrderStatusChange = async (orderId: string, newStatus: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     try {
       await kitchenApi.updateOrderStatus(orderId, newStatus);
@@ -68,6 +77,16 @@ export default function KitchenKDS() {
     } catch {
       toast.error('Failed to update status');
       fetchOrders();
+    }
+  };
+
+  const handleItemStatusChange = async (itemId: string, newStatus: string) => {
+    try {
+      await kitchenApi.updateItemStatus(itemId, newStatus);
+      toast.success(`Item marked as ${newStatus}`);
+      fetchOrders();
+    } catch {
+      toast.error('Failed to update item status');
     }
   };
 
@@ -84,14 +103,22 @@ export default function KitchenKDS() {
     );
   }
 
-  const incoming  = orders.filter(o => o.status === 'ACCEPTED');
-  const preparing = orders.filter(o => o.status === 'PREPARING');
+  // Filter orders to only show those that have items for the selected station
+  const stationOrders = orders.filter(o => o.items.some(i => stationMap[i.menu_item_id] === selectedStation));
+  const incoming  = stationOrders.filter(o => o.status === 'ACCEPTED');
+  const preparing = stationOrders.filter(o => o.status === 'PREPARING');
 
   const OrderCard = ({ order, type }: { order: Order; type: 'incoming' | 'preparing' }) => {
     const mins      = elapsed(order.created_at);
     const isDanger  = mins > 25;
     const isWarning = mins > 15;
     const accentColor = isDanger ? '#f43f5e' : isWarning ? '#f59e0b' : type === 'incoming' ? '#6366f1' : '#10b981';
+
+    // Filter items to show only those belonging to the current station
+    const itemsForStation = order.items.filter(i => stationMap[i.menu_item_id] === selectedStation);
+    const allItemsReady = itemsForStation.length > 0 && itemsForStation.every(i => i.status === 'READY');
+
+    if (itemsForStation.length === 0 || allItemsReady) return null; // Don't show if empty or all items are ready for this station
 
     return (
       <div
@@ -136,7 +163,7 @@ export default function KitchenKDS() {
 
           {/* items */}
           <div className="space-y-2 mb-5">
-            {order.items.map((item, idx) => (
+            {itemsForStation.map((item, idx) => (
               <div key={idx} className="flex gap-3 py-1.5 border-b border-white/5 last:border-0 items-start">
                 <span className="text-white font-bold text-[13px] min-w-[28px]">{item.quantity}×</span>
                 <div className="flex-1">
@@ -148,6 +175,15 @@ export default function KitchenKDS() {
                     </p>
                   )}
                 </div>
+                {type === 'preparing' && (
+                  <button 
+                    onClick={() => handleItemStatusChange(item.id, 'READY')}
+                    className="p-1.5 rounded bg-white/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
+                    title="Mark Item Ready"
+                  >
+                    <CheckSquare size={16} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -155,21 +191,13 @@ export default function KitchenKDS() {
           {/* action */}
           {type === 'incoming' ? (
             <button
-              onClick={() => handleStatusChange(order.id, 'PREPARING')}
+              onClick={() => handleOrderStatusChange(order.id, 'PREPARING')}
               className="w-full py-2.5 rounded-xl font-bold text-[13px] transition-all duration-200 hover:opacity-90"
               style={{ background: `linear-gradient(135deg, #6366f1, #4f46e5)`, color: '#fff', boxShadow: '0 4px 12px rgb(99 102 241 / .4)' }}
             >
-              🍳 Start Preparation
+              🍳 Start Preparation for Entire Ticket
             </button>
-          ) : (
-            <button
-              onClick={() => handleStatusChange(order.id, 'READY')}
-              className="w-full py-2.5 rounded-xl font-bold text-[13px] transition-all duration-200 hover:opacity-90"
-              style={{ background: `linear-gradient(135deg, #10b981, #059669)`, color: '#fff', boxShadow: '0 4px 12px rgb(16 185 129 / .4)' }}
-            >
-              🔔 Fire — Mark Ready
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -221,6 +249,18 @@ export default function KitchenKDS() {
             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{ boxShadow: '0 0 8px #10b981' }} />
             <span className="text-[12px] font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
           </div>
+          
+          {/* Station Selector */}
+          <select 
+            value={selectedStation} 
+            onChange={(e) => setSelectedStation(e.target.value)}
+            className="bg-[#1e2433] text-white text-[12px] font-semibold border border-[#ffffff10] rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 transition-colors"
+          >
+            <option value="Kitchen">Kitchen Station</option>
+            <option value="Bar">Bar Station</option>
+            <option value="Dessert">Dessert Station</option>
+          </select>
+
           <span className="text-[11px] text-slate-600 border-l border-white/5 pl-5">
             Sync: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>

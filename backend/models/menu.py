@@ -15,9 +15,21 @@ class Category(Base):
     name = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    station = Column(String, default="Kitchen") # Routing for KDS
 
     # Relationships
     menu_items = relationship("MenuItem", back_populates="category", cascade="all, delete-orphan")
+
+class RecipeIngredient(Base):
+    __tablename__ = "recipe_ingredients"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id = Column(UUID(as_uuid=True), ForeignKey("menu_items.id"), nullable=False)
+    stock_item_id = Column(UUID(as_uuid=True), ForeignKey("stock_items.id"), nullable=False)
+    quantity = Column(Float, nullable=False) # e.g. 150.0
+    unit = Column(String, nullable=False) # e.g. 'g' or 'ml' or 'pcs'
+
+    menu_item = relationship("MenuItem", back_populates="recipe_ingredients")
+    stock_item = relationship("StockItem")
 
 class MenuItem(Base):
     __tablename__ = "menu_items"
@@ -41,3 +53,4 @@ class MenuItem(Base):
 
     # Relationships
     category = relationship("Category", back_populates="menu_items")
+    recipe_ingredients = relationship("RecipeIngredient", back_populates="menu_item", cascade="all, delete-orphan")

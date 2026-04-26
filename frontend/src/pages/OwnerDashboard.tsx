@@ -22,11 +22,13 @@ interface MenuItem {
   is_veg: boolean;
   is_available: boolean;
   image_url?: string;
+  recipe_ingredients?: {id: string, stock_item_id: string, quantity: number, unit: string}[];
 }
 
 interface MenuCategory {
   id: string;
   name: string;
+  station: string;
   menu_items: MenuItem[];
 }
 
@@ -106,6 +108,10 @@ export default function OwnerDashboard() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Recipe Editor State
+  const [editingRecipeItemId, setEditingRecipeItemId] = useState<string | null>(null);
+  const [recipeIngredients, setRecipeIngredients] = useState<{stock_item_id: string, quantity: number, unit: string}[]>([]);
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -401,6 +407,30 @@ export default function OwnerDashboard() {
     navigate('/login');
   };
 
+  const handleOpenRecipeEditor = (item: MenuItem) => {
+    setEditingRecipeItemId(item.id);
+    setRecipeIngredients(item.recipe_ingredients?.map(r => ({
+      stock_item_id: r.stock_item_id,
+      quantity: r.quantity,
+      unit: r.unit
+    })) || []);
+  };
+
+  const handleSaveRecipe = async () => {
+    if (!editingRecipeItemId) return;
+    setFormLoading(true);
+    try {
+      await ownerApi.updateMenuItemRecipe(editingRecipeItemId, recipeIngredients);
+      toast.success("Recipe saved successfully!");
+      setEditingRecipeItemId(null);
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Failed to save recipe");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   // Form Submission Handlers
   const handleAddSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -433,7 +463,7 @@ export default function OwnerDashboard() {
         });
       } else if (showAddModal === 'menu') {
         if (menuAddType === 'category') {
-          await ownerApi.addCategory({ name: data.name as string });
+          await ownerApi.addCategory({ name: data.name as string, station: (data.station as string) || 'Kitchen' });
         } else {
           await ownerApi.addMenuItem({
             name: data.item_name as string,
@@ -914,6 +944,13 @@ export default function OwnerDashboard() {
                               <h4 className="text-[14px] font-medium pr-4 text-main">{item.name}</h4>
                               <div className="flex items-center gap-3">
                                 <span className="text-[13px] text-muted">₹{item.price}</span>
+                                <button 
+                                  onClick={() => handleOpenRecipeEditor(item)}
+                                  className="text-muted hover:text-indigo-500 transition-colors p-1 rounded hover:bg-indigo-50"
+                                  title="Edit Recipe / BOM"
+                                >
+                                  <FileText size={14} />
+                                </button>
                                 <button 
                                   onClick={() => handleDeleteMenuItem(item.id, item.name)}
                                   className="text-muted hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-50"
@@ -1619,10 +1656,20 @@ export default function OwnerDashboard() {
                   </div>
 
                   {menuAddType === 'category' && (
-                    <div className="space-y-1.5">
-                      <label className="text-[12px] font-medium text-main">Category Name</label>
-                      <input name="name" required className="form-input" />
-                    </div>
+                    <>
+                      <div className="space-y-1.5 mb-4">
+                        <label className="text-[12px] font-medium text-main">Category Name</label>
+                        <input name="name" required className="form-input" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-main">Routing Station (KDS)</label>
+                        <select name="station" required className="form-input">
+                          <option value="Kitchen">Kitchen</option>
+                          <option value="Bar">Bar</option>
+                          <option value="Dessert">Dessert Station</option>
+                        </select>
+                      </div>
+                    </>
                   )}
 
                   {menuAddType === 'item' && (
@@ -1742,6 +1789,87 @@ export default function OwnerDashboard() {
         </div>
       )}
  
+      {/* RECIPE BOM EDITOR MODAL */}
+      {editingRecipeItemId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !formLoading && setEditingRecipeItemId(null)}></div>
+          <div className="relative w-full max-w-2xl surface p-6 sm:p-8 animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+            <h3 className="text-[20px] font-bold mb-1">Recipe / BOM Editor</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Manage raw inventory deducted when this item is sold.</p>
+            
+            <div className="flex-1 overflow-y-auto mb-6 pr-2 space-y-4">
+              {recipeIngredients.map((ing, idx) => (
+                <div key={idx} className="flex gap-3 items-end bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div className="flex-1 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Raw Material</label>
+                    <select 
+                      value={ing.stock_item_id}
+                      onChange={e => {
+                        const newArr = [...recipeIngredients];
+                        newArr[idx].stock_item_id = e.target.value;
+                        setRecipeIngredients(newArr);
+                      }}
+                      className="form-input text-[13px]"
+                    >
+                      <option value="">Select Item...</option>
+                      {inventory.map(inv => <option key={inv.id} value={inv.id}>{inv.name} (in {inv.unit})</option>)}
+                    </select>
+                  </div>
+                  <div className="w-24 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Qty</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={ing.quantity}
+                      onChange={e => {
+                        const newArr = [...recipeIngredients];
+                        newArr[idx].quantity = parseFloat(e.target.value);
+                        setRecipeIngredients(newArr);
+                      }}
+                      className="form-input text-[13px]"
+                    />
+                  </div>
+                  <div className="w-20 space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Unit</label>
+                    <input 
+                      type="text" 
+                      value={ing.unit}
+                      onChange={e => {
+                        const newArr = [...recipeIngredients];
+                        newArr[idx].unit = e.target.value;
+                        setRecipeIngredients(newArr);
+                      }}
+                      className="form-input text-[13px]"
+                      placeholder="e.g. g, ml"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => setRecipeIngredients(recipeIngredients.filter((_, i) => i !== idx))}
+                    className="p-2.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              
+              <button 
+                onClick={() => setRecipeIngredients([...recipeIngredients, { stock_item_id: '', quantity: 1, unit: 'g' }])}
+                className="w-full py-3 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus size={16} /> Add Ingredient
+              </button>
+            </div>
+            
+            <div className="pt-4 border-t border-slate-200 flex gap-3 mt-auto">
+              <button onClick={() => setEditingRecipeItemId(null)} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={handleSaveRecipe} disabled={formLoading} className="btn flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+                {formLoading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : 'Save Recipe'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QR PRINT MODAL */}
       {showQRModal && (
         <div className="fixed inset-0 z-[100] bg-white text-black flex flex-col overflow-y-auto print:bg-white">

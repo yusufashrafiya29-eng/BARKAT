@@ -20,5 +20,10 @@ export const kitchenApi = {
   updateOrderStatus: async (orderId: string, status: string) => {
     const response = await axios.put(`${BASE_URL}/orders/${orderId}/status`, { status }, getHeaders());
     return response.data;
+  },
+
+  updateItemStatus: async (itemId: string, status: string) => {
+    const response = await axios.put(`${BASE_URL}/orders/items/${itemId}/status`, { status }, getHeaders());
+    return response.data;
   }
 };

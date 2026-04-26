@@ -115,3 +115,42 @@ def upload_menu_item_image(
     db.commit()
     db.refresh(item)
     return item
+
+from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead
+@router.post("/items/{item_id}/recipe", response_model=List[RecipeIngredientRead])
+def update_menu_item_recipe(
+    item_id: str,
+    ingredients: List[RecipeIngredientCreate],
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Set the BOM recipe for a menu item. Replaces existing recipe."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem, RecipeIngredient
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    # Delete old recipe
+    db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item_id).delete()
+    
+    # Add new recipe
+    new_ingredients = []
+    for ing in ingredients:
+        new_ing = RecipeIngredient(
+            menu_item_id=item_id,
+            stock_item_id=ing.stock_item_id,
+            quantity=ing.quantity,
+            unit=ing.unit
+        )
+        db.add(new_ing)
+        new_ingredients.append(new_ing)
+        
+    db.commit()
+    for ing in new_ingredients:
+        db.refresh(ing)
+        
+    return new_ingredients

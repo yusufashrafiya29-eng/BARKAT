@@ -123,10 +123,11 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    order.payment_status = new_payment_status
-    
-    if new_payment_status == 'PAID':
+    # Check if transitioning to PAID
+    if new_payment_status == 'PAID' and order.payment_status != 'PAID':
         from models.reservation import Reservation
+        from models.menu import RecipeIngredient
+        from models.inventory import StockItem
         from datetime import datetime
         today_date = datetime.now().date()
         reservations = db.query(Reservation).filter(
@@ -137,6 +138,17 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
         for res in reservations:
             res.status = 'COMPLETED'
             
+        # Deduct BOM inventory
+        for item in order.items:
+            recipes = db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item.menu_item_id).all()
+            for recipe in recipes:
+                stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
+                if stock_item:
+                    # Deduct quantity based on recipe quantity * order item quantity
+                    stock_item.quantity -= (recipe.quantity * item.quantity)
+                    # Don't let it go below 0 (optional, but standard for pos is to allow negatives or stop at 0. We'll allow negatives to show out of sync inventory)
+    
+    order.payment_status = new_payment_status
     db.commit()
     db.refresh(order)
     return order
@@ -148,6 +160,30 @@ def get_active_kitchen_orders(db: Session, restaurant_id: str):
         Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING]),
         Order.restaurant_id == restaurant_id
     ).order_by(Order.created_at.asc()).all()
+
+def update_order_item_status(db: Session, item_id: UUID, new_status: str, restaurant_id: str) -> OrderItem:
+    from models.order import Order
+    item = db.query(OrderItem).join(Order).filter(
+        OrderItem.id == item_id,
+        Order.restaurant_id == restaurant_id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Order item not found")
+        
+    item.status = new_status
+    db.commit()
+    db.refresh(item)
+    
+    # Check if all items in the order are READY
+    order = db.query(Order).filter(Order.id == item.order_id).first()
+    if order:
+        all_ready = all(oi.status == "READY" for oi in order.items)
+        if all_ready and order.status != OrderStatus.READY:
+            order.status = OrderStatus.READY
+            db.commit()
+            
+    return item
 
 def accept_order(db: Session, order_id: UUID, waiter_id: UUID, restaurant_id: str) -> Order:
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()

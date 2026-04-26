@@ -102,6 +102,16 @@ def update_order_status(
             
     return order
 
+from schemas.order import OrderItemStatusUpdate, OrderItemRead
+@router.put("/items/{item_id}/status", response_model=OrderItemRead)
+def update_item_status(
+    item_id: UUID,
+    status_update: OrderItemStatusUpdate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return order_service.update_order_item_status(db, item_id, status_update.status, str(restaurant_id))
+
 @router.put("/{order_id}/payment-status", response_model=OrderRead)
 def update_order_payment_status(
     order_id: UUID,

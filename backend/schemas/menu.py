@@ -15,9 +15,25 @@ class MenuItemBase(BaseModel):
 class MenuItemCreate(MenuItemBase):
     category_id: UUID
 
+class RecipeIngredientBase(BaseModel):
+    stock_item_id: UUID
+    quantity: float
+    unit: str
+
+class RecipeIngredientCreate(RecipeIngredientBase):
+    pass
+
+class RecipeIngredientRead(RecipeIngredientBase):
+    id: UUID
+    menu_item_id: UUID
+
+    class Config:
+        from_attributes = True
+
 class MenuItemRead(MenuItemBase):
     id: UUID
     category_id: UUID
+    recipe_ingredients: List[RecipeIngredientRead] = []
 
     class Config:
         from_attributes = True
@@ -36,6 +52,7 @@ class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
     is_active: bool = True
+    station: str = "Kitchen"
 
 class CategoryCreate(CategoryBase):
     pass

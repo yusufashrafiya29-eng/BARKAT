@@ -62,6 +62,7 @@ class OrderItem(Base):
     price_at_order_time = Column(Float, nullable=False)
     subtotal = Column(Float, nullable=False) # Extracted via Service logic
     notes = Column(String, nullable=True)
+    status = Column(String, default="PENDING", nullable=False) # PENDING, PREPARING, READY
 
     # Relationships
     order = relationship("Order", back_populates="items")
