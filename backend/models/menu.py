@@ -51,6 +51,9 @@ class MenuItem(Base):
     preparation_time = Column(Integer, nullable=True) # minutes
     image_url = Column(String, nullable=True)
 
+    # Aggregator Mapping
+    external_id = Column(String, nullable=True) # ID from UrbanPiper/Zomato/Swiggy
+
     # Relationships
     category = relationship("Category", back_populates="menu_items")
     recipe_ingredients = relationship("RecipeIngredient", back_populates="menu_item", cascade="all, delete-orphan")

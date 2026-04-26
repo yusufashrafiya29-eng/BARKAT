@@ -143,7 +143,13 @@ export default function KitchenKDS() {
                 T{tableMap[order.table_id] ?? '?'}
               </div>
               <div>
-                <p className="text-[14px] font-bold text-white tracking-tight">#{order.id.slice(0, 5)}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[14px] font-bold text-white tracking-tight">#{order.id.slice(0, 5)}</p>
+                  {/* @ts-ignore */}
+                  {order.source === 'ZOMATO' && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-600 text-white">Zomato</span>}
+                  {/* @ts-ignore */}
+                  {order.source === 'SWIGGY' && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-orange-600 text-white">Swiggy</span>}
+                </div>
                 <div
                   className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1"
                   style={{ background: `${accentColor}20`, color: accentColor }}

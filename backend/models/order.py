@@ -42,6 +42,9 @@ class Order(Base):
     razorpay_order_id = Column(String, nullable=True)
     razorpay_payment_id = Column(String, nullable=True)
 
+    # Aggregator tracking (UrbanPiper, Zomato, Swiggy)
+    external_order_id = Column(String, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

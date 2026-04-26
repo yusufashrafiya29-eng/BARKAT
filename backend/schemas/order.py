@@ -57,6 +57,7 @@ class OrderRead(BaseModel):
     items: List[OrderItemRead] = []
     razorpay_order_id: Optional[str] = None
     razorpay_payment_id: Optional[str] = None
+    external_order_id: Optional[str] = None
 
     class Config:
         from_attributes = True
