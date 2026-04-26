@@ -7,9 +7,10 @@ import {
   RefreshCcw, AlertCircle, Edit2,
   ShoppingCart, CheckCircle2, X,
   Wallet, CreditCard, Smartphone,
-  Send, Zap, ChefHat, Shield
+  Send, Zap, ChefHat, Shield, Banknote
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
+import { cashApi } from '../api/cashRegister';
 import toast from 'react-hot-toast';
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -52,6 +53,7 @@ export default function WaiterDashboard() {
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'UPI'>('CASH');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [upiId, setUpiId] = useState<string | null>(null);
+  const [shiftOpen, setShiftOpen] = useState<boolean | null>(null); // null = loading
 
   /* ── Data fetching ─────────────────────────────────────────── */
   const fetchOrdersOnly = async () => {
@@ -88,6 +90,11 @@ export default function WaiterDashboard() {
       setActiveOrders(ordersData);
       setReservations(resData || []);
       if (upiData?.upi_id) setUpiId(upiData.upi_id);
+      // Check if shift is open (read-only for waiter)
+      try {
+        await cashApi.getCurrentShift();
+        setShiftOpen(true);
+      } catch { setShiftOpen(false); }
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Failed to load dashboard');
     } finally { setLoading(false); }
@@ -225,6 +232,19 @@ export default function WaiterDashboard() {
           >
             <Clock size={13} /> Orders
           </button>
+          {/* Shift status badge */}
+          {shiftOpen !== null && (
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold"
+              style={shiftOpen
+                ? { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' }
+                : { background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c' }
+              }
+            >
+              <Banknote size={12} />
+              {shiftOpen ? 'Shift Open' : 'No Shift'}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-bold text-emerald-700 hidden sm:block">Online</span>
