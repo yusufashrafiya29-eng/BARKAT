@@ -128,11 +128,11 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
     if new_payment_status == 'PAID':
         from models.reservation import Reservation
         from datetime import datetime
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_date = datetime.now().date()
         reservations = db.query(Reservation).filter(
             Reservation.table_id == order.table_id,
             Reservation.status == 'CONFIRMED',
-            Reservation.reservation_date.startswith(today_str)
+            Reservation.reservation_date == today_date
         ).all()
         for res in reservations:
             res.status = 'COMPLETED'
