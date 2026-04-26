@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List, Optional
 from pydantic import BaseModel
-from db.session import get_db
+from api.deps import get_db
 from models.user import User, UserRole
 from models.restaurant import Restaurant
 from models.menu import MenuItem
