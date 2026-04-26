@@ -23,25 +23,42 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
                 detail=f"Please wait {30 - int(time_diff.total_seconds())}s before placing another order."
             )
 
-    # 3. Initialize Order record safely
+    # 3. Check for existing active unpaid order for the table
+    existing_order = db.query(Order).filter(
+        Order.table_id == order_in.table_id,
+        Order.payment_status != 'PAID',
+        Order.status != OrderStatus.CANCELLED
+    ).first()
+
     initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
+
+    if existing_order:
+        # Append to existing order
+        new_order = existing_order
+        if new_order.status == OrderStatus.SERVED:
+            new_order.status = initial_status
+        if order_in.source == "CUSTOMER" and not new_order.customer_phone and order_in.customer_phone:
+            new_order.customer_phone = order_in.customer_phone
+            new_order.customer_name = order_in.customer_name
+    else:
+        # Initialize new Order record safely
+        new_order = Order(
+            restaurant_id=table.restaurant_id,
+            table_id=order_in.table_id,
+            waiter_id=waiter_id,
+            customer_phone=order_in.customer_phone,
+            customer_name=order_in.customer_name,
+            source=order_in.source,
+            status=initial_status,
+            is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,
+            total_amount=0.0
+        )
+        db.add(new_order)
+        db.flush() # Flush pushes to DB without permanent commit to generate new_order.id
     
-    new_order = Order(
-        restaurant_id=table.restaurant_id,
-        table_id=order_in.table_id,
-        waiter_id=waiter_id,
-        customer_phone=order_in.customer_phone,
-        customer_name=order_in.customer_name,
-        source=order_in.source,
-        status=initial_status,
-        is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,
-        total_amount=0.0
-    )
-    db.add(new_order)
-    db.flush() # Flush pushes to DB without permanent commit to generate new_order.id
     
-    subtotal_sum = 0.0
-    tax_sum = 0.0
+    subtotal_sum = new_order.subtotal_amount or 0.0
+    tax_sum = new_order.tax_amount or 0.0
     
     # 2. We never trust the client with price calculations.
     # We fetch the *current DB price* dynamically and calculate subtotal.
@@ -58,15 +75,21 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         subtotal_sum += subtotal
         tax_sum += item_tax
         
-        new_order_item = OrderItem(
-            order_id=new_order.id,
-            menu_item_id=menu_item.id,
-            quantity=item_in.quantity,
-            price_at_order_time=menu_item.price,
-            subtotal=subtotal,
-            notes=item_in.notes
-        )
-        db.add(new_order_item)
+        # Check if item already exists in this order to increment quantity instead of adding new row
+        existing_item = db.query(OrderItem).filter(OrderItem.order_id == new_order.id, OrderItem.menu_item_id == menu_item.id).first()
+        if existing_item:
+            existing_item.quantity += item_in.quantity
+            existing_item.subtotal += subtotal
+        else:
+            new_order_item = OrderItem(
+                order_id=new_order.id,
+                menu_item_id=menu_item.id,
+                quantity=item_in.quantity,
+                price_at_order_time=menu_item.price,
+                subtotal=subtotal,
+                notes=item_in.notes
+            )
+            db.add(new_order_item)
         
     # 5. Apply exact total and commit atomic transaction
     new_order.subtotal_amount = subtotal_sum
@@ -101,6 +124,19 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
         raise HTTPException(status_code=404, detail="Order not found")
     
     order.payment_status = new_payment_status
+    
+    if new_payment_status == 'PAID':
+        from models.reservation import Reservation
+        from datetime import datetime
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        reservations = db.query(Reservation).filter(
+            Reservation.table_id == order.table_id,
+            Reservation.status == 'CONFIRMED',
+            Reservation.reservation_date.startswith(today_str)
+        ).all()
+        for res in reservations:
+            res.status = 'COMPLETED'
+            
     db.commit()
     db.refresh(order)
     return order

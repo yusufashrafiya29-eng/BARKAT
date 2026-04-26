@@ -49,6 +49,16 @@ def confirm_payment(db: Session, order_id: UUID, transaction_id: str = None, res
     order = db.query(Order).filter(Order.id == order_id).first()
     if order:
         order.payment_status = "PAID"
+        from models.reservation import Reservation
+        from datetime import datetime
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        reservations = db.query(Reservation).filter(
+            Reservation.table_id == order.table_id,
+            Reservation.status == 'CONFIRMED',
+            Reservation.reservation_date.startswith(today_str)
+        ).all()
+        for res in reservations:
+            res.status = 'COMPLETED'
         
     db.commit()
     db.refresh(bill)
