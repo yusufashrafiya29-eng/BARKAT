@@ -244,24 +244,32 @@ export default function KitchenKDS() {
           </div>
         </div>
 
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 mr-2">
             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" style={{ boxShadow: '0 0 8px #10b981' }} />
             <span className="text-[12px] font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
           </div>
-          
-          {/* Station Selector */}
-          <select 
-            value={selectedStation} 
-            onChange={(e) => setSelectedStation(e.target.value)}
-            className="bg-[#1e2433] text-white text-[12px] font-semibold border border-[#ffffff10] rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 transition-colors"
-          >
-            <option value="Kitchen">Kitchen Station</option>
-            <option value="Bar">Bar Station</option>
-            <option value="Dessert">Dessert Station</option>
-          </select>
 
-          <span className="text-[11px] text-slate-600 border-l border-white/5 pl-5">
+          {/* Station Switcher Buttons */}
+          {[
+            { label: '🍳 Kitchen', value: 'Kitchen', color: '#f59e0b' },
+            { label: '🍹 Bar', value: 'Bar', color: '#6366f1' },
+            { label: '🍰 Dessert', value: 'Dessert', color: '#ec4899' },
+          ].map(s => (
+            <button
+              key={s.value}
+              onClick={() => setSelectedStation(s.value)}
+              className="px-3 py-1.5 rounded-xl text-[12px] font-extrabold uppercase tracking-wider transition-all duration-200"
+              style={selectedStation === s.value
+                ? { background: s.color, color: '#fff', boxShadow: `0 0 16px ${s.color}80`, border: `1px solid ${s.color}` }
+                : { background: '#1e2433', color: '#64748b', border: '1px solid #ffffff10' }
+              }
+            >
+              {s.label}
+            </button>
+          ))}
+
+          <span className="text-[11px] text-slate-600 border-l border-white/5 pl-4">
             Sync: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
           <button
