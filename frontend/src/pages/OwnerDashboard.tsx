@@ -180,8 +180,9 @@ export default function OwnerDashboard() {
           // Nothing to fetch silently for reports tab
           break;
         case 'reservations':
-          const resvRes = await ownerApi.getReservations();
+          const [resvRes, tabRes] = await Promise.all([ownerApi.getReservations(), waiterApi.getTables()]);
           setReservations(resvRes);
+          setTables(tabRes);
           break;
         case 'settings':
           const [payRes, rzpRes] = await Promise.all([
@@ -232,8 +233,9 @@ export default function OwnerDashboard() {
         case 'reports':
           break;
         case 'reservations':
-          const resvRes2 = await ownerApi.getReservations();
+          const [resvRes2, tabRes2] = await Promise.all([ownerApi.getReservations(), waiterApi.getTables()]);
           setReservations(resvRes2);
+          setTables(tabRes2);
           break;
         case 'settings':
           const [payResData, rzpResData] = await Promise.all([
