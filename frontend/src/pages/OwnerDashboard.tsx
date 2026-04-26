@@ -97,6 +97,7 @@ export default function OwnerDashboard() {
   const [razorpayKeys, setRazorpayKeys] = useState({ razorpay_key_id: '', razorpay_key_secret: '' });
   const [showAddModal, setShowAddModal] = useState<TabType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [acceptingReservationId, setAcceptingReservationId] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [menuAddType, setMenuAddType] = useState('item');
 
@@ -457,6 +458,24 @@ export default function OwnerDashboard() {
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Action failed");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleAcceptReservation = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!acceptingReservationId) return;
+    setFormLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const tableId = formData.get('table_id') as string;
+      await ownerApi.updateReservationStatus(acceptingReservationId, 'CONFIRMED', tableId);
+      toast.success('Reservation accepted and table assigned!');
+      setAcceptingReservationId(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to accept reservation');
     } finally {
       setFormLoading(false);
     }
@@ -1239,7 +1258,7 @@ export default function OwnerDashboard() {
                             <td className="py-3 px-4 text-center">
                               {res.status === 'PENDING' && (
                                 <div className="flex justify-center gap-2">
-                                  <button onClick={() => ownerApi.updateReservationStatus(res.id, 'CONFIRMED').then(() => fetchData())} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[11px] font-bold hover:bg-emerald-100">Accept</button>
+                                  <button onClick={() => setAcceptingReservationId(res.id)} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[11px] font-bold hover:bg-emerald-100">Accept</button>
                                   <button onClick={() => ownerApi.updateReservationStatus(res.id, 'CANCELLED').then(() => fetchData())} className="px-2 py-1 bg-rose-50 text-rose-600 rounded text-[11px] font-bold hover:bg-rose-100">Reject</button>
                                 </div>
                               )}
@@ -1433,6 +1452,35 @@ export default function OwnerDashboard() {
         </div>
       </main>
  
+      {/* ACCEPT RESERVATION MODAL */}
+      {acceptingReservationId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-main/80 backdrop-blur-sm" onClick={() => !formLoading && setAcceptingReservationId(null)}></div>
+          <div className="relative w-full max-w-sm surface p-6 animate-in zoom-in-95 duration-150">
+            <h3 className="text-[16px] font-semibold mb-6">Assign Table to Booking</h3>
+            <form onSubmit={handleAcceptReservation} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-main">Select Table</label>
+                <select name="table_id" required className="form-input">
+                  <option value="">Choose an available table...</option>
+                  {tables.map(t => (
+                    <option key={t.id} value={t.id}>
+                      Table {t.table_number} ({t.capacity} seats) - {t.category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setAcceptingReservationId(null)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={formLoading} className="btn flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+                  {formLoading ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : 'Confirm Booking'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ADD ENTITY MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
