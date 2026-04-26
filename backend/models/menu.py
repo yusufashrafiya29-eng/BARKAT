@@ -29,6 +29,9 @@ class MenuItem(Base):
     description = Column(String, nullable=True)
     price = Column(Float, nullable=False)
     
+    # Tax & Compliance
+    tax_rate = Column(Float, default=5.0) # Standard 5% GST for food
+    
     # Required Improvements
     is_veg = Column(Boolean, default=False)
     is_available = Column(Boolean, default=True)

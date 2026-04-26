@@ -5,7 +5,7 @@ import {
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee, ClipboardList,
   ShoppingBag, Users, Clock, QrCode, CreditCard,
-  TrendingUp, Activity, Flame, ImagePlus
+  TrendingUp, Activity, Flame, ImagePlus, FileText, Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -62,7 +62,7 @@ interface Analytics {
   served_orders: number;
 }
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -101,6 +101,9 @@ export default function OwnerDashboard() {
       import('../api/auth').then(({ authApi }) => {
         authApi.getMe().then(({ data }) => {
           if (data) {
+            if (data.restaurant_gstin) localStorage.setItem('restaurantGstin', data.restaurant_gstin);
+            if (data.restaurant_fssai) localStorage.setItem('restaurantFssai', data.restaurant_fssai);
+            if (data.restaurant_name) localStorage.setItem('restaurantName', data.restaurant_name);
             const status = data.subscription_status;
             const trialEnd = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
             const subEnd = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
@@ -327,11 +330,13 @@ export default function OwnerDashboard() {
     const formData = new FormData(e.currentTarget);
     try {
       const res = await ownerApi.updateProfile(formData);
-      toast.success(res.message);
+      toast.success("Profile updated");
       if (res.name) localStorage.setItem('restaurantName', res.name);
       if (res.logo_url) {
         localStorage.setItem('restaurantLogo', res.logo_url);
       }
+      if (formData.get('gstin')) localStorage.setItem('restaurantGstin', formData.get('gstin') as string);
+      if (formData.get('fssai')) localStorage.setItem('restaurantFssai', formData.get('fssai') as string);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to update profile");
     } finally {
@@ -402,7 +407,8 @@ export default function OwnerDashboard() {
             price: parseFloat(data.price as string),
             category_id: data.category_id as string,
             is_veg: data.is_veg === 'true',
-            is_available: true
+            is_available: true,
+            tax_rate: parseFloat((data.tax_rate as string) || "5.0")
           });
         }
       }
@@ -469,6 +475,7 @@ export default function OwnerDashboard() {
           {[
             { id: 'analytics', label: 'Performance', icon: BarChart3 },
             { id: 'orders', label: 'Order History', icon: ClipboardList },
+            { id: 'reports', label: 'CA Reports', icon: FileText },
             { id: 'menu', label: 'Menu Catalog', icon: Package },
             { id: 'tables', label: 'Floor Plan', icon: LayoutGrid },
             { id: 'staff', label: 'Staff Roster', icon: Users },
@@ -1074,6 +1081,35 @@ export default function OwnerDashboard() {
                 );
               })()}
  
+              {/* REPORTS TAB */}
+              {activeTab === 'reports' && (
+                <div className="surface p-8 max-w-2xl">
+                  <h3 className="text-[18px] font-bold mb-2">Financial Reports</h3>
+                  <p className="text-[13px] text-muted mb-6">Download GST and Sales reports in Excel/CSV format for your Chartered Accountant (CA).</p>
+                  
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+                        <FileText size={24} className="text-indigo-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-800">Monthly Sales & GST Report</h4>
+                        <p className="text-[12px] text-slate-500 mt-1">Contains itemized sales, subtotal, tax collected, and payment status.</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/reports/sales/csv?token_str=${localStorage.getItem('auth_token')}`)}
+                      className="w-full py-3 rounded-lg text-[14px] font-bold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95"
+                      style={{ background: 'linear-gradient(135deg, #4f46e5, #4338ca)', boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}
+                    >
+                      <Download size={18} /> Download CSV Report
+                    </button>
+                    <p className="text-[11px] text-center text-slate-400 mt-4">Make sure you have updated your GSTIN and FSSAI in Settings before downloading.</p>
+                  </div>
+                </div>
+              )}
+ 
               {/* SETTINGS TAB */}
               {activeTab === 'settings' && (
                 <div className="max-w-xl">
@@ -1101,6 +1137,27 @@ export default function OwnerDashboard() {
                           accept="image/*"
                           className="w-full text-[13px] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-[12px] file:font-medium file:bg-main file:text-surface hover:file:bg-main/90"
                         />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">GSTIN Number</label>
+                          <input
+                            name="gstin"
+                            defaultValue={localStorage.getItem('restaurantGstin') || ''}
+                            placeholder="22AAAAA0000A1Z5"
+                            className="form-input uppercase"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">FSSAI License</label>
+                          <input
+                            name="fssai"
+                            defaultValue={localStorage.getItem('restaurantFssai') || ''}
+                            placeholder="14-digit number"
+                            className="form-input"
+                          />
+                        </div>
                       </div>
 
                       <div className="flex justify-end">
@@ -1316,12 +1373,23 @@ export default function OwnerDashboard() {
                           </select>
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[12px] font-medium text-main">Item Type</label>
-                        <select name="is_veg" className="form-input">
-                          <option value="true">Vegetarian 🟢</option>
-                          <option value="false">Non-Vegetarian 🔴</option>
-                        </select>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">Item Type</label>
+                          <select name="is_veg" className="form-input">
+                            <option value="true">Vegetarian 🟢</option>
+                            <option value="false">Non-Vegetarian 🔴</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">Tax Rate (%)</label>
+                          <select name="tax_rate" className="form-input">
+                            <option value="5.0">5% GST (Standard)</option>
+                            <option value="12.0">12% GST</option>
+                            <option value="18.0">18% GST (AC/Liquor)</option>
+                            <option value="0.0">0% GST (Exempt)</option>
+                          </select>
+                        </div>
                       </div>
                     </>
                   )}

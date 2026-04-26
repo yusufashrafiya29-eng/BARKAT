@@ -10,6 +10,7 @@ class MenuItemBase(BaseModel):
     is_available: bool = True
     preparation_time: Optional[int] = None
     image_url: Optional[str] = None
+    tax_rate: float = 5.0
 
 class MenuItemCreate(MenuItemBase):
     category_id: UUID
@@ -29,6 +30,7 @@ class MenuItemUpdate(BaseModel):
     is_available: Optional[bool] = None
     preparation_time: Optional[int] = None
     image_url: Optional[str] = None
+    tax_rate: Optional[float] = None
 
 class CategoryBase(BaseModel):
     name: str

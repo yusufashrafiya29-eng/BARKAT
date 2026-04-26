@@ -27,6 +27,10 @@ class Order(Base):
     customer_name = Column(String, nullable=True) # Gathered for UI
     
     status = Column(SAEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
+    
+    # Financial fields
+    subtotal_amount = Column(Float, default=0.0, nullable=False)
+    tax_amount = Column(Float, default=0.0, nullable=False)
     total_amount = Column(Float, default=0.0, nullable=False)
     
     # New fields for Customer vs Waiter ordering

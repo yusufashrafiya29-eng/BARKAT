@@ -41,6 +41,8 @@ interface Order {
   id: string;
   status: string;
   payment_status: 'PENDING' | 'PAID' | 'VERIFYING' | 'FAILED';
+  subtotal_amount: number;
+  tax_amount: number;
   total_amount: number;
   created_at: string;
   items?: OrderItem[];
@@ -49,7 +51,7 @@ interface Order {
 const CustomerMenu: React.FC = () => {
   const { tableId } = useParams<{ tableId: string }>();
   
-  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null, restaurant_upi_id: string | null } | null>(null);
+  const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null, restaurant_upi_id: string | null, restaurant_gstin: string | null, restaurant_fssai: string | null } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
@@ -480,11 +482,27 @@ const CustomerMenu: React.FC = () => {
               </div>
  
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 bg-slate-50 border border-indigo-500">
+                <div className="mb-6 space-y-2 pb-4 border-b border-dashed border-slate-300">
+                  <div className="flex justify-between text-[13px] text-slate-500 font-medium">
+                    <span>Subtotal</span>
+                    <span>₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + (o.subtotal_amount || o.total_amount), 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] text-slate-500 font-medium">
+                    <span>Taxes (GST)</span>
+                    <span>₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + (o.tax_amount || 0), 0).toFixed(2)}</span>
+                  </div>
+                </div>
                 <div className="text-center mb-6">
                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">Cumulative Total</p>
                   <p className="text-3xl font-semibold tracking-tight">
-                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0)}
+                    ₹{tableOrders.filter(o => o.status !== 'CANCELLED' && (o.payment_status === 'PENDING' || o.payment_status === 'VERIFYING')).reduce((sum, o) => sum + o.total_amount, 0).toFixed(2)}
                   </p>
+                  {tableInfo?.restaurant_gstin && (
+                    <p className="text-[10px] text-slate-400 mt-2">GSTIN: {tableInfo.restaurant_gstin}</p>
+                  )}
+                  {tableInfo?.restaurant_fssai && (
+                    <p className="text-[10px] text-slate-400">FSSAI: {tableInfo.restaurant_fssai}</p>
+                  )}
                 </div>
                 
                 <button 

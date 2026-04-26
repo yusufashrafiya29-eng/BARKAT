@@ -11,6 +11,10 @@ class Restaurant(Base):
     name = Column(String, nullable=False)
     logo_url = Column(String, nullable=True)
     
+    # Tax & Compliance fields
+    gstin = Column(String, nullable=True)
+    fssai = Column(String, nullable=True)
+    
     # Subscription fields
     subscription_status = Column(String, default="trial") # "trial", "active", "expired"
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)

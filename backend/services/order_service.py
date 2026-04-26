@@ -40,7 +40,8 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     db.add(new_order)
     db.flush() # Flush pushes to DB without permanent commit to generate new_order.id
     
-    total = 0.0
+    subtotal_sum = 0.0
+    tax_sum = 0.0
     
     # 2. We never trust the client with price calculations.
     # We fetch the *current DB price* dynamically and calculate subtotal.
@@ -52,7 +53,10 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
             raise HTTPException(status_code=400, detail=f"Menu item {menu_item.name} is currently unavailable")
             
         subtotal = menu_item.price * item_in.quantity
-        total += subtotal
+        item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
+        
+        subtotal_sum += subtotal
+        tax_sum += item_tax
         
         new_order_item = OrderItem(
             order_id=new_order.id,
@@ -65,7 +69,9 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         db.add(new_order_item)
         
     # 5. Apply exact total and commit atomic transaction
-    new_order.total_amount = total
+    new_order.subtotal_amount = subtotal_sum
+    new_order.tax_amount = tax_sum
+    new_order.total_amount = subtotal_sum + tax_sum
     
     # Update table's last order timestamp if customer order
     if order_in.source == "CUSTOMER":
@@ -140,14 +146,18 @@ def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_i
     db.query(OrderItem).filter(OrderItem.order_id == order_id).delete()
     
     # 2. Re-create items and calculate total
-    total = 0.0
+    subtotal_sum = 0.0
+    tax_sum = 0.0
     for item_in in items_in:
         menu_item = db.query(MenuItem).filter(MenuItem.id == item_in.menu_item_id).first()
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item not found")
         
         subtotal = menu_item.price * item_in.quantity
-        total += subtotal
+        item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
+        
+        subtotal_sum += subtotal
+        tax_sum += item_tax
         
         new_item = OrderItem(
             order_id=order.id,
@@ -160,7 +170,9 @@ def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_i
         db.add(new_item)
         
     # 3. Save new total
-    order.total_amount = total
+    order.subtotal_amount = subtotal_sum
+    order.tax_amount = tax_sum
+    order.total_amount = subtotal_sum + tax_sum
     db.commit()
     db.refresh(order)
     return order

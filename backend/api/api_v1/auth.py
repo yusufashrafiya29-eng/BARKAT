@@ -309,6 +309,8 @@ def get_current_user_info(
             "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
             "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
             "restaurant_logo": local_user.restaurant.logo_url if local_user.restaurant else None,
+            "restaurant_gstin": local_user.restaurant.gstin if local_user.restaurant else None,
+            "restaurant_fssai": local_user.restaurant.fssai if local_user.restaurant else None,
             "restaurant_email": local_user.restaurant_email,
             "subscription_status": local_user.restaurant.subscription_status if local_user.restaurant else None,
             "trial_ends_at": local_user.restaurant.trial_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.trial_ends_at else None,

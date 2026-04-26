@@ -10,6 +10,8 @@ router = APIRouter()
 async def update_restaurant_profile(
     name: str = Form(None),
     logo: UploadFile = File(None),
+    gstin: str = Form(None),
+    fssai: str = Form(None),
     db: Session = Depends(get_db),
     token: dict = Depends(get_current_user_token),
     restaurant_id=Depends(get_current_restaurant)
@@ -25,6 +27,10 @@ async def update_restaurant_profile(
         
     if name:
         restaurant.name = name
+    if gstin is not None:
+        restaurant.gstin = gstin
+    if fssai is not None:
+        restaurant.fssai = fssai
         
     if logo and logo.filename:
         from db.supabase import supabase_client

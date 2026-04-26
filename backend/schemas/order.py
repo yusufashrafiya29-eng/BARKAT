@@ -48,6 +48,8 @@ class OrderRead(BaseModel):
     source: str
     is_accepted: bool
     payment_status: str
+    subtotal_amount: float
+    tax_amount: float
     total_amount: float
     created_at: datetime
     updated_at: Optional[datetime] = None
