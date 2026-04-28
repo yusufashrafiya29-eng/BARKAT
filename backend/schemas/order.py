@@ -29,6 +29,7 @@ class OrderCreate(BaseModel):
     customer_name: Optional[str] = None
     source: str = "CUSTOMER"
     is_accepted: bool = False
+    tip_amount: float = 0.0
     
     @field_validator('customer_phone')
     @classmethod
@@ -51,6 +52,7 @@ class OrderRead(BaseModel):
     payment_status: str
     subtotal_amount: float
     tax_amount: float
+    tip_amount: float
     total_amount: float
     created_at: datetime
     updated_at: Optional[datetime] = None

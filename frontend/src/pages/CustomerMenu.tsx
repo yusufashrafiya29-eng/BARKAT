@@ -63,6 +63,9 @@ const CustomerMenu: React.FC = () => {
   const [imageError, setImageError] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorHeader, setErrorHeader] = useState<string | null>(null);
+  
+  const [tipAmount, setTipAmount] = useState<number>(0);
+  const [showUpsell, setShowUpsell] = useState<MenuItem | null>(null);
 
   const [customerView, setCustomerView] = useState<'menu' | 'bill'>('menu');
   const [tableOrders, setTableOrders] = useState<Order[]>([]);
@@ -186,7 +189,7 @@ const CustomerMenu: React.FC = () => {
     }
   };
 
-  const addToCart = (item: MenuItem) => {
+  const addToCart = (item: MenuItem, skipUpsell: boolean = false) => {
     if (!item.is_available) return;
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
@@ -196,6 +199,20 @@ const CustomerMenu: React.FC = () => {
       return [...prev, { ...item, quantity: 1, notes: '' }];
     });
     toast.success(`${item.name} added`, { position: 'top-center' });
+    
+    if (!skipUpsell) {
+      const lowerName = item.name.toLowerCase();
+      if ((lowerName.includes('burger') || lowerName.includes('pizza') || lowerName.includes('sandwich')) && !showUpsell) {
+        let suggestion = null;
+        for (const cat of categories) {
+           suggestion = cat.menu_items.find(mi => mi.name.toLowerCase().includes('fries') || mi.name.toLowerCase().includes('coke') || mi.name.toLowerCase().includes('drink') || mi.name.toLowerCase().includes('shake'));
+           if (suggestion) break;
+        }
+        if (suggestion) {
+           setShowUpsell(suggestion);
+        }
+      }
+    }
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -208,7 +225,7 @@ const CustomerMenu: React.FC = () => {
     }).filter(i => i.quantity > 0));
   };
   
-  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) + tipAmount;
 
   const handlePlaceOrder = async () => {
     if (!tableInfo || cart.length === 0) return;
@@ -221,9 +238,10 @@ const CustomerMenu: React.FC = () => {
           menu_item_id: i.id,
           quantity: i.quantity,
           notes: i.notes
-        })),
+        }),
         customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
-        customer_name: customerName || undefined
+        customer_name: customerName || undefined,
+        tip_amount: tipAmount
       };
 
       await customerApi.placeOrder(payload);
@@ -267,6 +285,7 @@ const CustomerMenu: React.FC = () => {
         <button 
           onClick={() => {
             setCart([]);
+            setTipAmount(0);
             setIsSuccess(false);
           }}
           className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-sm inline-flex items-center justify-center w-full max-w-xs text-[13px]"
@@ -539,6 +558,17 @@ const CustomerMenu: React.FC = () => {
               </div>
  
               <div className="flex flex-col gap-2">
+                <div className="flex gap-2 mb-1">
+                  {[10, 20, 50].map(tip => (
+                    <button
+                      key={tip}
+                      onClick={() => setTipAmount(tipAmount === tip ? 0 : tip)}
+                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${tipAmount === tip ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                    >
+                      +₹{tip} Tip
+                    </button>
+                  ))}
+                </div>
                 <input 
                   type="text"
                   placeholder="Your Name (optional)"
@@ -652,6 +682,33 @@ const CustomerMenu: React.FC = () => {
                 <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by Dine Flow</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Smart Upselling Modal */}
+      {showUpsell && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-emerald-500"></div>
+            <button onClick={() => setShowUpsell(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={16} /></button>
+            <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-indigo-100">
+              <Sparkles size={24} className="text-indigo-600" />
+            </div>
+            <h3 className="text-[18px] font-bold text-slate-800 mb-2">Want to add {showUpsell.name}?</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Complete your meal for just ₹{showUpsell.price} more!</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowUpsell(null)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">No, thanks</button>
+              <button 
+                onClick={() => {
+                  addToCart(showUpsell, true);
+                  setShowUpsell(null);
+                }} 
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200"
+              >
+                Add to Cart
+              </button>
+            </div>
           </div>
         </div>
       )}

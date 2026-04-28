@@ -51,6 +51,7 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
             source=order_in.source,
             status=initial_status,
             is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,
+            tip_amount=order_in.tip_amount,
             total_amount=0.0
         )
         db.add(new_order)
@@ -94,7 +95,7 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     # 5. Apply exact total and commit atomic transaction
     new_order.subtotal_amount = subtotal_sum
     new_order.tax_amount = tax_sum
-    new_order.total_amount = subtotal_sum + tax_sum
+    new_order.total_amount = subtotal_sum + tax_sum + new_order.tip_amount
     
     # Update table's last order timestamp if customer order
     if order_in.source == "CUSTOMER":
@@ -145,6 +146,8 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
                 stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
                 if stock_item:
                     stock_item.quantity -= (recipe.quantity * item.quantity)
+                    if stock_item.quantity <= stock_item.minimum_threshold:
+                        print(f"🚨 LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
 
         # Auto-record sale in active cash shift (if one is open)
         from services.cash_service import record_sale

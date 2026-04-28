@@ -31,6 +31,7 @@ class Order(Base):
     # Financial fields
     subtotal_amount = Column(Float, default=0.0, nullable=False)
     tax_amount = Column(Float, default=0.0, nullable=False)
+    tip_amount = Column(Float, default=0.0, nullable=False)
     total_amount = Column(Float, default=0.0, nullable=False)
     
     # New fields for Customer vs Waiter ordering
