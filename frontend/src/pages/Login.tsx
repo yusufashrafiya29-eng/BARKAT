@@ -10,6 +10,11 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [showPwd, setShowPwd]   = useState(false);
+  
+  // Ping backend on mount to wake up Vercel serverless function (mitigate cold start)
+  React.useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/health`).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +27,14 @@ const Login: React.FC = () => {
       } else {
         localStorage.setItem('auth_token', response.data.access_token);
         localStorage.setItem('userRole', response.data.role);
+        
+        // Optimistic caching for instant dashboard render
+        if (response.data.full_name) localStorage.setItem('userName', response.data.full_name);
+        else localStorage.setItem('userName', response.data.email.split('@')[0]);
+        if (response.data.restaurant_name) localStorage.setItem('restaurantName', response.data.restaurant_name);
+        if (response.data.restaurant_logo) localStorage.setItem('restaurantLogo', response.data.restaurant_logo);
+        if (response.data.subscription_status) localStorage.setItem('subscriptionStatus', response.data.subscription_status);
+
         toast.success('Welcome back! 🎉');
         navigate('/dashboard');
       }

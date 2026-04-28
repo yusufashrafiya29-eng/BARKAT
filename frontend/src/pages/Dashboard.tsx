@@ -9,9 +9,9 @@ import toast from 'react-hot-toast';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [role, setRole] = useState<string | null>(null);
-  const [userName, setUserName] = useState('User');
-  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(localStorage.getItem('userRole'));
+  const [userName, setUserName] = useState(localStorage.getItem('userName') || 'User');
+  const [loading, setLoading] = useState(!localStorage.getItem('userRole'));
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -20,12 +20,19 @@ const Dashboard: React.FC = () => {
         const { data } = await authApi.getMe();
         if (data?.role) {
           setRole(data.role);
-          setUserName(data.full_name || data.email.split('@')[0]);
+          if (data.full_name) {
+            setUserName(data.full_name);
+            localStorage.setItem('userName', data.full_name);
+          } else {
+            setUserName(data.email.split('@')[0]);
+            localStorage.setItem('userName', data.email.split('@')[0]);
+          }
           localStorage.setItem('restaurantName', data.restaurant_name || '');
           if (data.restaurant_name) {
             document.title = `${data.restaurant_name} | MyRestro`;
           }
           localStorage.setItem('restaurantLogo', data.restaurant_logo || '');
+          localStorage.setItem('subscriptionStatus', data.subscription_status || '');
 
           // ── Subscription Guard ──────────────────────────────
           const status = data.subscription_status;

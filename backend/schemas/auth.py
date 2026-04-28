@@ -55,6 +55,9 @@ class AuthResponse(BaseModel):
     phone_number: Optional[str] = None
     is_verified: bool = False
     created_at: Optional[datetime] = None
+    restaurant_name: Optional[str] = None
+    restaurant_logo: Optional[str] = None
+    subscription_status: Optional[str] = None
 
 
 class GenericResponse(BaseModel):

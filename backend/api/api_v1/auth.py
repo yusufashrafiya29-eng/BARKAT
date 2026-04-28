@@ -53,6 +53,9 @@ def _build_auth_data(local_user: User, access_token: str) -> AuthResponse:
         phone_number=local_user.phone_number,
         is_verified=local_user.is_verified,
         created_at=local_user.created_at,
+        restaurant_name=local_user.restaurant.name if local_user.restaurant else None,
+        restaurant_logo=local_user.restaurant.logo_url if local_user.restaurant else None,
+        subscription_status=local_user.restaurant.subscription_status if local_user.restaurant else None,
     )
 
 
