@@ -40,8 +40,8 @@ export default function PublicNavbar() {
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
             <img
-              src="/dineflow-logo.png"
-              alt="Dine Flow"
+              src="/logo.png"
+              alt="MyRestro"
               className="h-14 w-auto object-contain"
             />
           </div>

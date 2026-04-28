@@ -35,7 +35,7 @@ def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
         "id": str(table.id),
         "table_number": table.table_number,
         "restaurant_id": str(table.restaurant_id),
-        "restaurant_name": restaurant.name if restaurant else "BARKAT",
+        "restaurant_name": restaurant.name if restaurant else "MyRestro",
         "restaurant_logo": (restaurant.logo_url if restaurant.logo_url.startswith("http") else f"{settings.BASE_URL}{restaurant.logo_url}") if restaurant and restaurant.logo_url else None,
         "restaurant_upi_id": upi_id,
         "restaurant_gstin": restaurant.gstin if restaurant else None,

@@ -149,7 +149,7 @@ const CustomerMenu: React.FC = () => {
         key: razorpay_key_id,
         amount: amount,
         currency: currency,
-        name: tableInfo?.restaurant_name || "Dine Flow",
+        name: tableInfo?.restaurant_name || "MyRestro",
         description: `Payment for Table ${tableInfo?.table_number}`,
         order_id: razorpay_order_id,
         handler: async function (response: any) {
@@ -679,7 +679,7 @@ const CustomerMenu: React.FC = () => {
                   Pay by Cash
                 </button>
    
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by Dine Flow</p>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Powered by MyRestro</p>
               </div>
             )}
           </div>

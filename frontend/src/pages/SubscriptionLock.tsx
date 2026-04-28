@@ -10,7 +10,7 @@ const SubscriptionLock: React.FC = () => {
   const UPI_ID = "9979114665@kotak811";
   
   const handleWhatsAppClick = () => {
-    const text = encodeURIComponent(`Hi Dine Flow! I'd like to renew the subscription for ${restaurantName}.`);
+    const text = encodeURIComponent(`Hi MyRestro! I'd like to renew the subscription for ${restaurantName}.`);
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${text}`, '_blank');
   };
 
@@ -23,8 +23,8 @@ const SubscriptionLock: React.FC = () => {
           {/* Platform Logo */}
           <div className="flex justify-center mb-5">
             <img
-              src="/dineflow-logo.png"
-              alt="Dine Flow"
+              src="/logo.png"
+              alt="MyRestro"
               className="h-16 w-auto object-contain"
             />
           </div>

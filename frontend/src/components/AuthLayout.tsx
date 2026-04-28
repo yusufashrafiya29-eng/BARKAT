@@ -41,8 +41,8 @@ const AuthLayout: React.FC = () => {
         {/* Logo */}
         <div className="relative z-10">
           <img
-            src="/dineflow-logo.png"
-            alt="Dine Flow"
+            src="/logo.png"
+            alt="MyRestro"
             className="h-16 w-auto object-contain brightness-0 invert"
           />
         </div>
@@ -83,7 +83,7 @@ const AuthLayout: React.FC = () => {
         <div className="relative z-10">
           <div className="p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', backdropFilter: 'blur(8px)' }}>
             <p className="text-[13px] text-indigo-100 leading-relaxed italic">
-              "Dine Flow transformed how we manage our restaurant. Orders are now seamless and our kitchen efficiency has doubled."
+              "MyRestro transformed how we manage our restaurant. Orders are now seamless and our kitchen efficiency has doubled."
             </p>
             <div className="flex items-center gap-2 mt-3">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white">A</div>
@@ -105,8 +105,8 @@ const AuthLayout: React.FC = () => {
         {/* Mobile header */}
         <div className="lg:hidden flex items-center px-6 py-4 border-b border-slate-200 bg-white">
           <img
-            src="/dineflow-logo.png"
-            alt="Dine Flow"
+            src="/logo.png"
+            alt="MyRestro"
             className="h-12 w-auto object-contain"
           />
         </div>
@@ -120,7 +120,7 @@ const AuthLayout: React.FC = () => {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-6 pb-6 px-6">
-          <p className="text-[11px] text-slate-400 font-medium">© 2025 Dine Flow</p>
+          <p className="text-[11px] text-slate-400 font-medium">© 2025 MyRestro</p>
           <span className="text-slate-200">·</span>
           <Link to="/login" className="text-[11px] text-slate-400 hover:text-slate-700 transition-colors font-medium">
             {isLogin ? 'Create account' : 'Sign in'}

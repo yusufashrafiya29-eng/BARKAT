@@ -79,6 +79,6 @@ def get_current_restaurant(user = Depends(get_current_user)):
 #     """
 #     return {
 #         "sub": "mock-admin-id-1234",
-#         "email": "admin@barkat.local",
+#         "email": "admin@MyRestro.local",
 #         "role": "admin"
 #     }

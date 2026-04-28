@@ -23,7 +23,7 @@ const Dashboard: React.FC = () => {
           setUserName(data.full_name || data.email.split('@')[0]);
           localStorage.setItem('restaurantName', data.restaurant_name || '');
           if (data.restaurant_name) {
-            document.title = `${data.restaurant_name} | Dine Flow`;
+            document.title = `${data.restaurant_name} | MyRestro`;
           }
           localStorage.setItem('restaurantLogo', data.restaurant_logo || '');
 
@@ -92,7 +92,7 @@ const Dashboard: React.FC = () => {
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
   const canSeeKitchen = role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN';
 
-  const restaurantName = localStorage.getItem('restaurantName') || 'Dine Flow';
+  const restaurantName = localStorage.getItem('restaurantName') || 'MyRestro';
   const restaurantLogo = localStorage.getItem('restaurantLogo');
 
   const workspaces = [

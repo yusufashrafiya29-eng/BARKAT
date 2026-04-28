@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["Health"])
     def root():
-        return {"status": "BARKAT API is running 🔥"}
+        return {"status": "MyRestro API is running 🔥"}
 
     return app
 

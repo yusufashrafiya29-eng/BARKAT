@@ -69,7 +69,7 @@ const OwnerSignup: React.FC = () => {
             <label className={labelClass}>Restaurant Name</label>
             <div className={inputWrap}>
               <IconWrap><Store size={14} /></IconWrap>
-              <input name="restaurant_name" type="text" className={inputClass} placeholder="e.g. Barkat Biryani" onChange={handleChange} required />
+              <input name="restaurant_name" type="text" className={inputClass} placeholder="e.g. MyRestro Biryani" onChange={handleChange} required />
             </div>
           </div>
 

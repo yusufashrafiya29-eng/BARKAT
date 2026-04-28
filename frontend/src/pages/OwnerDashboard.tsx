@@ -480,7 +480,7 @@ export default function OwnerDashboard() {
           phone_number: data.phone,
           password: data.password,
           role: data.role,
-          restaurant_email: 'admin@barkat.local'
+          restaurant_email: 'admin@MyRestro.local'
         });
       } else if (showAddModal === 'menu') {
         if (menuAddType === 'category') {
@@ -1927,7 +1927,7 @@ export default function OwnerDashboard() {
                   </div>
                   <div className="mt-6 text-center">
                     <p className="font-semibold text-[15px]">Scan to Order</p>
-                    <p className="text-gray-500 text-[12px] mt-1 uppercase tracking-widest">{localStorage.getItem('restaurantName') || 'Dine Flow'}</p>
+                    <p className="text-gray-500 text-[12px] mt-1 uppercase tracking-widest">{localStorage.getItem('restaurantName') || 'MyRestro'}</p>
                   </div>
                 </div>
               );
@@ -1961,9 +1961,9 @@ export default function OwnerDashboard() {
                 onClick={() => setShowUpgradeModal(false)}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors text-[18px] font-bold"
               >×</button>
-              <img src="/dineflow-logo.png" alt="Dine Flow" className="h-12 w-auto object-contain mx-auto mb-3 brightness-0 invert" />
+              <img src="/logo.png" alt="MyRestro" className="h-12 w-auto object-contain mx-auto mb-3 brightness-0 invert" />
               <h2 className="text-[22px] font-black text-white tracking-tight">Upgrade to Premium</h2>
-              <p className="text-indigo-200 text-[13px] mt-1">Full access to all Dine Flow features</p>
+              <p className="text-indigo-200 text-[13px] mt-1">Full access to all MyRestro features</p>
             </div>
 
             <div className="p-6 space-y-4">
@@ -2012,7 +2012,7 @@ export default function OwnerDashboard() {
               <button
                 onClick={() => {
                   const restaurantName = localStorage.getItem('restaurantName') || 'my restaurant';
-                  const msg = encodeURIComponent(`Hi Dine Flow! I've paid for the subscription for ${restaurantName}. Please activate my account. 🙏`);
+                  const msg = encodeURIComponent(`Hi MyRestro! I've paid for the subscription for ${restaurantName}. Please activate my account. 🙏`);
                   window.open(`https://wa.me/919979114665?text=${msg}`, '_blank');
                 }}
                 className="w-full py-3.5 rounded-2xl text-[14px] font-extrabold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95"

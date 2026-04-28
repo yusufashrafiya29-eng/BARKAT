@@ -1,5 +1,5 @@
 -- ============================================================
--- BARKAT Smart Restaurant — users table migration
+-- MyRestro Smart Restaurant — users table migration
 -- Run this in: Supabase Dashboard → SQL Editor → New Query
 -- ============================================================
 

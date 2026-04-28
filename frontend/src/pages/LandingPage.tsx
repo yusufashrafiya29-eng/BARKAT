@@ -24,7 +24,7 @@ export default function LandingPage() {
             </div>
             
             <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight leading-[1.1] mb-6">
-              Streamline your restaurant with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Dine Flow</span>.
+              Streamline your restaurant with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">MyRestro</span>.
             </h1>
             
             <p className="text-lg md:text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl mx-auto font-medium">
@@ -56,7 +56,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">Everything you need to run smoothly</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Dine Flow replaces messy paper tickets and outdated POS systems with a sleek, synchronized digital ecosystem.</p>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">MyRestro replaces messy paper tickets and outdated POS systems with a sleek, synchronized digital ecosystem.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -126,10 +126,10 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-6">Built by restaurateurs, for restaurateurs.</h2>
               <div className="space-y-6 text-slate-300 text-lg leading-relaxed">
                 <p>
-                  Dine Flow was born out of frustration. Our founder, <strong className="text-white">Yusuf Ashrafiya</strong>, noticed that while the world was moving fast, restaurant management was stuck in the past with clunky hardware, confusing interfaces, and high monthly fees.
+                  MyRestro was born out of frustration. Our founder, <strong className="text-white">Yusuf Ashrafiya</strong>, noticed that while the world was moving fast, restaurant management was stuck in the past with clunky hardware, confusing interfaces, and high monthly fees.
                 </p>
                 <p>
-                  We built Dine Flow to solve these exact problems. Our mission is to democratize high-end restaurant technology. Whether you run a bustling cafe, a fine-dining establishment, or a quick-service food truck, Dine Flow scales with you.
+                  We built MyRestro to solve these exact problems. Our mission is to democratize high-end restaurant technology. Whether you run a bustling cafe, a fine-dining establishment, or a quick-service food truck, MyRestro scales with you.
                 </p>
                 <p>
                   By connecting the customer directly to the kitchen and the kitchen directly to the waiter, we eliminate miscommunications, reduce wait times, and drastically improve the dining experience.
@@ -141,7 +141,7 @@ export default function LandingPage() {
               <div className="aspect-square md:aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl relative border border-slate-700/50">
                 <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900 to-slate-800 flex items-center justify-center p-12 text-center">
                    <div>
-                     <h3 className="text-4xl font-black text-white mb-4">Dine Flow</h3>
+                     <h3 className="text-4xl font-black text-white mb-4">MyRestro</h3>
                      <p className="text-indigo-200 font-medium text-xl">Transforming Hospitality</p>
                    </div>
                 </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">Get in touch</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Have questions about Dine Flow? Want a custom enterprise plan? We'd love to hear from you.</p>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Have questions about MyRestro? Want a custom enterprise plan? We'd love to hear from you.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -261,9 +261,9 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center mr-3">
               <span className="text-white font-bold">D</span>
             </div>
-            <span className="text-xl font-bold text-white">Dine Flow</span>
+            <span className="text-xl font-bold text-white">MyRestro</span>
           </div>
-          <p className="text-sm">© {new Date().getFullYear()} Dine Flow. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} MyRestro. All rights reserved.</p>
         </div>
       </footer>
     </div>
