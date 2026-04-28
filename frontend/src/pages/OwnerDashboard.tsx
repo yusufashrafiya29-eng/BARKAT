@@ -1474,7 +1474,7 @@ export default function OwnerDashboard() {
                         <p className="text-[12px] text-muted mb-4">Payment QR Preview</p>
                         <div className="bg-white p-2 inline-block rounded-md mx-auto">
                           <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Dine_Flow&cu=INR`)}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=MyRestro&cu=INR`)}`}
                             alt="UPI QR Code"
                             className="w-32 h-32"
                           />

@@ -334,7 +334,7 @@ const CustomerMenu: React.FC = () => {
           </div>
           
           <h1 className="text-[22px] font-black tracking-tight text-slate-800 text-center leading-tight mb-2">
-            {tableInfo?.restaurant_name || 'DineFlow Select'}
+            {tableInfo?.restaurant_name || 'MyRestro Select'}
           </h1>
           
           <div className="flex items-center gap-2.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200">
@@ -443,7 +443,7 @@ const CustomerMenu: React.FC = () => {
           })}
         <div className="mt-12 text-center pb-8 opacity-50 flex items-center justify-center gap-2">
            <Zap size={14} className="text-slate-400" />
-           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Powered by DineFlow</p>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Powered by MyRestro</p>
         </div>
       </div>
       ) : (

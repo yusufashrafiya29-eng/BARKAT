@@ -194,7 +194,7 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-500 uppercase">Email Us</p>
-                      <a href="mailto:hello@dineflow.com" className="text-lg font-bold text-slate-900 hover:text-indigo-600">hello@dineflow.com</a>
+                      <a href="mailto:hello@myrestro.com" className="text-lg font-bold text-slate-900 hover:text-indigo-600">hello@myrestro.com</a>
                     </div>
                   </div>
 
