@@ -238,7 +238,7 @@ const CustomerMenu: React.FC = () => {
           menu_item_id: i.id,
           quantity: i.quantity,
           notes: i.notes
-        }),
+        })),
         customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
         customer_name: customerName || undefined,
         tip_amount: tipAmount
