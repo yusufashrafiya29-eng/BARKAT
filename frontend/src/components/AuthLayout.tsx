@@ -43,7 +43,7 @@ const AuthLayout: React.FC = () => {
           <img
             src="/logo.png"
             alt="MyRestro"
-            className="h-14 w-auto object-contain brightness-0 invert"
+            className="h-14 w-auto object-contain"
           />
         </div>
 
