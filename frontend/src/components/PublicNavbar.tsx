@@ -42,7 +42,7 @@ export default function PublicNavbar() {
             <img
               src="/logo.png"
               alt="MyRestro"
-              className="h-14 w-auto object-contain"
+              className="h-8 w-auto object-contain"
             />
           </div>
 
