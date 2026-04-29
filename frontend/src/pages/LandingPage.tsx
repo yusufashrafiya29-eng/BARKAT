@@ -134,7 +134,7 @@ export default function LandingPage() {
                 <p className="text-amber-800/70 font-medium leading-relaxed">Customers scan, browse beautiful digital menus, and order directly.</p>
               </div>
               <div className="mt-6 relative z-10 w-full h-[220px] overflow-hidden rounded-b-[2rem]">
-                  <img src="/images/qr_scan_demo.png" alt="Scanning QR Menu" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src="/images/qr_myrestro_scan.png" alt="Scanning QR Menu" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
               </div>
             </div>
 
