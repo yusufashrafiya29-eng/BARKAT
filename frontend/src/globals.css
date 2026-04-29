@@ -254,10 +254,25 @@
    PRINT STYLES FOR THERMAL RECEIPT
    ================================================================ */
 @media print {
-  /* Hide all normal UI elements when printing */
-  body > *:not(.print-container),
-  .no-print {
-    display: none !important;
+  /* Hide everything else, but keep the DOM structure intact to allow React to render */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only show the print container and its children */
+  .print-container, .print-container * {
+    visibility: visible;
+  }
+
+  /* Make sure the container is positioned at the top left of the printed page */
+  .print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
   }
 
   /* Reset body and html margins to avoid blank pages */
@@ -270,21 +285,9 @@
     margin: 0;
     padding: 0;
     background: white !important;
-    width: 100%;
     color: black !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-
-  /* Make sure the container is visible and aligned */
-  .print-container {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
   }
 
   .print-receipt {
