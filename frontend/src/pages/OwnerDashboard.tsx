@@ -322,6 +322,14 @@ export default function OwnerDashboard() {
     } catch { toast.error("Delete failed"); }
   };
 
+  const handleUpdateStaffRole = async (id: string, role: string) => {
+    try {
+      await ownerApi.updateStaffRole(id, role);
+      toast.success("Staff role updated");
+      fetchData();
+    } catch { toast.error("Update failed"); }
+  };
+
   const handleToggleMenu = async (itemId: string, currentAvail: boolean, name: string) => {
     try {
       await ownerApi.toggleMenuItemAvailability(itemId, !currentAvail);
@@ -1254,7 +1262,15 @@ export default function OwnerDashboard() {
                                   <div className="text-[12px] text-muted">{user.email}</div>
                                 </td>
                                 <td className="px-5 py-3">
-                                  <span className="text-[11px] font-medium bg-subtle px-2 py-1 rounded border border-subtle">{user.role}</span>
+                                  <select 
+                                    className="bg-subtle border border-subtle text-[11px] font-medium px-2 py-1 rounded text-main focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={user.role}
+                                    onChange={(e) => handleUpdateStaffRole(user.id, e.target.value)}
+                                  >
+                                    <option value="WAITER">WAITER</option>
+                                    <option value="KITCHEN">KITCHEN</option>
+                                    <option value="MANAGER">MANAGER</option>
+                                  </select>
                                 </td>
                                 <td className="px-5 py-3">
                                   <span className="text-[12px] text-emerald-600 font-medium">✅ Active</span>
@@ -1899,6 +1915,7 @@ export default function OwnerDashboard() {
                       <select name="role" className="form-input">
                         <option value="WAITER">Waiter</option>
                         <option value="KITCHEN">Kitchen Staff</option>
+                        <option value="MANAGER">Manager</option>
                       </select>
                     </div>
                   </div>

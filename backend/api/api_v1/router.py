@@ -1,11 +1,12 @@
 from fastapi import APIRouter
-from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings, payments, reports, reservations, cash_register
+from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings, payments, reports, reservations, cash_register, superadmin
 
 api_router = APIRouter()
 
 api_router.include_router(health.router, tags=["Health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
+api_router.include_router(superadmin.router, prefix="/superadmin", tags=["SuperAdmin"])
 
 # Restaurant functional routes
 api_router.include_router(menu.router, prefix="/menu", tags=["Menu"])

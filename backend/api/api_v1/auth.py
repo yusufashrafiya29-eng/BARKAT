@@ -250,10 +250,17 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         )
 
     # Staff must be approved by owner before login
-    if local_user.role != UserRole.OWNER and not local_user.is_approved:
+    if local_user.role in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER] and not local_user.is_approved:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Awaiting owner approval. Please contact your restaurant owner to activate your account."
+        )
+
+    # Owner must be approved by super admin before login
+    if local_user.role == UserRole.OWNER and local_user.restaurant and not local_user.restaurant.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is pending approval from the admin. Please contact support."
         )
 
     access_token = _make_local_token(str(local_user.id), local_user.email, local_user.role.value)

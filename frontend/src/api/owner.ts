@@ -28,6 +28,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  updateStaffRole: async (userId: string, role: string) => {
+    const response = await axios.put(`${BASE_URL}/users/staff/${userId}/role`, { role }, getHeaders());
+    return response.data;
+  },
+
   // Menu Modifications
   addCategory: async (payload: any) => {
     const response = await axios.post(`${BASE_URL}/menu/categories`, payload, getHeaders());

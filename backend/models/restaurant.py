@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, func, Float
+from sqlalchemy import Column, String, DateTime, func, Float, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
 from sqlalchemy.orm import relationship
@@ -15,6 +15,9 @@ class Restaurant(Base):
     gstin = Column(String, nullable=True)
     fssai = Column(String, nullable=True)
     advance_booking_fee = Column(Float, nullable=False, default=0.0)
+    
+    # Platform Approval
+    is_approved = Column(Boolean, default=False, nullable=False)
     
     # Subscription fields
     subscription_status = Column(String, default="trial") # "trial", "active", "expired"

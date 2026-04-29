@@ -92,10 +92,10 @@ def create_staff_member(
         
     try:
         role = UserRole(payload.role.upper())
-        if role not in [UserRole.WAITER, UserRole.KITCHEN]:
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER]:
             raise ValueError()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER or KITCHEN.")
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, or MANAGER.")
 
     new_user = User(
         email=payload.email,
@@ -112,3 +112,32 @@ def create_staff_member(
     db.commit()
     db.refresh(new_user)
     return new_user
+
+from pydantic import BaseModel
+class RoleUpdateRequest(BaseModel):
+    role: str
+
+@router.put("/staff/{user_id}/role", response_model=UserRead)
+def update_staff_role(
+    user_id: UUID,
+    payload: RoleUpdateRequest,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Update the role of an existing staff member."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    try:
+        role = UserRole(payload.role.upper())
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER]:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, or MANAGER.")
+        
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user

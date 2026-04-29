@@ -19,6 +19,8 @@ import KitchenKDS from './pages/KitchenKDS';
 import LandingPage from './pages/LandingPage';
 import SubscriptionLock from './pages/SubscriptionLock';
 import PublicBooking from './pages/PublicBooking';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import SuperAdminRoute from './components/SuperAdminRoute';
 
 const App: React.FC = () => {
   return (
@@ -45,6 +47,9 @@ const App: React.FC = () => {
         <Route path="/owner" element={<PrivateRoute><OwnerDashboard /></PrivateRoute>} />
         <Route path="/waiter" element={<PrivateRoute><WaiterDashboard /></PrivateRoute>} />
         <Route path="/kitchen" element={<PrivateRoute><KitchenKDS /></PrivateRoute>} />
+        
+        {/* Super Admin Route */}
+        <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
         
         {/* Subscription Expired — accessible when logged in but subscription lapsed */}
         <Route path="/subscription-expired" element={<PrivateRoute><SubscriptionLock /></PrivateRoute>} />
