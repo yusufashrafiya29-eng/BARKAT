@@ -1619,7 +1619,9 @@ export default function OwnerDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-main/80 backdrop-blur-sm" onClick={() => !formLoading && setShowAddModal(null)}></div>
           <div className="relative w-full max-w-md surface p-6 animate-in zoom-in-95 duration-150">
-            <h3 className="text-[16px] font-semibold mb-6">Add New {showAddModal.replace('ie', 'y').slice(0, -1)}</h3>
+            <h3 className="text-[16px] font-semibold mb-6">
+              Add New {showAddModal === 'inventory' ? 'Inventory Item' : showAddModal.replace('ie', 'y').slice(0, -1)}
+            </h3>
             <form onSubmit={handleAddSubmit} className="space-y-4">
               {showAddModal === 'tables' && (
                 <>
@@ -1656,7 +1658,16 @@ export default function OwnerDashboard() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[12px] font-medium text-main">Metric Unit</label>
-                      <input name="unit" required placeholder="kg, liters..." className="form-input" />
+                      <select name="unit" required className="form-input" defaultValue="">
+                        <option value="" disabled>Select Unit</option>
+                        <option value="kg">kg</option>
+                        <option value="gm">gm</option>
+                        <option value="ltr">ltr</option>
+                        <option value="ml">ml</option>
+                        <option value="pcs">pcs</option>
+                        <option value="pkt">pkt</option>
+                        <option value="box">box</option>
+                      </select>
                     </div>
                   </div>
                   <div className="space-y-1.5">
