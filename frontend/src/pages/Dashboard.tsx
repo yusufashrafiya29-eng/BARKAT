@@ -20,6 +20,14 @@ const Dashboard: React.FC = () => {
         const { data } = await authApi.getMe();
         if (data?.role) {
           setRole(data.role);
+          localStorage.setItem('userRole', data.role);
+
+          // SuperAdmin goes directly to admin portal
+          if (data.role === 'SUPERADMIN') {
+            navigate('/superadmin', { replace: true });
+            return;
+          }
+
           if (data.full_name) {
             setUserName(data.full_name);
             localStorage.setItem('userName', data.full_name);
