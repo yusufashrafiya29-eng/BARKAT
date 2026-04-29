@@ -222,11 +222,12 @@ const Dashboard: React.FC = () => {
 
             {/* Big restaurant logo or monogram */}
             <div className="flex flex-col items-center gap-4 mb-8">
-              {restaurantLogo
+              {(restaurantLogo && !imageError)
                 ? <img
                     src={restaurantLogo}
                     alt="Logo"
                     className="w-44 h-44 object-contain"
+                    onError={() => setImageError(true)}
                   />
                 : <div
                     className="w-44 h-44 rounded-3xl flex items-center justify-center"
