@@ -62,8 +62,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3. VALUE PROPS */}
-      <section className="py-24 bg-[#0a101d] relative">
+      {/* 3. VALUE PROPS (About Us) */}
+      <section id="about" className="py-24 bg-[#0a101d] relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-black tracking-widest uppercase mb-4">
@@ -100,8 +100,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. THE ECOSYSTEM (BENTO BOX) */}
-      <section className="py-32 bg-slate-50 text-slate-900 rounded-t-[3rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+      {/* 4. THE ECOSYSTEM (BENTO BOX - Features) */}
+      <section id="features" className="py-32 bg-slate-50 text-slate-900 rounded-t-[3rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-6">
@@ -266,7 +266,7 @@ export default function LandingPage() {
       </section>
 
       {/* 8. CONTACT FORM */}
-      <section className="py-24 bg-white">
+      <section id="contact" className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="bg-[#0a101d] rounded-[3rem] p-10 md:p-16 shadow-2xl relative overflow-hidden">
              {/* Abstract Glow */}
