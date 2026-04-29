@@ -51,9 +51,15 @@ const Dashboard: React.FC = () => {
           }
           // ───────────────────────────────────────────────────
         }
-      } catch {
-        toast.error('Session expired. Please log in again.');
-        navigate('/login');
+      } catch (error: any) {
+        console.error("Dashboard auth error:", error);
+        if (error.response && [401, 403].includes(error.response.status)) {
+          localStorage.clear();
+          toast.error('Session expired. Please log in again.');
+          navigate('/login');
+        } else {
+          toast.error('Server is restarting. Please wait a moment.');
+        }
       } finally {
         setLoading(false);
       }
