@@ -2088,7 +2088,11 @@ export default function OwnerDashboard() {
                 onClick={() => setShowUpgradeModal(false)}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors text-[18px] font-bold"
               >×</button>
-              <img src="/logo.png" alt="MyRestro" className="h-12 w-auto object-contain mx-auto mb-3 brightness-0 invert" />
+              {localStorage.getItem('restaurantLogo') ? (
+                <img src={localStorage.getItem('restaurantLogo')!} alt="Logo" className="h-16 w-16 object-contain bg-white rounded-2xl p-1.5 mx-auto mb-3 shadow-lg" />
+              ) : (
+                <img src="/logo.png" alt="MyRestro" className="h-12 w-auto object-contain bg-white rounded-xl p-1.5 mx-auto mb-3 shadow-lg" />
+              )}
               <h2 className="text-[22px] font-black text-white tracking-tight">Upgrade to Premium</h2>
               <p className="text-indigo-200 text-[13px] mt-1">Full access to all MyRestro features</p>
             </div>
