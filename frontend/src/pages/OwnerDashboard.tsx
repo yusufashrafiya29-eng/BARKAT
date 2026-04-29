@@ -145,8 +145,10 @@ export default function OwnerDashboard() {
 
       fetchData();
       const interval = setInterval(() => {
-        silentlyFetchData();
-      }, 5000);
+        if (['analytics', 'reservations'].includes(activeTab)) {
+          silentlyFetchData();
+        }
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [navigate, activeTab]);
