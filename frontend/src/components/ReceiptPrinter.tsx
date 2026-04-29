@@ -13,8 +13,6 @@ export default function ReceiptPrinter({ order, tableNumber, restaurantName, gst
 
   // Formatting helpers
   const fmt = (n: number) => n.toFixed(2);
-  const padRight = (str: string, len: number) => str.padEnd(len, ' ').substring(0, len);
-  const padLeft = (str: string, len: number) => str.padStart(len, ' ').substring(0, len);
 
   // Calculate taxes
   const taxAmount = order.tax_amount || 0;
