@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, LayoutDashboard, Utensils, Smartphone, Activity, BarChart3, Clock, ChefHat, HeartHandshake, ShieldCheck, Laptop, MessageSquare, TrendingUp, Users } from 'lucide-react';
+import { ArrowRight, LayoutDashboard, Utensils, Smartphone, Activity, BarChart3, Clock, ChefHat, HeartHandshake, ShieldCheck, Users } from 'lucide-react';
 import PublicNavbar from '../components/PublicNavbar';
 
 export default function LandingPage() {
