@@ -33,11 +33,11 @@ export default function LandingPage() {
           {/* Device Mockups (Laptop + Mobile) */}
           <div className="relative w-full max-w-6xl mx-auto mt-10">
             {/* Laptop Frame */}
-            <div className="relative z-10 mx-auto w-[90%] md:w-[80%] rounded-t-2xl md:rounded-t-[2rem] border-[8px] md:border-[12px] border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/20 overflow-hidden aspect-[16/10]">
+            <div className="relative z-10 mx-auto w-[95%] md:w-[90%] rounded-t-2xl md:rounded-t-[2rem] border-[8px] md:border-[12px] border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/20 overflow-hidden aspect-[16/9]">
               <img src="/images/owner_analytics.png" alt="Owner Dashboard" className="w-full h-full object-cover object-top" />
             </div>
             {/* Laptop Base */}
-            <div className="relative z-10 mx-auto w-[95%] md:w-[85%] h-4 md:h-6 bg-slate-700 rounded-b-xl shadow-2xl"></div>
+            <div className="relative z-10 mx-auto w-full md:w-[95%] h-4 md:h-6 bg-slate-700 rounded-b-xl shadow-2xl"></div>
 
             {/* Mobile Frame */}
             <div className="absolute -bottom-10 md:-bottom-16 right-[5%] md:right-[15%] z-20 w-[120px] md:w-[220px] rounded-[1.5rem] md:rounded-[2.5rem] border-[6px] md:border-[10px] border-slate-800 bg-white shadow-2xl overflow-hidden aspect-[9/19]">
