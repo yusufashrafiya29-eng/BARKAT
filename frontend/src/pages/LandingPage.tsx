@@ -133,10 +133,8 @@ export default function LandingPage() {
                 <h3 className="text-2xl font-black text-slate-900 mb-3">Live QR Menu</h3>
                 <p className="text-amber-800/70 font-medium leading-relaxed">Customers scan, browse beautiful digital menus, and order directly.</p>
               </div>
-              <div className="mt-auto relative z-10 w-full h-[200px] flex justify-center overflow-hidden">
-                <div className="w-[220px] h-[450px] mt-6 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] border-[8px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-4 bg-white">
-                  <img src="/images/customer_menu.jpg" alt="QR Menu" className="w-full h-full object-cover object-top" />
-                </div>
+              <div className="mt-6 relative z-10 w-full h-[220px] overflow-hidden rounded-b-[2rem]">
+                  <img src="/images/qr_scan_demo.png" alt="Scanning QR Menu" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
               </div>
             </div>
 
