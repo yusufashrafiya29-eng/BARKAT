@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Store, ConciergeBell, ChefHat, Loader2,
-  ArrowRight, LogOut, Sparkles, Zap
+  ArrowRight, LogOut, Sparkles, Zap, ShieldCheck
 } from 'lucide-react';
 import { authApi } from '../api/auth';
 import toast from 'react-hot-toast';
@@ -99,6 +99,7 @@ const Dashboard: React.FC = () => {
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
   const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
   const canSeeKitchen = (role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN') && subscriptionPlan !== 'basic';
+  const canSeeSuperAdmin = role === 'SUPERADMIN';
 
   const restaurantName = localStorage.getItem('restaurantName') || 'MyRestro';
   const restaurantLogo = localStorage.getItem('restaurantLogo');
@@ -139,6 +140,18 @@ const Dashboard: React.FC = () => {
       ring: 'ring-emerald-500/20',
       iconBg: 'bg-emerald-500',
       badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    canSeeSuperAdmin && {
+      label: 'Super Admin Portal',
+      sub: 'Platform Admin',
+      desc: 'Approve new restaurants, manage subscription plans, and view platform analytics.',
+      Icon: ShieldCheck,
+      path: '/superadmin',
+      gradA: '#e11d48', gradB: '#be123c',
+      accent: 'rose',
+      ring: 'ring-rose-500/20',
+      iconBg: 'bg-rose-600',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
     },
   ].filter(Boolean) as any[];
 
