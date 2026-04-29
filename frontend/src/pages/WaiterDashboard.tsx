@@ -54,6 +54,8 @@ export default function WaiterDashboard() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [upiId, setUpiId] = useState<string | null>(null);
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null); // null = loading
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
 
   /* ── Data fetching ─────────────────────────────────────────── */
   const fetchOrdersOnly = async () => {
@@ -117,7 +119,8 @@ export default function WaiterDashboard() {
 
   /* ── Order actions ──────────────────────────────────────────── */
   const placeOrder = async () => {
-    if (!selectedTable || cart.length === 0) return;
+    if (!selectedTable || cart.length === 0 || isPlacingOrder) return;
+    setIsPlacingOrder(true);
     try {
       if (editingOrderId) {
         await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })));
@@ -139,16 +142,19 @@ export default function WaiterDashboard() {
     } catch (e: any) {
       const d = e.response?.data?.detail;
       toast.error(Array.isArray(d) ? d[0]?.msg : d || 'Failed to process order');
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
   const handleDeleteOrder = async (id: string) => { if (!confirm('Delete this order?')) return; try { await waiterApi.deleteOrder(id); toast.success('Deleted'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
   const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', category_id: '', is_veg: false, is_available: true })) || []); toast('✏️ Editing order'); };
-  const handleServeOrder = async (id: string) => { try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleAcceptOrder = async (id: string) => { try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleRejectOrder = async (id: string) => { if (!confirm('Reject this order?')) return; try { await waiterApi.updateOrderStatus(id, 'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleDirectPaymentConfirm = async (id: string) => { try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleStartCheckout = async (order: Order) => { try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
+  
+  const handleServeOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleRejectOrder = async (id: string) => { if (!confirm('Reject this order?')) return; if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleDirectPaymentConfirm = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
   const handleConfirmPayment = async () => {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
@@ -653,12 +659,12 @@ export default function WaiterDashboard() {
               )}
               <button
                 onClick={placeOrder}
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || isPlacingOrder}
                 className="w-full py-3 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={cart.length > 0 ? { background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', boxShadow: '0 4px 16px rgb(79 70 229 / .4)' } : { background: '#f1f5f9', color: '#94a3b8' }}
               >
-                <Send size={15} />
-                {editingOrderId ? 'Update Order' : 'Send to Kitchen'}
+                {isPlacingOrder ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                {isPlacingOrder ? 'Processing...' : (editingOrderId ? 'Update Order' : 'Send to Kitchen')}
               </button>
             </div>
           </div>

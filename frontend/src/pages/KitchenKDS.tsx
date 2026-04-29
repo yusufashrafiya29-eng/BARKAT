@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChefHat, Clock, AlertCircle, Loader2, Flame, CheckCircle2, ArrowLeft, ShoppingCart, Shield, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { kitchenApi } from '../api/kitchen';
@@ -31,6 +31,8 @@ export default function KitchenKDS() {
   const [lastSync, setLastSync] = useState(new Date());
   
   const [selectedStation, setSelectedStation] = useState<string>('Kitchen');
+  const processingOrdersRef = useRef<Set<string>>(new Set());
+  const processingItemsRef = useRef<Set<string>>(new Set());
 
   const fetchMetadata = useCallback(async () => {
     try {
@@ -52,7 +54,28 @@ export default function KitchenKDS() {
   const fetchOrders = useCallback(async () => {
     try {
       const active = await kitchenApi.getActiveOrders();
-      setOrders(active);
+      setOrders(prev => {
+        const next = [...active];
+        for (let i = 0; i < next.length; i++) {
+          if (processingOrdersRef.current.has(next[i].id)) {
+            // Keep local optimistic state to prevent jumping/flickering
+            const localOrder = prev.find(o => o.id === next[i].id);
+            if (localOrder) next[i] = localOrder;
+          } else {
+            // Check if any items in this order are processing
+            const localOrder = prev.find(o => o.id === next[i].id);
+            if (localOrder) {
+              for (let j = 0; j < next[i].items.length; j++) {
+                if (processingItemsRef.current.has(next[i].items[j].id)) {
+                  const localItem = localOrder.items.find(item => item.id === next[i].items[j].id);
+                  if (localItem) next[i].items[j] = localItem;
+                }
+              }
+            }
+          }
+        }
+        return next;
+      });
       setLastSync(new Date());
     } catch { toast.error('Failed to fetch orders.'); }
     finally { if (loading) setLoading(false); }
@@ -65,6 +88,9 @@ export default function KitchenKDS() {
   }, [fetchMetadata, fetchOrders]);
 
   const handleOrderStatusChange = async (orderId: string, newStatus: string) => {
+    if (processingOrdersRef.current.has(orderId)) return;
+    processingOrdersRef.current.add(orderId);
+    
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     try {
       await kitchenApi.updateOrderStatus(orderId, newStatus);
@@ -77,16 +103,29 @@ export default function KitchenKDS() {
     } catch {
       toast.error('Failed to update status');
       fetchOrders();
+    } finally {
+      setTimeout(() => { processingOrdersRef.current.delete(orderId); }, 3000);
     }
   };
 
-  const handleItemStatusChange = async (itemId: string, newStatus: string) => {
+  const handleItemStatusChange = async (orderId: string, itemId: string, newStatus: string) => {
+    if (processingItemsRef.current.has(itemId)) return;
+    processingItemsRef.current.add(itemId);
+    
+    // Optimistic update for item
+    setOrders(prev => prev.map(o => {
+      if (o.id !== orderId) return o;
+      return { ...o, items: o.items.map(i => i.id === itemId ? { ...i, status: newStatus } : i) };
+    }));
+    
     try {
       await kitchenApi.updateItemStatus(itemId, newStatus);
       toast.success(`Item marked as ${newStatus}`);
-      fetchOrders();
     } catch {
       toast.error('Failed to update item status');
+      fetchOrders();
+    } finally {
+      setTimeout(() => { processingItemsRef.current.delete(itemId); fetchOrders(); }, 3000);
     }
   };
 
@@ -175,14 +214,19 @@ export default function KitchenKDS() {
                     </p>
                   )}
                 </div>
-                {type === 'preparing' && (
+                {type === 'preparing' && item.status !== 'READY' && (
                   <button 
-                    onClick={() => handleItemStatusChange(item.id, 'READY')}
+                    onClick={() => handleItemStatusChange(order.id, item.id, 'READY')}
                     className="p-1.5 rounded bg-white/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
                     title="Mark Item Ready"
                   >
                     <CheckSquare size={16} />
                   </button>
+                )}
+                {type === 'preparing' && item.status === 'READY' && (
+                  <span className="p-1.5 text-emerald-400" title="Item is Ready">
+                    <CheckSquare size={16} />
+                  </span>
                 )}
               </div>
             ))}
