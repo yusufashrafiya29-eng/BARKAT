@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 
 const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = localStorage.getItem('auth_token');
-  const role = localStorage.getItem('user_role');
+  const role = localStorage.getItem('userRole');
 
   if (!token) {
     return <Navigate to="/login" replace />;
