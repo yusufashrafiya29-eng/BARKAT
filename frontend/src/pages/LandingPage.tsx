@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, LayoutDashboard, Utensils, Smartphone, Activity, BarChart3, Clock, ChefHat, HeartHandshake, ShieldCheck, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, LayoutDashboard, Utensils, Smartphone, Activity, BarChart3, Clock, ChefHat, HeartHandshake, ShieldCheck, Users } from 'lucide-react';
 import PublicNavbar from '../components/PublicNavbar';
 
 export default function LandingPage() {
@@ -145,8 +145,8 @@ export default function LandingPage() {
                 <h3 className="text-2xl font-black text-slate-900 mb-3">Kitchen Display</h3>
                 <p className="text-violet-800/70 font-medium leading-relaxed mb-6">No more paper tickets. Real-time syncing from table to kitchen.</p>
               </div>
-              <div className="absolute bottom-0 right-[-10%] w-[110%] h-[50%] rounded-tl-xl shadow-2xl border-t-[6px] border-l-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-x-4">
-                <img src="/images/kitchen_kds.png" alt="Kitchen Display System" className="w-full h-full object-cover object-left-top" />
+              <div className="absolute bottom-0 right-[-20%] w-[130%] h-[55%] rounded-tl-xl shadow-2xl border-t-[6px] border-l-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-4">
+                <img src="/images/kitchen_kds.png" alt="Kitchen Display System" className="w-full h-full object-cover object-left" />
               </div>
             </div>
 
@@ -162,6 +162,34 @@ export default function LandingPage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* 4.5. MORE FEATURES GRID */}
+      <section className="py-20 bg-slate-50 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Plus everything else you need to run a successful restaurant</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {[
+              { title: 'Cash Register & Shifts' },
+              { title: 'Staff Roster & Payroll' },
+              { title: 'Inventory Tracking' },
+              { title: 'Table Reservations' },
+              { title: 'Recipe Management' },
+              { title: 'GST Billing & Returns' },
+              { title: 'Dynamic Floor Plans' },
+              { title: 'Waiter Role Security' },
+            ].map((f, i) => (
+              <div key={i} className="flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:-translate-y-1 transition-all">
+                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={16} className="text-indigo-600"/>
+                </div>
+                <span className="font-semibold text-slate-700 text-[13px] md:text-sm">{f.title}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
