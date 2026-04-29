@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 
-from db.session import get_db
+from api.deps import get_db, get_current_user
 from models.user import User, UserRole
 from models.restaurant import Restaurant
 from schemas.superadmin import RestaurantOverview, SuperAdminDashboardStats, UpdateSubscriptionRequest
-from api.deps import get_current_user
+
 
 router = APIRouter()
 

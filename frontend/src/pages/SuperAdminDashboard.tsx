@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, LogOut, CheckCircle2, TrendingUp, Users, RefreshCw, Crown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, LogOut, CheckCircle2, Users, RefreshCw, Crown } from 'lucide-react';
 
 interface Stats {
   total_restaurants: number;
