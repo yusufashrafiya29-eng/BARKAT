@@ -18,6 +18,7 @@ class Restaurant(Base):
     
     # Subscription fields
     subscription_status = Column(String, default="trial") # "trial", "active", "expired"
+    subscription_plan = Column(String, default="basic") # "basic", "pro", "max"
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
     

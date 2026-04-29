@@ -58,6 +58,7 @@ class AuthResponse(BaseModel):
     restaurant_name: Optional[str] = None
     restaurant_logo: Optional[str] = None
     subscription_status: Optional[str] = None
+    subscription_plan: Optional[str] = None
 
 
 class GenericResponse(BaseModel):

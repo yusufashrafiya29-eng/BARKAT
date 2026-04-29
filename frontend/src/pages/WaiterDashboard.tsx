@@ -59,6 +59,8 @@ export default function WaiterDashboard() {
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
 
+  const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
+
   const handlePrintReceipt = (order: Order) => {
     setPrintingOrder(order);
     setTimeout(() => {
@@ -805,9 +807,11 @@ export default function WaiterDashboard() {
                               )}
                               {order.status === 'SERVED' && (
                                 <>
-                                  <button onClick={() => handlePrintReceipt(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-700 bg-slate-100 border border-slate-200 transition-all hover:bg-slate-200 flex items-center gap-1.5">
-                                    <Printer size={14} /> Print Bill
-                                  </button>
+                                  {subscriptionPlan !== 'basic' && (
+                                    <button onClick={() => handlePrintReceipt(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-700 bg-slate-100 border border-slate-200 transition-all hover:bg-slate-200 flex items-center gap-1.5">
+                                      <Printer size={14} /> Print Bill
+                                    </button>
+                                  )}
                                   <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }}>
                                     💳 Checkout
                                   </button>

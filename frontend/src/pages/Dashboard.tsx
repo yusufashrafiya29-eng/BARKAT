@@ -97,7 +97,8 @@ const Dashboard: React.FC = () => {
 
   const canSeeOwner = role === 'OWNER';
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
-  const canSeeKitchen = role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN';
+  const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
+  const canSeeKitchen = (role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN') && subscriptionPlan !== 'basic';
 
   const restaurantName = localStorage.getItem('restaurantName') || 'MyRestro';
   const restaurantLogo = localStorage.getItem('restaurantLogo');

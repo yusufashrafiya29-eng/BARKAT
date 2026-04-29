@@ -5,7 +5,7 @@ import {
   LayoutGrid, Package, BarChart3,
   Plus, Trash2, IndianRupee, ClipboardList,
   ShoppingBag, Users, Clock, QrCode, CreditCard,
-  TrendingUp, Activity, Flame, ImagePlus, FileText, Download, Banknote, Calendar
+  TrendingUp, Activity, Flame, ImagePlus, FileText, Download, Banknote, Calendar, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -107,8 +107,17 @@ export default function OwnerDashboard() {
 
   // Subscription State
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>('basic');
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'basic' | 'pro' | 'max'>('pro');
+
+  const isFeatureLocked = (tabName: string) => {
+    if (subscriptionPlan === 'max') return false;
+    if (subscriptionPlan === 'pro' && ['reports', 'staff'].includes(tabName)) return true;
+    if (subscriptionPlan === 'basic' && ['inventory', 'cash_register', 'reports', 'staff'].includes(tabName)) return true;
+    return false;
+  };
 
   // Recipe Editor State
   const [editingRecipeItemId, setEditingRecipeItemId] = useState<string | null>(null);
@@ -147,6 +156,8 @@ export default function OwnerDashboard() {
               setDaysRemaining(Math.max(0, diff));
             }
             setSubscriptionStatus(status || 'trial');
+            setSubscriptionPlan(data.subscription_plan || 'basic');
+            localStorage.setItem('subscriptionPlan', data.subscription_plan || 'basic');
           }
         }).catch(() => {});
       });
@@ -721,6 +732,27 @@ export default function OwnerDashboard() {
                 <Loader2 className="w-5 h-5 text-muted animate-spin mb-3" />
                 <span className="text-[13px] text-muted">Loading data...</span>
              </div>
+          ) : isFeatureLocked(activeTab) ? (
+            <div className="h-64 flex flex-col items-center justify-center border border-slate-200 rounded-2xl bg-white shadow-sm mt-8 animate-in fade-in zoom-in-95">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Feature Locked</h3>
+              <p className="text-[14px] text-slate-500 mb-6 text-center max-w-md">
+                This feature is not available on your current <strong>{subscriptionPlan.toUpperCase()}</strong> plan. 
+                Upgrade your subscription to unlock {activeTab.replace('_', ' ')} and grow your business!
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedUpgradePlan(subscriptionPlan === 'basic' ? 'pro' : 'max');
+                  setShowUpgradeModal(true);
+                }}
+                className="px-6 py-2.5 rounded-xl text-[13px] font-bold text-white shadow-md transition-all hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg,#f97316,#ef4444)' }}
+              >
+                Upgrade to {subscriptionPlan === 'basic' ? 'PRO' : 'MAX'}
+              </button>
+            </div>
           ) : (
             <div className="animate-in fade-in duration-300">
               
@@ -2063,55 +2095,79 @@ export default function OwnerDashboard() {
 
             <div className="p-6 space-y-4">
               {/* Plans */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Monthly */}
-                <div className="rounded-2xl border-2 border-indigo-100 bg-indigo-50 p-4 text-center">
-                  <p className="text-[10px] font-extrabold text-indigo-500 uppercase tracking-widest mb-1">Monthly</p>
-                  <p className="text-[28px] font-black text-slate-900 leading-none">₹999</p>
-                  <p className="text-[11px] text-slate-500 mt-1">per month</p>
-                </div>
-                {/* Yearly */}
-                <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4 text-center relative overflow-hidden">
-                  <div className="absolute top-1.5 right-1.5 bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">SAVE 17%</div>
-                  <p className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-widest mb-1">Yearly</p>
-                  <p className="text-[28px] font-black text-slate-900 leading-none">₹9,999</p>
-                  <p className="text-[11px] text-slate-500 mt-1">per year</p>
-                </div>
+              <div className="grid grid-cols-3 gap-2">
+                {/* Basic */}
+                <button
+                  onClick={() => setSelectedUpgradePlan('basic')}
+                  className={`rounded-2xl border-2 p-2.5 text-center transition-all ${selectedUpgradePlan === 'basic' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-100 bg-slate-50 hover:border-indigo-200'}`}
+                >
+                  <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1">Basic</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹499</p>
+                  <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
+                </button>
+                {/* Pro */}
+                <button
+                  onClick={() => setSelectedUpgradePlan('pro')}
+                  className={`rounded-2xl border-2 p-2.5 text-center relative overflow-hidden transition-all ${selectedUpgradePlan === 'pro' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 bg-slate-50 hover:border-emerald-200'}`}
+                >
+                  <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-bl-lg uppercase tracking-wider">POPULAR</div>
+                  <p className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-widest mb-1">Pro</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹999</p>
+                  <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
+                </button>
+                {/* Max */}
+                <button
+                  onClick={() => setSelectedUpgradePlan('max')}
+                  className={`rounded-2xl border-2 p-2.5 text-center transition-all ${selectedUpgradePlan === 'max' ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : 'border-slate-100 bg-slate-50 hover:border-purple-200'}`}
+                >
+                  <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-widest mb-1">Max</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹1399</p>
+                  <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
+                </button>
               </div>
 
               {/* Features */}
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
-                {['Complete Owner Dashboard','Waiter Console & KDS Station','QR Code Ordering','Real-time Analytics','Priority Support'].map(f => (
-                  <div key={f} className="flex items-center gap-2 text-[13px] text-slate-700">
-                    <span className="text-emerald-500 font-bold text-[15px]">✓</span> {f}
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-100">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Features Included</p>
+                {selectedUpgradePlan === 'basic' && ['POS Billing & Waiter Dashboard', 'Menu & Category Management', 'Table & Floorplan Management', 'Customer QR Menu & Ordering', 'Basic Daily Analytics'].map(f => (
+                  <div key={f} className="flex items-center gap-2 text-[12px] text-slate-700 font-medium">
+                    <span className="text-indigo-500 font-bold text-[14px]">✓</span> {f}
+                  </div>
+                ))}
+                {selectedUpgradePlan === 'pro' && ['Everything in Basic Plan', 'Kitchen Display System (KDS)', 'Inventory & Recipes (BOM)', 'Cash Register & Shift Tracking', 'Thermal Receipt Printing'].map(f => (
+                  <div key={f} className="flex items-center gap-2 text-[12px] text-slate-700 font-medium">
+                    <span className="text-emerald-500 font-bold text-[14px]">✓</span> {f}
+                  </div>
+                ))}
+                {selectedUpgradePlan === 'max' && ['Everything in Pro Plan', 'Advanced GST & CA Reports', 'Staff Mgmt & Approvals', 'Zomato/Swiggy Sync (Upcoming)', 'WhatsApp CRM (Upcoming)'].map(f => (
+                  <div key={f} className="flex items-center gap-2 text-[12px] text-slate-700 font-medium">
+                    <span className="text-purple-500 font-bold text-[14px]">✓</span> {f}
                   </div>
                 ))}
               </div>
 
               {/* Payment Instructions */}
-              <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4">
-                <p className="text-[12px] font-bold text-orange-700 uppercase tracking-wider mb-2">📲 How to Pay</p>
-                <p className="text-[12px] text-slate-600 leading-relaxed mb-3">
-                  Pay via UPI to the ID below, then send payment screenshot on WhatsApp to activate instantly.
-                </p>
-                <div className="flex items-center gap-2 bg-white rounded-xl border border-orange-200 px-3 py-2">
-                  <span className="text-[13px] font-extrabold text-slate-900 flex-1">9979114665@kotak811</span>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText('9979114665@kotak811'); toast.success('UPI ID copied!'); }}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                  >Copy</button>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+                <p className="text-[12px] font-bold text-slate-800 mb-3">Scan to Pay via UPI</p>
+                <div className="inline-block p-2 bg-white border border-slate-200 rounded-xl mb-3 shadow-sm">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=9979114665@kotak811&pn=MyRestro&am=${selectedUpgradePlan === 'basic' ? '499' : selectedUpgradePlan === 'pro' ? '999' : '1399'}&cu=INR`)}`}
+                    alt="UPI QR"
+                    className="w-32 h-32"
+                  />
                 </div>
+                <p className="text-[11px] text-slate-500">Amount: <strong className="text-slate-800">₹{selectedUpgradePlan === 'basic' ? '499' : selectedUpgradePlan === 'pro' ? '999' : '1399'}</strong></p>
+                <p className="text-[11px] text-slate-500 mt-1">UPI ID: <strong>9979114665@kotak811</strong></p>
               </div>
 
               {/* WhatsApp CTA */}
               <button
                 onClick={() => {
                   const restaurantName = localStorage.getItem('restaurantName') || 'my restaurant';
-                  const msg = encodeURIComponent(`Hi MyRestro! I've paid for the subscription for ${restaurantName}. Please activate my account. 🙏`);
+                  const msg = encodeURIComponent(`Hi MyRestro! I've paid for the *${selectedUpgradePlan.toUpperCase()}* subscription for ${restaurantName}. Please activate my account. 🙏`);
                   window.open(`https://wa.me/919979114665?text=${msg}`, '_blank');
                 }}
-                className="w-full py-3.5 rounded-2xl text-[14px] font-extrabold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95"
-                style={{ background: '#25D366', boxShadow: '0 4px 20px rgba(37,211,102,0.4)' }}
+                className="w-full py-3.5 rounded-2xl text-[14px] font-extrabold text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-[0_4px_20px_rgba(37,211,102,0.4)] bg-[#25D366]"
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 Paid? Notify on WhatsApp
