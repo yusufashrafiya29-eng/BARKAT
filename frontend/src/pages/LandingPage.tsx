@@ -116,48 +116,52 @@ export default function LandingPage() {
             
             {/* ITEM 1: Waiter App (Large) */}
             <div className="lg:col-span-2 bg-[#f0fdf4] rounded-[2rem] border border-emerald-100 overflow-hidden relative group">
-              <div className="p-10 relative z-10 w-full md:w-1/2">
+              <div className="p-8 md:p-10 relative z-20 w-full md:w-[55%] pointer-events-none">
                 <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-6 shadow-sm"><Smartphone size={24}/></div>
-                <h3 className="text-2xl font-black text-slate-900 mb-3">Service Terminal (POS)</h3>
-                <p className="text-emerald-800/70 font-medium leading-relaxed">Empower your waiters to take orders, add chef notes, and process checkouts instantly from any device. Fully synced with the kitchen.</p>
+                <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-3">Service Terminal (POS)</h3>
+                <p className="text-emerald-800/70 font-medium leading-relaxed text-[15px] md:text-lg">Empower your waiters to take orders, add chef notes, and process checkouts instantly from any device. Fully synced with the kitchen.</p>
               </div>
-              <div className="absolute right-[-5%] bottom-[-5%] w-[80%] md:w-[60%] h-[85%] rounded-tl-2xl shadow-2xl border-t-8 border-l-8 border-white overflow-hidden transition-transform duration-500 group-hover:-translate-x-4 group-hover:-translate-y-4">
+              <div className="absolute right-0 bottom-0 w-[85%] md:w-[50%] h-[60%] md:h-[85%] rounded-tl-2xl shadow-2xl border-t-8 border-l-8 border-white overflow-hidden transition-transform duration-500 group-hover:-translate-x-3 group-hover:-translate-y-3 z-10 bg-slate-50">
                 <img src="/images/waiter_order.png" alt="Waiter Order App" className="w-full h-full object-cover object-left-top" />
               </div>
             </div>
 
             {/* ITEM 2: QR Menu */}
-            <div className="bg-[#fffbeb] rounded-[2rem] border border-amber-100 overflow-hidden relative group">
-              <div className="p-10 relative z-10">
+            <div className="bg-[#fffbeb] rounded-[2rem] border border-amber-100 overflow-hidden relative group flex flex-col">
+              <div className="p-8 pb-0 relative z-20 pointer-events-none">
                 <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-6 shadow-sm"><Smartphone size={24}/></div>
                 <h3 className="text-2xl font-black text-slate-900 mb-3">Live QR Menu</h3>
-                <p className="text-amber-800/70 font-medium leading-relaxed mb-6">Customers scan, browse beautiful digital menus, and order directly.</p>
+                <p className="text-amber-800/70 font-medium leading-relaxed">Customers scan, browse beautiful digital menus, and order directly.</p>
               </div>
-              <div className="absolute bottom-[-10%] left-1/2 -translate-x-1/2 w-[60%] aspect-[9/19] rounded-[2rem] shadow-2xl border-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-4">
-                <img src="/images/customer_menu.jpg" alt="QR Menu" className="w-full h-full object-cover" />
+              <div className="mt-auto relative z-10 w-full h-[180px] flex justify-center overflow-hidden">
+                <div className="w-[140px] h-[300px] mt-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-4 bg-white">
+                  <img src="/images/customer_menu.jpg" alt="QR Menu" className="w-full h-full object-cover object-top" />
+                </div>
               </div>
             </div>
 
             {/* ITEM 3: KDS */}
-            <div className="bg-[#f5f3ff] rounded-[2rem] border border-violet-100 overflow-hidden relative group">
-               <div className="p-10 relative z-10">
+            <div className="bg-[#f5f3ff] rounded-[2rem] border border-violet-100 overflow-hidden relative group flex flex-col">
+               <div className="p-8 pb-0 relative z-20 pointer-events-none">
                 <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mb-6 shadow-sm"><ChefHat size={24}/></div>
                 <h3 className="text-2xl font-black text-slate-900 mb-3">Kitchen Display</h3>
-                <p className="text-violet-800/70 font-medium leading-relaxed mb-6">No more paper tickets. Real-time syncing from table to kitchen.</p>
+                <p className="text-violet-800/70 font-medium leading-relaxed">No more paper tickets. Real-time syncing from table to kitchen.</p>
               </div>
-              <div className="absolute bottom-0 right-[-20%] w-[130%] h-[55%] rounded-tl-xl shadow-2xl border-t-[6px] border-l-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-4">
-                <img src="/images/kitchen_kds.png" alt="Kitchen Display System" className="w-full h-full object-cover object-left" />
+              <div className="mt-auto relative z-10 w-full h-[160px] pl-8">
+                <div className="w-[150%] h-[150%] rounded-tl-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t-[6px] border-l-[6px] border-white overflow-hidden transition-transform duration-500 group-hover:-translate-y-2 group-hover:-translate-x-2 bg-slate-900">
+                  <img src="/images/kitchen_kds.png" alt="Kitchen Display System" className="w-full h-full object-cover object-left-top" />
+                </div>
               </div>
             </div>
 
             {/* ITEM 4: Owner Analytics (Large) */}
             <div className="lg:col-span-2 bg-[#eff6ff] rounded-[2rem] border border-blue-100 overflow-hidden relative group">
-               <div className="p-10 relative z-10 w-full md:w-1/2">
+               <div className="p-8 md:p-10 relative z-20 w-full md:w-[55%] pointer-events-none">
                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6 shadow-sm"><BarChart3 size={24}/></div>
-                <h3 className="text-2xl font-black text-slate-900 mb-3">Executive Portal</h3>
-                <p className="text-blue-800/70 font-medium leading-relaxed">Your entire business at a glance. Track live revenue, monitor active tables, and generate advanced GST & CA reports with one click.</p>
+                <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-3">Executive Portal</h3>
+                <p className="text-blue-800/70 font-medium leading-relaxed text-[15px] md:text-lg">Your entire business at a glance. Track live revenue, monitor active tables, and generate advanced GST & CA reports with one click.</p>
               </div>
-              <div className="absolute right-[-5%] bottom-[-5%] w-[80%] md:w-[60%] h-[85%] rounded-tl-2xl shadow-2xl border-t-8 border-l-8 border-white overflow-hidden transition-transform duration-500 group-hover:-translate-x-4 group-hover:-translate-y-4">
+              <div className="absolute right-0 bottom-0 w-[85%] md:w-[55%] h-[60%] md:h-[85%] rounded-tl-2xl shadow-2xl border-t-8 border-l-8 border-white overflow-hidden transition-transform duration-500 group-hover:-translate-x-3 group-hover:-translate-y-3 z-10 bg-slate-50">
                 <img src="/images/reports.png" alt="Advanced Reports" className="w-full h-full object-cover object-left-top" />
               </div>
             </div>
