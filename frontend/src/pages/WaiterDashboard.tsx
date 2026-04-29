@@ -7,11 +7,12 @@ import {
   RefreshCcw, AlertCircle, Edit2,
   ShoppingCart, CheckCircle2, X,
   Wallet, CreditCard, Smartphone,
-  Send, Zap, ChefHat, Shield, Banknote
+  Send, Zap, ChefHat, Shield, Banknote, Printer
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
 import toast from 'react-hot-toast';
+import ReceiptPrinter from '../components/ReceiptPrinter';
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; }
@@ -56,6 +57,14 @@ export default function WaiterDashboard() {
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null); // null = loading
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
+  const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+
+  const handlePrintReceipt = (order: Order) => {
+    setPrintingOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 100); // Wait for React to render the invisible component
+  };
 
   /* ── Data fetching ─────────────────────────────────────────── */
   const fetchOrdersOnly = async () => {
@@ -795,9 +804,14 @@ export default function WaiterDashboard() {
                                 </button>
                               )}
                               {order.status === 'SERVED' && (
-                                <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }}>
-                                  💳 Checkout
-                                </button>
+                                <>
+                                  <button onClick={() => handlePrintReceipt(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-700 bg-slate-100 border border-slate-200 transition-all hover:bg-slate-200 flex items-center gap-1.5">
+                                    <Printer size={14} /> Print Bill
+                                  </button>
+                                  <button onClick={() => handleStartCheckout(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }}>
+                                    💳 Checkout
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -925,6 +939,16 @@ export default function WaiterDashboard() {
           Owner View
         </button>
       </div>
+      {/* ── RECEIPTS OVERLAY ── */}
+      {printingOrder && (
+        <ReceiptPrinter 
+          order={printingOrder}
+          tableNumber={tables.find(t => t.id === printingOrder.table_id)?.table_number}
+          restaurantName={localStorage.getItem('restaurantName') || 'BARKAT POS'}
+          gstin={localStorage.getItem('restaurantGstin') || undefined}
+          fssai={localStorage.getItem('restaurantFssai') || undefined}
+        />
+      )}
     </div>
   );
 }

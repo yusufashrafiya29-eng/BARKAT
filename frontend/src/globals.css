@@ -249,3 +249,59 @@
     background-clip: text;
   }
 }
+
+/* ================================================================
+   PRINT STYLES FOR THERMAL RECEIPT
+   ================================================================ */
+@media print {
+  /* Hide all normal UI elements when printing */
+  body > *:not(.print-container),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset body and html margins to avoid blank pages */
+  @page {
+    margin: 0;
+    padding: 0;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    width: 100%;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Make sure the container is visible and aligned */
+  .print-container {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-receipt {
+    width: 100%;
+    /* Max width acts as 80mm standard, but fluid for 58mm if chosen in print dialog */
+    max-width: 80mm; 
+    margin: 0 auto;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.2;
+    color: black;
+  }
+
+  /* Force black & white and remove shadows */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    background: transparent !important;
+  }
+}
