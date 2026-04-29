@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 import ReceiptPrinter from '../components/ReceiptPrinter';
 
 /* ── Types ──────────────────────────────────────────────────── */
-interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; }
+interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; }
 interface Category { id: string; name: string; menu_items: MenuItem[]; }
 interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
 interface CartItem extends MenuItem { quantity: number; notes: string; }
@@ -515,28 +515,41 @@ export default function WaiterDashboard() {
                       <button
                         key={item.id}
                         onClick={() => addToCart(item)}
-                        className="group bg-white rounded-2xl border border-slate-200 p-4 flex flex-col text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300"
+                        className="group bg-white rounded-2xl border border-slate-200 p-3 flex flex-row items-center text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 gap-3"
                         style={{ boxShadow: inCart ? '0 0 0 2px #6366f1, 0 4px 12px rgb(79 70 229 / .15)' : undefined, borderColor: inCart ? '#6366f1' : undefined }}
                         disabled={!item.is_available}
                       >
-                        <div className="flex justify-between items-start mb-2 w-full gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-2.5 h-2.5 shrink-0 rounded-sm border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
-                              <div className={`w-1 h-1 rounded-sm ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="w-14 h-14 object-cover rounded-xl shrink-0" />
+                        ) : (
+                          <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center shrink-0 border border-slate-100">
+                             <div className={`w-4 h-4 rounded-sm border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
+                              <div className={`w-2 h-2 rounded-sm ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                             </div>
-                            <h4 className="text-[13px] font-semibold text-slate-800 truncate">{item.name}</h4>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {inCart && (
-                              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">
-                                {inCart.quantity}
-                              </span>
-                            )}
-                            <span className="text-[13px] font-bold text-slate-700">₹{item.price}</span>
+                        )}
+                        <div className="flex flex-col flex-grow min-w-0">
+                          <div className="flex justify-between items-start mb-1 w-full gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {item.image_url && (
+                                <div className={`w-2.5 h-2.5 shrink-0 rounded-sm border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
+                                  <div className={`w-1 h-1 rounded-sm ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                </div>
+                              )}
+                              <h4 className="text-[13px] font-semibold text-slate-800 truncate">{item.name}</h4>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {inCart && (
+                                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-sm">
+                                  {inCart.quantity}
+                                </span>
+                              )}
+                              <span className="text-[13px] font-bold text-slate-900">₹{item.price}</span>
+                            </div>
                           </div>
+                          {item.description && <p className="text-[10px] text-slate-400 line-clamp-1 leading-relaxed mt-0.5">{item.description}</p>}
+                          {!item.is_available && <span className="mt-1 text-[9px] font-bold text-rose-500 uppercase">Unavailable</span>}
                         </div>
-                        {item.description && <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{item.description}</p>}
-                        {!item.is_available && <span className="mt-2 text-[10px] font-bold text-rose-500 uppercase">Unavailable</span>}
                       </button>
                     );
                   })}
