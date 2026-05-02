@@ -38,6 +38,7 @@ class Order(Base):
     source = Column(String, default="WAITER", nullable=False)
     is_accepted = Column(Boolean, default=True, nullable=False)
     payment_status = Column(String, default="PENDING", nullable=False)
+    is_inventory_deducted = Column(Boolean, default=False, nullable=False)
     
     # Razorpay tracking
     razorpay_order_id = Column(String, nullable=True)

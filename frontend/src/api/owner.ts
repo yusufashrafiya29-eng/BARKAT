@@ -98,6 +98,16 @@ export const ownerApi = {
     return response.data;
   },
 
+  getInventoryVelocity: async () => {
+    const response = await axios.get(`${BASE_URL}/analytics/inventory-velocity`, getHeaders());
+    return response.data;
+  },
+
+  getStaffPerformance: async () => {
+    const response = await axios.get(`${BASE_URL}/analytics/staff-performance`, getHeaders());
+    return response.data;
+  },
+
   // Orders
   getOwnerOrders: async () => {
     const response = await axios.get(`${BASE_URL}/orders/history/owner`, getHeaders());

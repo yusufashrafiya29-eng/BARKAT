@@ -114,6 +114,20 @@ def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, re
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
+    # Deduct BOM inventory when order is READY (KDS completed)
+    if new_status == OrderStatus.READY and order.status != OrderStatus.READY and not order.is_inventory_deducted:
+        from models.menu import RecipeIngredient
+        from models.inventory import StockItem
+        for item in order.items:
+            recipes = db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item.menu_item_id).all()
+            for recipe in recipes:
+                stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
+                if stock_item:
+                    stock_item.quantity -= (recipe.quantity * item.quantity)
+                    if stock_item.quantity <= stock_item.minimum_threshold:
+                        print(f"🚨 LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
+        order.is_inventory_deducted = True
+
     order.status = new_status
     db.commit()
     db.refresh(order)
@@ -127,8 +141,6 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
     # Check if transitioning to PAID
     if new_payment_status == 'PAID' and order.payment_status != 'PAID':
         from models.reservation import Reservation
-        from models.menu import RecipeIngredient
-        from models.inventory import StockItem
         from datetime import datetime
         today_date = datetime.now().date()
         reservations = db.query(Reservation).filter(
@@ -138,16 +150,6 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
         ).all()
         for res in reservations:
             res.status = 'COMPLETED'
-            
-        # Deduct BOM inventory
-        for item in order.items:
-            recipes = db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item.menu_item_id).all()
-            for recipe in recipes:
-                stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
-                if stock_item:
-                    stock_item.quantity -= (recipe.quantity * item.quantity)
-                    if stock_item.quantity <= stock_item.minimum_threshold:
-                        print(f"🚨 LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
 
         # Auto-record sale in active cash shift (if one is open)
         from services.cash_service import record_sale

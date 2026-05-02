@@ -90,3 +90,88 @@ def get_historical_analytics(
         })
         
     return history
+
+@router.get("/staff-performance", response_model=List[Dict[str, Any]])
+def get_staff_performance(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    from models.user import User
+    
+    # Get last 7 days
+    now_utc = datetime.now(timezone.utc)
+    start_date = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc) - timedelta(days=6)
+    
+    orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= start_date,
+        Order.waiter_id.isnot(None),
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    staff_stats = {}
+    for o in orders:
+        wid = str(o.waiter_id)
+        if wid not in staff_stats:
+            staff_stats[wid] = {"orders": 0, "revenue": 0.0}
+        staff_stats[wid]["orders"] += 1
+        staff_stats[wid]["revenue"] += (o.total_amount or 0.0)
+        
+    if not staff_stats:
+        return []
+        
+    users = db.query(User).filter(User.id.in_(list(staff_stats.keys()))).all()
+    user_map = {str(u.id): u.full_name for u in users}
+    
+    result = []
+    for wid, stats in staff_stats.items():
+        result.append({
+            "name": user_map.get(wid, "Unknown Staff"),
+            "orders": stats["orders"],
+            "revenue": stats["revenue"]
+        })
+        
+    return sorted(result, key=lambda x: x["orders"], reverse=True)
+
+@router.get("/inventory-velocity", response_model=List[Dict[str, Any]])
+def get_inventory_velocity(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    from models.order import OrderItem
+    from models.menu import MenuItem
+    
+    # Top selling items last 7 days
+    now_utc = datetime.now(timezone.utc)
+    start_date = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc) - timedelta(days=6)
+    
+    order_items = db.query(OrderItem).join(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= start_date,
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    item_stats = {}
+    for oi in order_items:
+        mid = str(oi.menu_item_id)
+        if mid not in item_stats:
+            item_stats[mid] = 0
+        item_stats[mid] += oi.quantity
+        
+    if not item_stats:
+        return []
+        
+    menu_items = db.query(MenuItem).filter(MenuItem.id.in_(list(item_stats.keys()))).all()
+    menu_map = {str(m.id): m.name for m in menu_items}
+    
+    result = []
+    for mid, qty in item_stats.items():
+        result.append({
+            "name": menu_map.get(mid, "Unknown Item"),
+            "quantity": qty
+        })
+        
+    # Get top 5
+    return sorted(result, key=lambda x: x["quantity"], reverse=True)[:5]
