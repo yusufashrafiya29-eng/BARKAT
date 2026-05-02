@@ -57,6 +57,7 @@ export default function ReservationsTab({ setShowAddModal }: { setShowAddModal: 
                 <td className="py-3 px-4">
                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
                     res.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' :
+                    res.status === 'WAITLIST' ? 'bg-purple-100 text-purple-700 animate-pulse' :
                     res.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
                     res.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' :
                     'bg-slate-100 text-slate-700'
@@ -69,9 +70,8 @@ export default function ReservationsTab({ setShowAddModal }: { setShowAddModal: 
                   <span className={`block text-[10px] uppercase ${res.payment_status === 'PAID' ? 'text-emerald-500' : 'text-slate-400'}`}>{res.payment_status}</span>
                 </td>
                 <td className="py-3 px-4 text-center">
-                  {res.status === 'PENDING' && (
+                  {(res.status === 'PENDING' || res.status === 'WAITLIST') && (
                     <div className="flex justify-center gap-2">
-                      {/* Normally Accept involves selecting table. Original owner dashboard handled this. For now just expose a function */}
                       <button onClick={() => setAcceptingReservationId(res.id)} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[11px] font-bold hover:bg-emerald-100">Assign Table</button>
                       <button onClick={() => ownerApi.updateReservationStatus(res.id, 'CANCELLED').then(() => fetchData())} className="px-2 py-1 bg-rose-50 text-rose-600 rounded text-[11px] font-bold hover:bg-rose-100">Reject</button>
                     </div>

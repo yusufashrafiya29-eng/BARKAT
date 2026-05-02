@@ -114,6 +114,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  getAiInsights: async () => {
+    const response = await axios.get(`${BASE_URL}/analytics/ai-insights`, getHeaders());
+    return response.data;
+  },
+
   // Orders
   getOwnerOrders: async () => {
     const response = await axios.get(`${BASE_URL}/orders/history/owner`, getHeaders());

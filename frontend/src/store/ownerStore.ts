@@ -21,6 +21,7 @@ interface OwnerState {
   inventory: any[];
   reservations: any[];
   customers: any[];
+  aiInsights: any[];
   inventoryVelocity: any[];
   staffPerformance: any[];
   upiId: string;
@@ -53,6 +54,7 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
   inventory: [],
   reservations: [],
   customers: [],
+  aiInsights: [],
   inventoryVelocity: [],
   staffPerformance: [],
   upiId: '',
@@ -101,17 +103,19 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
     try {
       switch (activeTab) {
         case 'analytics':
-          const [analyticRes, historyRes, invVelRes, staffPerfRes] = await Promise.all([
+          const [analyticRes, historyRes, invVelRes, staffPerfRes, aiRes] = await Promise.all([
             ownerApi.getDailyAnalytics(),
             ownerApi.getHistoryAnalytics(),
             ownerApi.getInventoryVelocity(),
-            ownerApi.getStaffPerformance()
+            ownerApi.getStaffPerformance(),
+            ownerApi.getAiInsights()
           ]);
           set({ 
             analytics: analyticRes, 
             historyData: historyRes,
             inventoryVelocity: invVelRes,
-            staffPerformance: staffPerfRes
+            staffPerformance: staffPerfRes,
+            aiInsights: aiRes
           });
           break;
         case 'orders':
@@ -164,17 +168,19 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
     try {
       switch (activeTab) {
         case 'analytics':
-          const [silAnalyticRes, silHistoryRes, silInvVelRes, silStaffPerfRes] = await Promise.all([
+          const [silAnalyticRes, silHistoryRes, silInvVelRes, silStaffPerfRes, silAiRes] = await Promise.all([
             ownerApi.getDailyAnalytics(),
             ownerApi.getHistoryAnalytics(),
             ownerApi.getInventoryVelocity(),
-            ownerApi.getStaffPerformance()
+            ownerApi.getStaffPerformance(),
+            ownerApi.getAiInsights()
           ]);
           set({ 
             analytics: silAnalyticRes, 
             historyData: silHistoryRes,
             inventoryVelocity: silInvVelRes,
-            staffPerformance: silStaffPerfRes
+            staffPerformance: silStaffPerfRes,
+            aiInsights: silAiRes
           });
           break;
         case 'orders':

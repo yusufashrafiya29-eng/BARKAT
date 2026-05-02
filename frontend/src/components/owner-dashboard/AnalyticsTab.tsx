@@ -1,17 +1,60 @@
 import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
-import { IndianRupee, ShoppingBag, Flame, CheckCircle2, TrendingUp, Activity, Clock, Loader2, Users, Package } from 'lucide-react';
+import { IndianRupee, ShoppingBag, Flame, CheckCircle2, TrendingUp, Activity, Clock, Loader2, Users, Package, Sparkles, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useOwnerStore } from '../../store/ownerStore';
 
 export default function AnalyticsTab() {
   const [selectedMetric, setSelectedMetric] = useState<'revenue' | 'total_orders' | 'active_orders' | 'completed'>('revenue');
-  const { analytics, historyData, inventoryVelocity, staffPerformance } = useOwnerStore();
+  const { analytics, historyData, inventoryVelocity, staffPerformance, aiInsights } = useOwnerStore();
   const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981'];
 
   if (!analytics) return null;
 
   return (
     <div className="space-y-6">
+      {/* AI Insights Card */}
+      {aiInsights && aiInsights.length > 0 && (
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-[1px] rounded-2xl shadow-lg animate-in fade-in zoom-in-95 duration-500">
+          <div className="bg-white rounded-[15px] p-5">
+            <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Sparkles className="text-purple-500" size={20} />
+              <h3 className="text-[15px] font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                AI-Powered Insights
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {aiInsights.map((insight: any, idx: number) => (
+                <div key={idx} className={`p-4 rounded-xl border ${
+                  insight.type === 'warning' ? 'bg-red-50 border-red-100' :
+                  insight.type === 'success' ? 'bg-emerald-50 border-emerald-100' :
+                  'bg-blue-50 border-blue-100'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {insight.type === 'warning' && <AlertCircle className="text-red-500" size={16} />}
+                      {insight.type === 'success' && <CheckCircle className="text-emerald-500" size={16} />}
+                      {insight.type === 'info' && <Info className="text-blue-500" size={16} />}
+                    </div>
+                    <div>
+                      <h4 className={`text-[13px] font-bold mb-1 ${
+                        insight.type === 'warning' ? 'text-red-900' :
+                        insight.type === 'success' ? 'text-emerald-900' :
+                        'text-blue-900'
+                      }`}>{insight.title}</h4>
+                      <p className={`text-[12px] leading-relaxed ${
+                        insight.type === 'warning' ? 'text-red-700' :
+                        insight.type === 'success' ? 'text-emerald-700' :
+                        'text-blue-700'
+                      }`}>{insight.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Revenue */}
         <div 
