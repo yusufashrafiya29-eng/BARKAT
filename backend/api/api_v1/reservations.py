@@ -37,10 +37,13 @@ def create_manual_reservation(
     restaurant_id: UUID = Depends(get_current_restaurant)
 ):
     """Staff creates a manual reservation (already confirmed, no advance needed)"""
+    # If no table is assigned at booking, they are put on the WAITLIST
+    initial_status = "CONFIRMED" if reservation_in.table_id else "WAITLIST"
+
     new_res = Reservation(
         **reservation_in.model_dump(),
         restaurant_id=restaurant_id,
-        status="CONFIRMED"
+        status=initial_status
     )
     db.add(new_res)
     db.commit()
