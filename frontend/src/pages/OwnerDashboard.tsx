@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Loader2, LayoutGrid, Package, BarChart3,
-  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock
+  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock, Heart
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -18,6 +18,7 @@ import ReportsTab from '../components/owner-dashboard/ReportsTab';
 import ReservationsTab from '../components/owner-dashboard/ReservationsTab';
 import SettingsTab from '../components/owner-dashboard/SettingsTab';
 import CashRegisterTab from '../components/CashRegisterTab';
+import CustomersTab from '../components/owner-dashboard/CustomersTab';
 
 // Interfaces
 interface MenuItem {
@@ -34,7 +35,7 @@ interface MenuItem {
 
 
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -266,6 +267,7 @@ export default function OwnerDashboard() {
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {[
             { id: 'analytics', label: 'Performance', icon: BarChart3 },
+            { id: 'crm', label: 'CRM & Loyalty', icon: Heart },
             { id: 'orders', label: 'Order History', icon: ClipboardList },
             { id: 'reservations', label: 'Bookings', icon: Clock },
             { id: 'reports', label: 'CA Reports', icon: FileText },
@@ -423,6 +425,7 @@ export default function OwnerDashboard() {
               {activeTab === 'staff' && <StaffTab />}
               {activeTab === 'reports' && <ReportsTab setActiveTab={setActiveTab} />}
               {activeTab === 'reservations' && <ReservationsTab setShowAddModal={setShowAddModal} />}
+              {activeTab === 'crm' && <CustomersTab />}
               {activeTab === 'settings' && <SettingsTab />}
             </div>
           )}

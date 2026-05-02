@@ -108,6 +108,12 @@ export const ownerApi = {
     return response.data;
   },
 
+  // CRM & Loyalty
+  getCustomers: async () => {
+    const response = await axios.get(`${BASE_URL}/crm/`, getHeaders());
+    return response.data;
+  },
+
   // Orders
   getOwnerOrders: async () => {
     const response = await axios.get(`${BASE_URL}/orders/history/owner`, getHeaders());

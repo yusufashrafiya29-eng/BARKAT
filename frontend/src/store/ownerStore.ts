@@ -20,6 +20,7 @@ interface OwnerState {
   tables: any[];
   inventory: any[];
   reservations: any[];
+  customers: any[];
   inventoryVelocity: any[];
   staffPerformance: any[];
   upiId: string;
@@ -51,6 +52,7 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
   tables: [],
   inventory: [],
   reservations: [],
+  customers: [],
   inventoryVelocity: [],
   staffPerformance: [],
   upiId: '',
@@ -138,6 +140,10 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
           const [resvRes2, tabRes2] = await Promise.all([ownerApi.getReservations(), waiterApi.getTables()]);
           set({ reservations: resvRes2, tables: tabRes2 });
           break;
+        case 'crm':
+          const crmRes = await ownerApi.getCustomers();
+          set({ customers: crmRes });
+          break;
         case 'settings':
           const [payResData, rzpResData] = await Promise.all([
             ownerApi.getUpiId(),
@@ -196,6 +202,10 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
         case 'reservations':
           const [resvRes, tabRes] = await Promise.all([ownerApi.getReservations(), waiterApi.getTables()]);
           set({ reservations: resvRes, tables: tabRes });
+          break;
+        case 'crm':
+          const crmResSil = await ownerApi.getCustomers();
+          set({ customers: crmResSil });
           break;
         case 'settings':
           const [payRes, rzpRes] = await Promise.all([

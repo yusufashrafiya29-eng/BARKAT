@@ -154,6 +154,41 @@ def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, 
         # Auto-record sale in active cash shift (if one is open)
         from services.cash_service import record_sale
         record_sale(db, restaurant_id, order.total_amount)
+        
+        # CRM & Loyalty Points
+        if order.customer_phone:
+            from models.customer import Customer
+            from services.notification_service import send_whatsapp_receipt
+            
+            customer = db.query(Customer).filter(
+                Customer.restaurant_id == restaurant_id,
+                Customer.phone_number == order.customer_phone
+            ).first()
+            
+            points_earned = int((order.total_amount or 0) // 100)
+            
+            if not customer:
+                customer = Customer(
+                    restaurant_id=restaurant_id,
+                    phone_number=order.customer_phone,
+                    name=order.customer_name,
+                    loyalty_points=points_earned,
+                    total_spent=order.total_amount or 0,
+                    total_visits=1
+                )
+                db.add(customer)
+            else:
+                customer.loyalty_points += points_earned
+                customer.total_spent += (order.total_amount or 0)
+                customer.total_visits += 1
+                if order.customer_name and not customer.name:
+                    customer.name = order.customer_name
+                    
+            db.commit()
+            db.refresh(customer)
+            
+            # Send digital receipt
+            send_whatsapp_receipt(order, customer)
     
     order.payment_status = new_payment_status
     db.commit()
