@@ -12,6 +12,7 @@ const Dashboard: React.FC = () => {
   const [role, setRole] = useState<string | null>(localStorage.getItem('userRole'));
   const [userName, setUserName] = useState(localStorage.getItem('userName') || 'User');
   const [loading, setLoading] = useState(!localStorage.getItem('userRole'));
+  const [subscriptionPlan, setSubscriptionPlan] = useState(localStorage.getItem('subscriptionPlan') || 'basic');
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -41,6 +42,9 @@ const Dashboard: React.FC = () => {
           }
           localStorage.setItem('restaurantLogo', data.restaurant_logo || '');
           localStorage.setItem('subscriptionStatus', data.subscription_status || '');
+          const newPlan = data.subscription_plan || 'basic';
+          localStorage.setItem('subscriptionPlan', newPlan);
+          setSubscriptionPlan(newPlan);
 
           // ── Subscription Guard ──────────────────────────────
           const status = data.subscription_status;
@@ -111,7 +115,6 @@ const Dashboard: React.FC = () => {
 
   const canSeeOwner = role === 'OWNER';
   const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
-  const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
   const canSeeKitchen = (role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN') && subscriptionPlan !== 'basic';
   const canSeeSuperAdmin = role === 'SUPERADMIN';
 
