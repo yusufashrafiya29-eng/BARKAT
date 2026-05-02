@@ -70,7 +70,6 @@ export default function OwnerDashboard() {
       navigate('/login');
     } else {
       initSubscription();
-      fetchData();
       const interval = setInterval(() => {
         const { activeTab } = useOwnerStore.getState();
         if (['analytics', 'reservations'].includes(activeTab)) {
@@ -80,6 +79,10 @@ export default function OwnerDashboard() {
       return () => clearInterval(interval);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab, fetchData]);
 
   // Actions
   const handleLogout = () => {
