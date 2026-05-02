@@ -42,7 +42,7 @@ export default function OwnerDashboard() {
   const { 
     activeTab, setActiveTab, loading, formLoading, setFormLoading,
     subscriptionStatus, subscriptionPlan, daysRemaining, initSubscription,
-    fetchData, tables, reservations, inventory
+    fetchData, tables, reservations, inventory, menuCategories
   } = useOwnerStore();
 
   const [showAddModal, setShowAddModal] = useState<string | null>(null);
@@ -637,7 +637,7 @@ export default function OwnerDashboard() {
                           <label className="text-[12px] font-medium text-main">Category</label>
                           <select name="category_id" required className="form-input">
                             <option value="">Select...</option>
-                            {menuCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {menuCategories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                         </div>
                       </div>

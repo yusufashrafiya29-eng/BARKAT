@@ -51,6 +51,8 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
   tables: [],
   inventory: [],
   reservations: [],
+  inventoryVelocity: [],
+  staffPerformance: [],
   upiId: '',
   razorpayKeys: { razorpay_key_id: '', razorpay_key_secret: '' },
 
