@@ -209,7 +209,7 @@ export default function AnalyticsTab() {
                     paddingAngle={5}
                     dataKey="quantity"
                     nameKey="name"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
                     {inventoryVelocity.map((_, index) => (
