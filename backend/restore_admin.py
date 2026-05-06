@@ -25,11 +25,12 @@ def restore_superadmin():
             db.commit()
             print("Successfully created Super Admin!")
         else:
-            print(f"User {email} already exists. Setting role to SUPERADMIN...")
+            print(f"User {email} already exists. Setting role to SUPERADMIN and resetting password to 'admin123'...")
             admin.role = UserRole.SUPERADMIN
             admin.restaurant_id = None # Detach from any restaurant so it doesn't get deleted again
+            admin.password_hash = get_password_hash("admin123")
             db.commit()
-            print("Successfully restored Super Admin role!")
+            print("Successfully restored Super Admin role and reset password!")
             
     except Exception as e:
         print(f"Error restoring superadmin: {e}")
