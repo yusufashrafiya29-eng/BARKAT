@@ -36,7 +36,7 @@ const AnnouncementBanner: React.FC = () => {
 
   return (
     <div className="flex flex-col z-[90] relative shadow-md">
-      {announcements.map((ann, idx) => (
+      {announcements.map((ann) => (
         <div key={ann.id} className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-center gap-4 text-center border-b border-blue-700/50">
           <Megaphone size={18} className="shrink-0 text-blue-200" />
           <div>

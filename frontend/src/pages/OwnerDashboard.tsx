@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Loader2, LayoutGrid, Package, BarChart3,
-  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock, Heart
+  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock, Heart, Info
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
