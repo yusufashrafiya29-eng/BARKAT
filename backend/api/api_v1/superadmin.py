@@ -209,6 +209,23 @@ def get_all_users(
         ))
     return result
 
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if target_user.role == UserRole.SUPERADMIN and target_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own superadmin account")
+
+    db.delete(target_user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
 @router.delete("/restaurants/{restaurant_id}")
 def delete_restaurant(
     restaurant_id: str,

@@ -125,6 +125,19 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this user?")) {
+      return;
+    }
+    try {
+      await superadminApi.deleteUser(id);
+      toast.success('User deleted permanently');
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = '/login';
@@ -471,7 +484,7 @@ export default function SuperAdminDashboard() {
                         <td className="px-6 py-4 text-[12px] text-slate-500">
                           {new Date(u.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-6 py-4 text-right space-x-2">
                           {u.role !== 'SUPERADMIN' && (
                             <button 
                               onClick={() => handleImpersonate('user', u.id)}
@@ -481,6 +494,13 @@ export default function SuperAdminDashboard() {
                               <LogIn size={13}/> Login As
                             </button>
                           )}
+                          <button 
+                            onClick={() => handleDeleteUser(u.id)} 
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors inline-flex opacity-0 group-hover:opacity-100"
+                            title="Delete User"
+                          >
+                            <Trash2 size={16}/>
+                          </button>
                         </td>
                       </tr>
                     ))}

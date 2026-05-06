@@ -94,5 +94,10 @@ export const superadminApi = {
   impersonateUser: async (id: string) => {
     const response = await axios.post(`${BASE_URL}/superadmin/users/${id}/impersonate`, {}, getHeaders());
     return response.data;
+  },
+
+  deleteUser: async (id: string) => {
+    const response = await axios.delete(`${BASE_URL}/superadmin/users/${id}`, getHeaders());
+    return response.data;
   }
 };
