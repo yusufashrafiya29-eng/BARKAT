@@ -1,12 +1,12 @@
 import os
 from db.session import SessionLocal
 from models.user import User, UserRole
-from api.api_v1.auth import get_password_hash
+from api.api_v1.auth import _hash_password as get_password_hash
 
 def restore_superadmin():
     db = SessionLocal()
     try:
-        email = "myrestro@gmail.com"
+        email = "yusufashrafiya29@gmail.com"
         admin = db.query(User).filter(User.email == email).first()
         
         if not admin:
@@ -15,7 +15,7 @@ def restore_superadmin():
                 email=email,
                 full_name="Platform Admin",
                 role=UserRole.SUPERADMIN,
-                hashed_password=get_password_hash("admin123"),
+                password_hash=get_password_hash("admin123"),
                 is_active=True,
                 is_verified=True,
                 is_approved=True,
