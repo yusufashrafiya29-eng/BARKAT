@@ -219,9 +219,49 @@ def delete_restaurant(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
         
-    db.delete(restaurant)
-    db.commit()
-    return {"message": "Restaurant deleted successfully"}
+    try:
+        from models.table import Table
+        from models.menu import Category, MenuItem
+        from models.order import Order, OrderItem
+        from models.billing import Bill
+        from models.inventory import StockItem
+        from models.settings import RestaurantConfig
+        from models.cash_register import CashShift, CashTransaction
+        from models.ticket import Ticket
+        
+        # We need to manually delete related records since we don't have DB level cascades
+        # Delete related Order Items first
+        orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).all()
+        order_ids = [o.id for o in orders]
+        if order_ids:
+            db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+            
+        # Delete related Cash Transactions
+        shifts = db.query(CashShift).filter(CashShift.restaurant_id == restaurant_id).all()
+        shift_ids = [s.id for s in shifts]
+        if shift_ids:
+            db.query(CashTransaction).filter(CashTransaction.shift_id.in_(shift_ids)).delete(synchronize_session=False)
+
+        # Delete dependent tables directly
+        db.query(Bill).filter(Bill.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Order).filter(Order.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Category).filter(Category.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Table).filter(Table.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(StockItem).filter(StockItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(RestaurantConfig).filter(RestaurantConfig.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(CashShift).filter(CashShift.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Ticket).filter(Ticket.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        
+        # Finally delete users and restaurant
+        db.query(User).filter(User.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.delete(restaurant)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Cannot delete restaurant due to dependencies. Error: {str(e)}")
+
+    return {"message": "Restaurant and all its data deleted successfully"}
 
 @router.post("/restaurants/{restaurant_id}/impersonate", response_model=GenericResponse)
 def impersonate_restaurant_owner(
