@@ -12,3 +12,9 @@ class RestaurantConfig(Base):
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
     key = Column(String, index=True, nullable=False)
     value = Column(String, nullable=False)
+
+class PlatformConfig(Base):
+    __tablename__ = "platform_config"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String, nullable=False)
+    description = Column(String, nullable=True)

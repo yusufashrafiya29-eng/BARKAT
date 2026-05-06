@@ -39,5 +39,35 @@ export const authApi = {
       }
     });
     return response.data;
+  },
+  
+  getActiveAnnouncements: async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return [];
+    
+    // The endpoint is under /users, not /auth
+    const USERS_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1') + '/users';
+    try {
+      const response = await axios.get(`${USERS_URL}/announcements/active`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Failed to fetch announcements:", error);
+      return [];
+    }
+  },
+  
+  getPublicPlatformSettings: async () => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+    try {
+      const response = await axios.get(`${API_BASE}/platform-settings`);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to fetch platform settings:", error);
+      return [];
+    }
   }
 };

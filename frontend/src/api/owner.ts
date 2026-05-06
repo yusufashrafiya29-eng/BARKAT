@@ -186,5 +186,16 @@ export const ownerApi = {
   updateReservationStatus: async (resId: string, status: string, tableId?: string) => {
     const response = await axios.put(`${BASE_URL}/reservations/${resId}/status`, { status, table_id: tableId }, getHeaders());
     return response.data;
+  },
+
+  // Support Tickets
+  getTickets: async () => {
+    const response = await axios.get(`${BASE_URL}/users/tickets`, getHeaders());
+    return response.data;
+  },
+
+  createTicket: async (payload: { subject: string, description: string }) => {
+    const response = await axios.post(`${BASE_URL}/users/tickets`, payload, getHeaders());
+    return response.data;
   }
 };

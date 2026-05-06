@@ -1,9 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { UserCheck } from 'lucide-react';
 
 // Layout
 import AuthLayout from './components/AuthLayout';
 import PrivateRoute from './components/PrivateRoute';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 // Pages
 import Login from './pages/Login';
@@ -22,9 +24,41 @@ import PublicBooking from './pages/PublicBooking';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
+const ImpersonationBanner = () => {
+  const isImpersonating = !!localStorage.getItem('superadmin_token');
+  if (!isImpersonating) return null;
+
+  const handleReturn = () => {
+    const superadminToken = localStorage.getItem('superadmin_token');
+    if (superadminToken) {
+      localStorage.setItem('auth_token', superadminToken);
+      localStorage.setItem('userRole', 'SUPERADMIN');
+      localStorage.removeItem('superadmin_token');
+      window.location.href = '/superadmin';
+    }
+  };
+
+  return (
+    <div className="bg-rose-600 text-white px-4 py-2 flex items-center justify-center gap-6 z-[100] relative shadow-md">
+      <div className="flex items-center gap-2">
+        <UserCheck size={18} />
+        <span className="text-sm font-bold tracking-wide">You are currently impersonating an account. Actions taken will affect this user.</span>
+      </div>
+      <button 
+        onClick={handleReturn}
+        className="px-4 py-1.5 bg-white text-rose-700 text-xs font-black uppercase tracking-wider rounded-md hover:bg-rose-50 transition-colors shadow-sm"
+      >
+        Return to Super Admin
+      </button>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <ImpersonationBanner />
+      <AnnouncementBanner />
       <Routes>
         {/* Landing Page (Public) */}
         <Route path="/" element={<LandingPage />} />

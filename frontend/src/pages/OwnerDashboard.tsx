@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
+import { authApi } from '../api/auth';
 import { useOwnerStore } from '../store/ownerStore';
 
 import AnalyticsTab from '../components/owner-dashboard/AnalyticsTab';
@@ -17,6 +18,7 @@ import StaffTab from '../components/owner-dashboard/StaffTab';
 import ReportsTab from '../components/owner-dashboard/ReportsTab';
 import ReservationsTab from '../components/owner-dashboard/ReservationsTab';
 import SettingsTab from '../components/owner-dashboard/SettingsTab';
+import SupportTab from '../components/owner-dashboard/SupportTab';
 import CashRegisterTab from '../components/CashRegisterTab';
 import CustomersTab from '../components/owner-dashboard/CustomersTab';
 
@@ -35,7 +37,7 @@ interface MenuItem {
 
 
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -53,6 +55,7 @@ export default function OwnerDashboard() {
   const [menuAddType, setMenuAddType] = useState('item');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'basic' | 'pro' | 'max'>('pro');
+  const [platformConfig, setPlatformConfig] = useState<any[]>([]);
   const [editingRecipeItemId, setEditingRecipeItemId] = useState<string | null>(null);
   const [recipeIngredients, setRecipeIngredients] = useState<{stock_item_id: string, quantity: number, unit: string}[]>([]);
 
@@ -70,6 +73,7 @@ export default function OwnerDashboard() {
       navigate('/login');
     } else {
       initSubscription();
+      authApi.getPublicPlatformSettings().then(setPlatformConfig).catch(console.error);
       const interval = setInterval(() => {
         const { activeTab } = useOwnerStore.getState();
         if (['analytics', 'reservations'].includes(activeTab)) {
@@ -280,6 +284,7 @@ export default function OwnerDashboard() {
             { id: 'staff', label: 'Staff Roster', icon: Users },
             { id: 'inventory', label: 'Inventory', icon: ShoppingBag },
             { id: 'settings', label: 'Settings', icon: CreditCard },
+            { id: 'support', label: 'Help & Support', icon: Info },
           ].map(tab => (
             <button
               key={tab.id}
@@ -430,6 +435,7 @@ export default function OwnerDashboard() {
               {activeTab === 'reservations' && <ReservationsTab setShowAddModal={setShowAddModal} />}
               {activeTab === 'crm' && <CustomersTab />}
               {activeTab === 'settings' && <SettingsTab />}
+              {activeTab === 'support' && <SupportTab />}
             </div>
           )}
         </div>
@@ -905,7 +911,7 @@ export default function OwnerDashboard() {
                   className={`rounded-2xl border-2 p-2.5 text-center transition-all ${selectedUpgradePlan === 'basic' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-100 bg-slate-50 hover:border-indigo-200'}`}
                 >
                   <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest mb-1">Basic</p>
-                  <p className="text-[20px] font-black text-slate-900 leading-none">₹499</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹{platformConfig.find(c => c.key === 'basic_plan_price')?.value || '499'}</p>
                   <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
                 </button>
                 {/* Pro */}
@@ -915,7 +921,7 @@ export default function OwnerDashboard() {
                 >
                   <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-bl-lg uppercase tracking-wider">POPULAR</div>
                   <p className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-widest mb-1">Pro</p>
-                  <p className="text-[20px] font-black text-slate-900 leading-none">₹999</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹{platformConfig.find(c => c.key === 'pro_plan_price')?.value || '999'}</p>
                   <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
                 </button>
                 {/* Max */}
@@ -924,7 +930,7 @@ export default function OwnerDashboard() {
                   className={`rounded-2xl border-2 p-2.5 text-center transition-all ${selectedUpgradePlan === 'max' ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : 'border-slate-100 bg-slate-50 hover:border-purple-200'}`}
                 >
                   <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-widest mb-1">Max</p>
-                  <p className="text-[20px] font-black text-slate-900 leading-none">₹1399</p>
+                  <p className="text-[20px] font-black text-slate-900 leading-none">₹{platformConfig.find(c => c.key === 'max_plan_price')?.value || '1399'}</p>
                   <p className="text-[9px] text-slate-500 mt-1">/ mo</p>
                 </button>
               </div>
@@ -954,13 +960,13 @@ export default function OwnerDashboard() {
                 <p className="text-[12px] font-bold text-slate-800 mb-3">Scan to Pay via UPI</p>
                 <div className="inline-block p-2 bg-white border border-slate-200 rounded-xl mb-3 shadow-sm">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=9979114665@kotak811&pn=MyRestro&am=${selectedUpgradePlan === 'basic' ? '499' : selectedUpgradePlan === 'pro' ? '999' : '1399'}&cu=INR`)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${platformConfig.find(c => c.key === 'platform_upi_id')?.value || '9979114665@kotak811'}&pn=MyRestro&am=${selectedUpgradePlan === 'basic' ? platformConfig.find(c => c.key === 'basic_plan_price')?.value || '499' : selectedUpgradePlan === 'pro' ? platformConfig.find(c => c.key === 'pro_plan_price')?.value || '999' : platformConfig.find(c => c.key === 'max_plan_price')?.value || '1399'}&cu=INR`)}`}
                     alt="UPI QR"
                     className="w-32 h-32"
                   />
                 </div>
-                <p className="text-[11px] text-slate-500">Amount: <strong className="text-slate-800">₹{selectedUpgradePlan === 'basic' ? '499' : selectedUpgradePlan === 'pro' ? '999' : '1399'}</strong></p>
-                <p className="text-[11px] text-slate-500 mt-1">UPI ID: <strong>9979114665@kotak811</strong></p>
+                <p className="text-[11px] text-slate-500">Amount: <strong className="text-slate-800">₹{selectedUpgradePlan === 'basic' ? platformConfig.find(c => c.key === 'basic_plan_price')?.value || '499' : selectedUpgradePlan === 'pro' ? platformConfig.find(c => c.key === 'pro_plan_price')?.value || '999' : platformConfig.find(c => c.key === 'max_plan_price')?.value || '1399'}</strong></p>
+                <p className="text-[11px] text-slate-500 mt-1">UPI ID: <strong>{platformConfig.find(c => c.key === 'platform_upi_id')?.value || '9979114665@kotak811'}</strong></p>
               </div>
 
               {/* WhatsApp CTA */}

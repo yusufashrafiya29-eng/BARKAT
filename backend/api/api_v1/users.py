@@ -5,6 +5,10 @@ from uuid import UUID
 from api.deps import get_db, get_current_user_token, get_current_restaurant
 from schemas.user import UserRead
 from models.user import User, UserRole
+from models.announcement import Announcement
+from schemas.superadmin import AnnouncementResponse
+from schemas.ticket import TicketCreate, TicketResponse
+from models.ticket import Ticket
 
 router = APIRouter()
 
@@ -141,3 +145,47 @@ def update_staff_role(
     db.commit()
     db.refresh(user)
     return user
+
+@router.get("/announcements/active", response_model=List[AnnouncementResponse])
+def get_active_announcements(
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token)
+):
+    """Fetch active announcements for the current user's role."""
+    role = token.get("role", "")
+    
+    # Target either 'ALL' or specifically the user's role (e.g. 'OWNER')
+    return db.query(Announcement).filter(
+        Announcement.is_active == True,
+        Announcement.target_role.in_(["ALL", role])
+    ).order_by(Announcement.created_at.desc()).all()
+
+@router.get("/tickets", response_model=List[TicketResponse])
+def get_restaurant_tickets(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Get all tickets created by this restaurant."""
+    return db.query(Ticket).filter(Ticket.restaurant_id == restaurant_id).order_by(Ticket.created_at.desc()).all()
+
+@router.post("/tickets", response_model=TicketResponse)
+def create_ticket(
+    ticket_in: TicketCreate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Create a new support ticket."""
+    user_id = UUID(token.get("sub"))
+    
+    ticket = Ticket(
+        restaurant_id=restaurant_id,
+        opened_by_id=user_id,
+        subject=ticket_in.subject,
+        description=ticket_in.description,
+        status="OPEN"
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket

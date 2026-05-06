@@ -22,8 +22,48 @@ export const superadminApi = {
     return response.data;
   },
 
+  getFinancials: async () => {
+    const response = await axios.get(`${BASE_URL}/superadmin/financials`, getHeaders());
+    return response.data;
+  },
+
+  getAnnouncements: async () => {
+    const response = await axios.get(`${BASE_URL}/superadmin/announcements`, getHeaders());
+    return response.data;
+  },
+
+  createAnnouncement: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/superadmin/announcements`, data, getHeaders());
+    return response.data;
+  },
+
+  deleteAnnouncement: async (id: string) => {
+    const response = await axios.delete(`${BASE_URL}/superadmin/announcements/${id}`, getHeaders());
+    return response.data;
+  },
+
+  getPlatformSettings: async () => {
+    const response = await axios.get(`${BASE_URL}/superadmin/platform-settings`, getHeaders());
+    return response.data;
+  },
+
+  updatePlatformSettings: async (data: {key: string, value: string}[]) => {
+    const response = await axios.put(`${BASE_URL}/superadmin/platform-settings`, data, getHeaders());
+    return response.data;
+  },
+
   getUsers: async () => {
     const response = await axios.get(`${BASE_URL}/superadmin/users`, getHeaders());
+    return response.data;
+  },
+
+  getTickets: async () => {
+    const response = await axios.get(`${BASE_URL}/superadmin/tickets`, getHeaders());
+    return response.data;
+  },
+
+  updateTicketStatus: async (ticketId: string, status: string, notes?: string) => {
+    const response = await axios.put(`${BASE_URL}/superadmin/tickets/${ticketId}`, { status, resolution_notes: notes }, getHeaders());
     return response.data;
   },
 
@@ -43,6 +83,16 @@ export const superadminApi = {
 
   deleteRestaurant: async (id: string) => {
     const response = await axios.delete(`${BASE_URL}/superadmin/restaurants/${id}`, getHeaders());
+    return response.data;
+  },
+
+  impersonateRestaurant: async (id: string) => {
+    const response = await axios.post(`${BASE_URL}/superadmin/restaurants/${id}/impersonate`, {}, getHeaders());
+    return response.data;
+  },
+
+  impersonateUser: async (id: string) => {
+    const response = await axios.post(`${BASE_URL}/superadmin/users/${id}/impersonate`, {}, getHeaders());
     return response.data;
   }
 };

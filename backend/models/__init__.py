@@ -10,3 +10,5 @@ from .otp import OTP
 from .settings import RestaurantConfig
 from .restaurant import Restaurant
 from .cash_register import CashShift, CashTransaction
+from .announcement import Announcement
+from .ticket import Ticket
