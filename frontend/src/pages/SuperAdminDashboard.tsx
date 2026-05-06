@@ -462,7 +462,7 @@ export default function SuperAdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {users.map(u => (
-                      <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={u.id} className="hover:bg-slate-50 transition-colors group">
                         <td className="px-6 py-4">
                           <p className="font-bold text-slate-900 text-[14px]">{u.full_name || 'N/A'}</p>
                           <p className="text-slate-500 text-[12px]">{u.email}</p>
