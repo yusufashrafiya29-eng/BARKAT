@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
+from uuid import UUID
 
 from api.deps import get_db, get_current_user
 from models.user import User, UserRole
