@@ -9,6 +9,8 @@ import {
 import { customerApi } from '../api/customer';
 import toast from 'react-hot-toast';
 
+const ModelViewer = 'model-viewer' as any;
+
 interface MenuItem {
   id: string;
   name: string;
@@ -736,7 +738,7 @@ const CustomerMenu: React.FC = () => {
           </button>
           
           <div className="w-full h-full max-w-lg mx-auto relative flex flex-col items-center justify-center">
-            <model-viewer
+            <ModelViewer
               src={arModelUrl}
               ar
               ar-modes="webxr scene-viewer quick-look"
@@ -750,7 +752,7 @@ const CustomerMenu: React.FC = () => {
               <div slot="poster" className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
               </div>
-            </model-viewer>
+            </ModelViewer>
             
             <div className="absolute bottom-10 left-0 w-full text-center px-6">
               <p className="text-white/70 text-sm mb-4">Swipe to rotate. Pinch to zoom.</p>
