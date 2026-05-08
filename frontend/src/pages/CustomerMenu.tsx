@@ -741,7 +741,8 @@ const CustomerMenu: React.FC = () => {
             <ModelViewer
               src={arModelUrl}
               ar
-              ar-modes="webxr scene-viewer quick-look"
+              ar-modes="scene-viewer quick-look webxr"
+              ar-placement="floor"
               camera-controls
               auto-rotate
               shadow-intensity="1"
