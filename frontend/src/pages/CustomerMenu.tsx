@@ -6,13 +6,6 @@ import {
   Receipt, QrCode, X, Loader2, Zap, Sparkles, Box
 } from 'lucide-react';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'model-viewer': any;
-    }
-  }
-}
 import { customerApi } from '../api/customer';
 import toast from 'react-hot-toast';
 
