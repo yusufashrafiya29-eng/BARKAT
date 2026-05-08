@@ -3,8 +3,16 @@ import { useParams } from 'react-router-dom';
 import { 
   UtensilsCrossed, Plus, Minus, 
   ShoppingCart, AlertCircle, CheckCircle2, ChevronRight,
-  Receipt, QrCode, X, Loader2, Zap, Sparkles
+  Receipt, QrCode, X, Loader2, Zap, Sparkles, Box
 } from 'lucide-react';
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'model-viewer': any;
+    }
+  }
+}
 import { customerApi } from '../api/customer';
 import toast from 'react-hot-toast';
 
@@ -17,6 +25,7 @@ interface MenuItem {
   is_veg: boolean;
   is_available: boolean;
   image_url?: string;
+  model_3d_url?: string;
 }
 
 interface Category {
@@ -68,6 +77,7 @@ const CustomerMenu: React.FC = () => {
   const [showUpsell, setShowUpsell] = useState<MenuItem | null>(null);
 
   const [customerView, setCustomerView] = useState<'menu' | 'bill'>('menu');
+  const [arModelUrl, setArModelUrl] = useState<string | null>(null);
   const [tableOrders, setTableOrders] = useState<Order[]>([]);
   const [showPaymentQR, setShowPaymentQR] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -415,6 +425,15 @@ const CustomerMenu: React.FC = () => {
                                  ) : (
                                    <span className="text-slate-300 font-bold text-4xl">{item.name.charAt(0)}</span>
                                  )}
+                                 {item.model_3d_url && (
+                                    <button 
+                                      onClick={() => setArModelUrl(item.model_3d_url || null)}
+                                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm shadow-lg border border-white/20 animate-pulse hover:bg-black/80"
+                                      title="View in AR"
+                                    >
+                                      <Box size={14} className="text-emerald-400" />
+                                    </button>
+                                 )}
                               </div>
                               
                               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-[85%] z-10 shadow-lg rounded-xl">
@@ -707,6 +726,49 @@ const CustomerMenu: React.FC = () => {
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200"
               >
                 Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AR Model Viewer Modal */}
+      {arModelUrl && (
+        <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
+          <button 
+            onClick={() => setArModelUrl(null)}
+            className="absolute top-6 right-6 text-white/50 hover:text-white bg-white/10 p-2 rounded-full z-10"
+          >
+            <X size={24} />
+          </button>
+          
+          <div className="w-full h-full max-w-lg mx-auto relative flex flex-col items-center justify-center">
+            <model-viewer
+              src={arModelUrl}
+              ar
+              ar-modes="webxr scene-viewer quick-look"
+              camera-controls
+              auto-rotate
+              shadow-intensity="1"
+              environment-image="neutral"
+              exposure="1"
+              style={{ width: '100%', height: '70vh' }}
+            >
+              <div slot="poster" className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
+              </div>
+            </model-viewer>
+            
+            <div className="absolute bottom-10 left-0 w-full text-center px-6">
+              <p className="text-white/70 text-sm mb-4">Swipe to rotate. Pinch to zoom.</p>
+              <button 
+                onClick={() => {
+                   const mv = document.querySelector('model-viewer') as any;
+                   if (mv && mv.activateAR) mv.activateAR();
+                }}
+                className="bg-white text-black font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center gap-2 mx-auto transition-transform active:scale-95"
+              >
+                <Box size={18} /> View on your table
               </button>
             </div>
           </div>

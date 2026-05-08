@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ImagePlus, Loader2, FileText, Trash2 } from 'lucide-react';
+import { ImagePlus, Loader2, FileText, Trash2, Box } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
@@ -7,6 +7,46 @@ import { useOwnerStore } from '../../store/ownerStore';
 export default function MenuTab({ handleOpenRecipeEditor }: { handleOpenRecipeEditor: (item: any) => void }) {
   const { menuCategories, fetchData } = useOwnerStore();
   const [isUploadingImage, setIsUploadingImage] = useState<Record<string, boolean>>({});
+  const [isGenerating3D, setIsGenerating3D] = useState<Record<string, boolean>>({});
+
+  const handleGenerate3D = async (item: any) => {
+    if (!item.image_url) {
+      toast.error("Please upload an image first");
+      return;
+    }
+    
+    setIsGenerating3D(prev => ({ ...prev, [item.id]: true }));
+    try {
+      if (!item.model_3d_task_id) {
+        await ownerApi.generate3DModel(item.id);
+        toast.success("AI 3D Generation started! This takes about 30 seconds.");
+      } else {
+        toast.success("Resuming 3D generation check...");
+      }
+      
+      const interval = setInterval(async () => {
+        try {
+          const res = await ownerApi.check3DModelStatus(item.id);
+          if (res.status === 'success') {
+            clearInterval(interval);
+            setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
+            toast.success(`3D Model for ${item.name} is ready!`);
+            fetchData();
+          } else if (res.status === 'failed') {
+            clearInterval(interval);
+            setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
+            toast.error(`Failed to generate 3D model for ${item.name}`);
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 5000);
+      
+    } catch (e: any) {
+      setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
+      toast.error(e.response?.data?.detail || "Failed to start generation");
+    }
+  };
 
   const handleImageUpload = async (itemId: string, file: File) => {
     if (!file) return;
@@ -111,6 +151,21 @@ export default function MenuTab({ handleOpenRecipeEditor }: { handleOpenRecipeEd
                     >
                       <FileText size={14} />
                     </button>
+                    {item.image_url && !item.model_3d_url && (
+                      <button 
+                        onClick={() => handleGenerate3D(item)}
+                        disabled={isGenerating3D[item.id] || !!item.model_3d_task_id}
+                        className={`text-muted transition-colors p-1 rounded ${isGenerating3D[item.id] || item.model_3d_task_id ? 'text-indigo-500 animate-pulse bg-indigo-50' : 'hover:text-indigo-500 hover:bg-indigo-50'}`}
+                        title="Generate 3D AR Model"
+                      >
+                        <Box size={14} />
+                      </button>
+                    )}
+                    {item.model_3d_url && (
+                      <div className="text-emerald-500 p-1 bg-emerald-50 rounded" title="3D AR Active">
+                        <Box size={14} />
+                      </div>
+                    )}
                     <button 
                       onClick={() => handleDeleteMenuItem(item.id, item.name)}
                       className="text-muted hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-50"

@@ -154,3 +154,60 @@ def update_menu_item_recipe(
         db.refresh(ing)
         
     return new_ingredients
+
+from services import tripo_service
+
+@router.post("/items/{item_id}/generate-3d")
+def generate_3d_model(
+    item_id: str,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Trigger Tripo3D API to generate a 3D model for this menu item."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if not item.image_url:
+        raise HTTPException(status_code=400, detail="Menu item must have an image_url to generate a 3D model")
+        
+    try:
+        task_id = tripo_service.generate_3d_model_task(item.image_url)
+        item.model_3d_task_id = task_id
+        db.commit()
+        return {"message": "3D generation started", "task_id": task_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/items/{item_id}/3d-status")
+def check_3d_model_status(
+    item_id: str,
+    db: Session = Depends(get_db)
+):
+    """Check the status of 3D model generation and update DB if complete."""
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if item.model_3d_url:
+        return {"status": "success", "model_url": item.model_3d_url}
+        
+    if not item.model_3d_task_id:
+        return {"status": "none", "message": "No 3D generation task found"}
+        
+    try:
+        status_info = tripo_service.check_3d_model_status(item.model_3d_task_id)
+        if status_info["status"] == "success" and status_info["model_url"]:
+            item.model_3d_url = status_info["model_url"]
+            item.model_3d_task_id = None # Clear task id
+            db.commit()
+            
+        return status_info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

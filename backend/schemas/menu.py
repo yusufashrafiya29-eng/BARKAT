@@ -11,6 +11,8 @@ class MenuItemBase(BaseModel):
     preparation_time: Optional[int] = None
     image_url: Optional[str] = None
     tax_rate: float = 5.0
+    model_3d_url: Optional[str] = None
+    model_3d_task_id: Optional[str] = None
 
 class MenuItemCreate(MenuItemBase):
     category_id: UUID
@@ -47,6 +49,8 @@ class MenuItemUpdate(BaseModel):
     preparation_time: Optional[int] = None
     image_url: Optional[str] = None
     tax_rate: Optional[float] = None
+    model_3d_url: Optional[str] = None
+    model_3d_task_id: Optional[str] = None
 
 class CategoryBase(BaseModel):
     name: str

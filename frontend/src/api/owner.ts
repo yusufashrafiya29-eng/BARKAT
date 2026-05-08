@@ -197,5 +197,16 @@ export const ownerApi = {
   createTicket: async (payload: { subject: string, description: string }) => {
     const response = await axios.post(`${BASE_URL}/users/tickets`, payload, getHeaders());
     return response.data;
+  },
+
+  // 3D AR Methods
+  generate3DModel: async (itemId: string) => {
+    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/generate-3d`, {}, getHeaders());
+    return response.data;
+  },
+
+  check3DModelStatus: async (itemId: string) => {
+    const response = await axios.get(`${BASE_URL}/menu/items/${itemId}/3d-status`, getHeaders());
+    return response.data;
   }
 };

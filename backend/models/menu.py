@@ -50,6 +50,8 @@ class MenuItem(Base):
     is_deleted = Column(Boolean, default=False)
     preparation_time = Column(Integer, nullable=True) # minutes
     image_url = Column(String, nullable=True)
+    model_3d_url = Column(String, nullable=True)
+    model_3d_task_id = Column(String, nullable=True)
 
     # Relationships
     category = relationship("Category", back_populates="menu_items")
