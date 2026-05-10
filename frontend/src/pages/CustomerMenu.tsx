@@ -864,6 +864,7 @@ const CustomerMenu: React.FC = () => {
               src={arModelUrl}
               ar
               ar-modes="scene-viewer quick-look webxr"
+              ar-scale="auto"
               ar-placement="floor"
               camera-controls
               auto-rotate
