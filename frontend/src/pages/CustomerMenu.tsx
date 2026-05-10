@@ -864,14 +864,12 @@ const CustomerMenu: React.FC = () => {
               src={arModelUrl}
               ar
               ar-modes="scene-viewer quick-look webxr"
-              ar-scale="auto"
               ar-placement="floor"
               camera-controls
               auto-rotate
               shadow-intensity="1"
               environment-image="neutral"
               exposure="1"
-              crossorigin="anonymous"
               style={{ width: '100%', height: '70vh' }}
             >
               <div slot="poster" className="absolute inset-0 flex items-center justify-center">
