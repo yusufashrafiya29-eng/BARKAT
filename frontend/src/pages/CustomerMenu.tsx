@@ -82,6 +82,41 @@ const CustomerMenu: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRazorpayVerifying, setIsRazorpayVerifying] = useState(false);
 
+  // Generic close function for modals/views to handle browser history correctly
+  const closeActiveModal = () => {
+    if (window.history.state?.modalOpen) {
+      window.history.back(); // Triggers popstate
+    } else {
+      setSelectedItem(null);
+      setArModelUrl(null);
+      setShowPaymentQR(false);
+      setShowUpsell(null);
+      if (customerView === 'bill') setCustomerView('menu');
+    }
+  };
+
+  // Hardware back button handler for PWA / Mobile Browser
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (selectedItem || arModelUrl || showPaymentQR || showUpsell || customerView === 'bill') {
+        setSelectedItem(null);
+        setArModelUrl(null);
+        setShowPaymentQR(false);
+        setShowUpsell(null);
+        setCustomerView('menu');
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedItem, arModelUrl, showPaymentQR, showUpsell, customerView]);
+
+  useEffect(() => {
+    if (selectedItem || arModelUrl || showPaymentQR || showUpsell || customerView === 'bill') {
+      window.history.pushState({ modalOpen: true }, '');
+    }
+  }, [selectedItem, arModelUrl, showPaymentQR, showUpsell, customerView]);
+
   useEffect(() => {
     if (!tableId) {
       setErrorHeader("Invalid Table QR Code");
@@ -658,14 +693,14 @@ const CustomerMenu: React.FC = () => {
       <div className="fixed bottom-0 left-0 w-full h-[70px] bg-[#0f0f11]/95 backdrop-blur-md border-t border-white/5 z-50 px-5 flex pb-safe">
         <div className="max-w-md w-full mx-auto flex items-center justify-around h-full">
           <button 
-            onClick={() => setCustomerView('menu')}
+            onClick={() => { if (customerView !== 'menu') closeActiveModal(); }}
             className={`flex flex-col items-center justify-center gap-1.5 w-16 transition-colors ${customerView === 'menu' ? 'text-[#e6c27a]' : 'text-gray-500 hover:text-white'}`}
           >
             <UtensilsCrossed size={20} strokeWidth={customerView === 'menu' ? 2.5 : 2} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Menu</span>
           </button>
           <button 
-            onClick={() => setCustomerView('bill')}
+            onClick={() => { if (customerView !== 'bill') setCustomerView('bill'); }}
             className={`flex flex-col items-center justify-center gap-1.5 w-16 transition-colors relative ${customerView === 'bill' ? 'text-[#e6c27a]' : 'text-gray-500 hover:text-white'}`}
           >
             {tableOrders.length > 0 && <span className="absolute top-0 right-2 w-2 h-2 bg-[#e6c27a] rounded-full animate-pulse border border-[#0f0f11]"></span>}
@@ -680,7 +715,7 @@ const CustomerMenu: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-sm w-full relative animate-in zoom-in-95 duration-200">
             <button 
-              onClick={() => { setShowPaymentQR(false); setIsVerifying(false); }}
+              onClick={closeActiveModal}
               className="absolute top-4 right-4 text-slate-500 hover:text-slate-800"
             >
               <X size={18} />
@@ -748,18 +783,18 @@ const CustomerMenu: React.FC = () => {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-emerald-500"></div>
-            <button onClick={() => setShowUpsell(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={16} /></button>
+            <button onClick={closeActiveModal} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={16} /></button>
             <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-indigo-100">
               <Sparkles size={24} className="text-indigo-600" />
             </div>
             <h3 className="text-[18px] font-bold text-slate-800 mb-2">Want to add {showUpsell.name}?</h3>
             <p className="text-[13px] text-slate-500 mb-6">Complete your meal for just ₹{showUpsell.price} more!</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowUpsell(null)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">No, thanks</button>
+              <button onClick={closeActiveModal} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">No, thanks</button>
               <button 
                 onClick={() => {
                   addToCart(showUpsell, true);
-                  setShowUpsell(null);
+                  closeActiveModal();
                 }} 
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200"
               >
@@ -772,14 +807,21 @@ const CustomerMenu: React.FC = () => {
 
       {/* Item Detail Bottom Sheet */}
       {selectedItem && (
-        <div className="fixed inset-0 z-[115] flex flex-col justify-end bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setSelectedItem(null)}>
+        <div className="fixed inset-0 z-[115] flex flex-col justify-end bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" onClick={closeActiveModal}>
           <div 
             className="bg-[#0f0f11] w-full max-h-[90vh] rounded-t-[2rem] border-t border-white/10 flex flex-col animate-in slide-in-from-bottom-full duration-300 relative overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* Dragger */}
-            <div className="w-full flex justify-center py-4">
+            {/* Dragger and Close Button */}
+            <div className="w-full flex justify-between items-center px-6 py-4">
+               <div className="w-8"></div> {/* Spacer for centering dragger */}
                <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+               <button 
+                 onClick={closeActiveModal}
+                 className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white/50 hover:text-white"
+               >
+                 <X size={16} />
+               </button>
             </div>
             
             <div className="px-6 pb-6 overflow-y-auto scrollbar-hide">
@@ -836,7 +878,7 @@ const CustomerMenu: React.FC = () => {
                  <button 
                    onClick={() => {
                      addToCart(selectedItem);
-                     setSelectedItem(null);
+                     closeActiveModal();
                    }}
                    disabled={!selectedItem.is_available}
                    className="w-full py-4 rounded-full bg-[#e6c27a] text-black font-bold text-[14px] active:scale-95 transition-transform disabled:opacity-50 disabled:bg-gray-500"
@@ -853,7 +895,7 @@ const CustomerMenu: React.FC = () => {
       {arModelUrl && (
         <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
           <button 
-            onClick={() => setArModelUrl(null)}
+            onClick={closeActiveModal}
             className="absolute top-6 right-6 text-white/50 hover:text-white bg-white/10 p-2 rounded-full z-10"
           >
             <X size={24} />
