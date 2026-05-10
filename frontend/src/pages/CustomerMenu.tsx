@@ -97,7 +97,7 @@ const CustomerMenu: React.FC = () => {
 
   // Hardware back button handler for PWA / Mobile Browser
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       if (selectedItem || arModelUrl || showPaymentQR || showUpsell || customerView === 'bill') {
         setSelectedItem(null);
         setArModelUrl(null);
