@@ -170,7 +170,13 @@ export default function WaiterDashboard() {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
     try {
-      await waiterApi.confirmPayment(checkoutOrder.id, paymentMethod === 'CASH' ? undefined : `TRX-${Date.now()}`);
+      const amountToPay = billDetails.total_amount - (billDetails.amount_paid || 0);
+      await waiterApi.confirmPayment(
+        checkoutOrder.id, 
+        amountToPay, 
+        paymentMethod, 
+        paymentMethod === 'CASH' ? undefined : `TRX-${Date.now()}`
+      );
       toast.success('✅ Payment confirmed! Table cleared.');
       setCheckoutModalOpen(false); setCheckoutOrder(null); setBillDetails(null);
       fetchInitialData();

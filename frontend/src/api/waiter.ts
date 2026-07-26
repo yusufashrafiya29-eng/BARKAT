@@ -86,9 +86,11 @@ export const waiterApi = {
     return response.data;
   },
 
-  confirmPayment: async (orderId: string, transactionId?: string) => {
+  confirmPayment: async (orderId: string, amount: number, paymentMethod: string, transactionReference?: string) => {
     const response = await axios.put(`${BASE_URL}/billing/${orderId}/confirm`, {
-      transaction_id: transactionId || null
+      amount: amount,
+      payment_method: paymentMethod,
+      transaction_reference: transactionReference || null
     }, getHeaders());
     return response.data;
   },

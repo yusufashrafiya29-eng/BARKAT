@@ -52,10 +52,14 @@ const Dashboard: React.FC = () => {
           const subEndsAt = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
           const now = new Date();
 
-          const isExpired =
-            (status === 'trial' && trialEndsAt && trialEndsAt < now) ||
-            (status === 'expired') ||
-            (status === 'active' && subEndsAt && subEndsAt < now);
+          let isExpired = false;
+          if (status === 'trial') {
+            isExpired = trialEndsAt ? (trialEndsAt < now) : false;
+          } else if (status === 'expired') {
+            isExpired = true;
+          } else if (status === 'active') {
+            isExpired = subEndsAt ? (subEndsAt < now) : false;
+          }
 
           if (isExpired) {
             navigate('/subscription-expired');

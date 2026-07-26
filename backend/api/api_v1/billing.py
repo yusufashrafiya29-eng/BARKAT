@@ -36,4 +36,4 @@ def apply_payment_confirmation(
     token: dict = Depends(get_current_user_token),
     restaurant_id: UUID = Depends(get_current_restaurant)
 ):
-    return billing_service.confirm_payment(db, order_id, confirmation.transaction_id, str(restaurant_id))
+    return billing_service.confirm_payment(db, order_id, confirmation, str(restaurant_id))

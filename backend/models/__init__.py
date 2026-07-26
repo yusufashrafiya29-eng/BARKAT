@@ -3,7 +3,7 @@ from .user import User, UserRole
 from .table import Table
 from .menu import Category, MenuItem
 from .order import Order, OrderItem, OrderStatus
-from .billing import Bill
+from .billing import Bill, PaymentTransaction
 from .inventory import StockItem
 from .notification import NotificationLog
 from .otp import OTP

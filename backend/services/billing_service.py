@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
 from models.order import Order
-from models.billing import Bill, PaymentStatus
-from schemas.billing import BillCreate
+from models.billing import Bill, PaymentStatus, PaymentTransaction
+from schemas.billing import BillCreate, PaymentConfirmation
 
 def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_id: str) -> Bill:
     existing = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
@@ -37,20 +37,34 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_i
     db.refresh(new_bill)
     return new_bill
 
-def confirm_payment(db: Session, order_id: UUID, transaction_id: str = None, restaurant_id: str = None) -> Bill:
+def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, restaurant_id: str) -> Bill:
     bill = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found for this order. Generate bill first.")
         
-    bill.status = PaymentStatus.COMPLETED
-    if transaction_id:
-        bill.transaction_id = transaction_id
+    if bill.status == PaymentStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Bill is already fully paid.")
         
-    order = db.query(Order).filter(Order.id == order_id).first()
-    if order and order.payment_status != 'PAID':
-        from services.order_service import update_payment_status
-        update_payment_status(db, order_id, "PAID", restaurant_id)
+    txn = PaymentTransaction(
+        bill_id=bill.id,
+        restaurant_id=restaurant_id,
+        amount=payload.amount,
+        payment_method=payload.payment_method,
+        transaction_reference=payload.transaction_reference,
+        status="COMPLETED"
+    )
+    db.add(txn)
+    
+    bill.amount_paid = (bill.amount_paid or 0.0) + payload.amount
+    
+    if (bill.amount_paid or 0.0) >= (bill.total_amount or 0.0):
+        bill.status = PaymentStatus.COMPLETED
         
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if order and order.payment_status != 'PAID':
+            from services.order_service import update_payment_status
+            update_payment_status(db, order_id, "PAID", restaurant_id)
+            
     db.commit()
     db.refresh(bill)
     return bill
