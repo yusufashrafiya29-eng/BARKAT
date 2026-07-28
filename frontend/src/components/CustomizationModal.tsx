@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -105,6 +105,10 @@ export default function CustomizationModal({ item, onClose, onAddToCart }: Custo
                   return (
                     <label 
                       key={mod.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleToggleModifier(group, mod);
+                      }}
                       className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${
                         isSelected 
                           ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10' 
