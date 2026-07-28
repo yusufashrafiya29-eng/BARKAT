@@ -11,11 +11,13 @@ interface OrderItem {
   quantity: number;
   notes?: string;
   status: string;
+  is_parcel?: boolean;
 }
 
 interface Order {
   id: string;
-  table_id: string;
+  table_id: string | null;
+  order_type?: string;
   status: string;
   items: OrderItem[];
   created_at: string;
@@ -179,7 +181,7 @@ export default function KitchenKDS() {
                 className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-[15px]"
                 style={{ background: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}30` }}
               >
-                T{tableMap[order.table_id] ?? '?'}
+                {order.order_type === 'TAKEAWAY' ? 'PKG' : `T${tableMap[order.table_id || ''] ?? '?'}`}
               </div>
               <div>
                 <p className="text-[14px] font-bold text-white tracking-tight">#{order.id.slice(0, 5)}</p>
@@ -206,7 +208,14 @@ export default function KitchenKDS() {
               <div key={idx} className="flex gap-3 py-1.5 border-b border-white/5 last:border-0 items-start">
                 <span className="text-white font-bold text-[13px] min-w-[28px]">{item.quantity}×</span>
                 <div className="flex-1">
-                  <p className="text-[13px] text-slate-300">{menuMap[item.menu_item_id] || 'Item'}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[13px] text-slate-300">{menuMap[item.menu_item_id] || 'Item'}</p>
+                    {item.is_parcel && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        PARCEL
+                      </span>
+                    )}
+                  </div>
                   {item.notes && (
                     <p className="text-[11px] text-amber-400 mt-0.5 flex items-start gap-1">
                       <AlertCircle size={10} className="mt-[2px] shrink-0" />

@@ -35,6 +35,7 @@ interface CartItem extends MenuItem {
   cartItemId: string;
   quantity: number;
   notes: string;
+  is_parcel?: boolean;
   modifiers?: any[];
 }
 
@@ -43,6 +44,7 @@ interface OrderItem {
   quantity: number;
   price_at_order_time: number;
   notes?: string;
+  is_parcel?: boolean;
   modifiers?: any[];
   menu_item?: { name: string; price: number };
 }
@@ -50,6 +52,7 @@ interface OrderItem {
 interface Order {
   id: string;
   status: string;
+  order_type?: string;
   payment_status: 'PENDING' | 'PAID' | 'VERIFYING' | 'FAILED';
   subtotal_amount: number;
   tax_amount: number;

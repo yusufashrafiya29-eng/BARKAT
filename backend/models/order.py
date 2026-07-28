@@ -19,7 +19,8 @@ class Order(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
-    table_id = Column(UUID(as_uuid=True), ForeignKey("tables.id"), nullable=False)
+    table_id = Column(UUID(as_uuid=True), ForeignKey("tables.id"), nullable=True)
+    order_type = Column(String, default="DINE_IN", nullable=False)
     
     # Waiter tracking
     waiter_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -65,6 +66,7 @@ class OrderItem(Base):
     subtotal = Column(Float, nullable=False) # Extracted via Service logic
     notes = Column(String, nullable=True)
     status = Column(String, default="PENDING", nullable=False) # PENDING, PREPARING, READY
+    is_parcel = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     order = relationship("Order", back_populates="items")

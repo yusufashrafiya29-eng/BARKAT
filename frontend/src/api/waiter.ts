@@ -37,6 +37,7 @@ export const waiterApi = {
     // Inject WAITER source directly, which maps to is_accepted=true automatically in the Pydantic schema if provided
     const response = await axios.post(`${BASE_URL}/orders/`, {
       ...orderData,
+      restaurant_id: localStorage.getItem('restaurantId'),
       source: 'WAITER',
       is_accepted: true
     }, getHeaders());

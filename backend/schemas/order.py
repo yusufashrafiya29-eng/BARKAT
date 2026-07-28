@@ -24,6 +24,7 @@ class OrderItemCreate(BaseModel):
     menu_item_id: UUID
     quantity: int = 1
     notes: Optional[str] = None
+    is_parcel: bool = False
     modifiers: List[OrderItemModifierCreate] = []
 
 class OrderItemRead(BaseModel):
@@ -34,13 +35,16 @@ class OrderItemRead(BaseModel):
     subtotal: float
     notes: Optional[str] = None
     status: str = "PENDING"
+    is_parcel: bool = False
     modifiers: List[OrderItemModifierRead] = []
 
     class Config:
         from_attributes = True
 
 class OrderCreate(BaseModel):
-    table_id: UUID
+    restaurant_id: Optional[UUID] = None
+    table_id: Optional[UUID] = None
+    order_type: str = "DINE_IN"
     items: List[OrderItemCreate]
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
@@ -59,7 +63,8 @@ class OrderCreate(BaseModel):
 class OrderRead(BaseModel):
     id: UUID
     restaurant_id: UUID
-    table_id: UUID
+    table_id: Optional[UUID] = None
+    order_type: str
     waiter_id: Optional[UUID] = None
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None

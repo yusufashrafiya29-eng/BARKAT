@@ -43,7 +43,7 @@ export default function ReceiptPrinter({ order, tableNumber, restaurantName, gst
           <div>Date: {dateStr.split(',')[0]}</div>
         </div>
         <div className="text-[11px] mb-3 flex justify-between">
-          <div>Table: {tableNumber || 'Takeaway'}</div>
+          <div>Table: {order.order_type === 'TAKEAWAY' ? 'Parcel / Takeaway' : (tableNumber || 'Takeaway')}</div>
           <div>Time: {dateStr.split(',')[1]?.trim()}</div>
         </div>
 
@@ -68,7 +68,10 @@ export default function ReceiptPrinter({ order, tableNumber, restaurantName, gst
             return (
               <div key={idx} className="flex flex-col text-[11px]">
                 <div className="flex items-start">
-                  <div className="flex-1 pr-1 break-words">{itemName}</div>
+                  <div className="flex-1 pr-1 break-words">
+                    {itemName}
+                    {item.is_parcel && <span className="ml-1 text-[9px] font-bold border border-black px-0.5 rounded uppercase">PKG</span>}
+                  </div>
                   <div className="w-8 text-center">{item.quantity}</div>
                   <div className="w-12 text-right">{fmt(price)}</div>
                   <div className="w-16 text-right">{fmt(amt)}</div>

@@ -7,7 +7,7 @@ import {
   RefreshCcw, AlertCircle, Edit2,
   ShoppingCart, CheckCircle2, X,
   Wallet, CreditCard, Smartphone,
-  Send, Zap, ChefHat, Shield, Banknote, Printer
+  Send, Zap, ChefHat, Shield, Banknote, Printer, ShoppingBag
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
@@ -19,9 +19,9 @@ import CustomizationModal from '../components/CustomizationModal';
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; modifier_groups?: any[]; }
 interface Category { id: string; name: string; menu_items: MenuItem[]; }
 interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
-interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; modifiers?: any[]; }
-interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; modifiers?: any[]; menu_item?: { name: string; price: number }; }
-interface Order { id: string; table_id: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
+interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; is_parcel: boolean; modifiers?: any[]; }
+interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; is_parcel?: boolean; modifiers?: any[]; menu_item?: { name: string; price: number }; }
+interface Order { id: string; table_id: string | null; order_type?: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -36,6 +36,7 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; d
 export default function WaiterDashboard() {
   const navigate = useNavigate();
   const [view, setView] = useState<'tables' | 'order' | 'status'>('tables');
+  const [orderType, setOrderType] = useState<'DINE_IN' | 'TAKEAWAY'>('DINE_IN');
   const [tables, setTables] = useState<Table[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
@@ -157,20 +158,21 @@ export default function WaiterDashboard() {
 
   /* ── Order actions ──────────────────────────────────────────── */
   const placeOrder = async () => {
-    if (!selectedTable || cart.length === 0 || isPlacingOrder) return;
+    if ((!selectedTable && orderType !== 'TAKEAWAY') || cart.length === 0 || isPlacingOrder) return;
     setIsPlacingOrder(true);
     try {
       if (editingOrderId) {
         await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ 
-          menu_item_id: i.id, quantity: i.quantity, notes: i.notes, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+          menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
         })));
         toast.success('Order updated!');
         setEditingOrderId(null);
       } else {
         await waiterApi.placeOrder({
-          table_id: selectedTable.id,
+          table_id: selectedTable?.id || null,
+          order_type: orderType,
           items: cart.map(i => ({ 
-            menu_item_id: i.id, quantity: i.quantity, notes: i.notes, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+            menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
           })),
           customer_name: customerName || undefined,
           customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
@@ -190,7 +192,7 @@ export default function WaiterDashboard() {
   };
 
   const handleDeleteOrder = async (id: string) => { if (!confirm('Delete this order?')) return; try { await waiterApi.deleteOrder(id); toast.success('Deleted'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', category_id: '', is_veg: false, is_available: true, cartItemId: i.id, modifiers: i.modifiers || [] })) || []); toast('✏️ Editing order'); };
+  const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', is_parcel: !!i.is_parcel, category_id: '', is_veg: false, is_available: true, cartItemId: i.id, modifiers: i.modifiers || [] })) || []); toast('✏️ Editing order'); };
   
   const handleServeOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
   const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
@@ -353,22 +355,18 @@ export default function WaiterDashboard() {
             )}
 
             {/* ── Section header ── */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-[26px] font-extrabold tracking-tight text-slate-900">Floor Plan</h2>
                 <p className="text-[13px] text-slate-500 mt-0.5 font-medium">{tables.length} tables · tap to manage orders</p>
               </div>
               <div className="flex gap-2">
-                {[
-                  { label: 'Free', bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0', dot: '#e2e8f0' },
-                  { label: 'Occupied', bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', dot: '#4f46e5' },
-                  { label: '⚡ Pending', bg: '#fef3c7', text: '#b45309', border: '#fcd34d', dot: '#f59e0b' },
-                ].map(s => (
-                  <div key={s.label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}>
-                    <div className="w-2 h-2 rounded-full" style={{ background: s.dot, boxShadow: `0 0 4px ${s.dot}` }} />
-                    {s.label}
-                  </div>
-                ))}
+                <button 
+                  onClick={() => { setSelectedTable(null); setOrderType('TAKEAWAY'); setView('order'); setCart([]); setEditingOrderId(null); }}
+                  className="px-4 py-2 rounded-xl text-[12px] font-extrabold tracking-wide flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors uppercase"
+                >
+                  <ShoppingBag size={14} /> Parcel Order
+                </button>
               </div>
             </div>
 
@@ -407,7 +405,7 @@ export default function WaiterDashboard() {
                       return (
                         <button
                           key={table.id}
-                          onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
+                          onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
                           className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
                           style={{
                             border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
@@ -476,7 +474,7 @@ export default function WaiterDashboard() {
                   return (
                     <button
                       key={table.id}
-                      onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
+                      onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
                       className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
                       style={{
                         border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
@@ -604,7 +602,7 @@ export default function WaiterDashboard() {
               <div className="flex items-center gap-2">
                 <ShoppingCart size={16} className="text-indigo-600" />
                 <h3 className="font-bold text-[15px] text-slate-900">
-                  {selectedTable ? `Table ${selectedTable.table_number}` : 'Order Ticket'}
+                  {orderType === 'TAKEAWAY' ? 'Parcel Order' : (selectedTable ? `Table ${selectedTable.table_number}` : 'Order Ticket')}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -703,12 +701,22 @@ export default function WaiterDashboard() {
                             <button onClick={() => updateQuantity(item.cartItemId, 1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 transition-colors"><Plus size={11} className="text-indigo-600" /></button>
                           </div>
                         </div>
-                        <input
-                          placeholder="Chef notes (optional)..."
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[12px] focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
-                          value={item.notes}
-                          onChange={e => updateNotes(item.cartItemId, e.target.value)}
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            placeholder="Chef notes (optional)..."
+                            className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[12px] focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+                            value={item.notes}
+                            onChange={e => updateNotes(item.cartItemId, e.target.value)}
+                          />
+                          <button
+                            onClick={() => setCart(prev => prev.map(i => i.cartItemId === item.cartItemId ? { ...i, is_parcel: !i.is_parcel } : i))}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-wide transition-colors whitespace-nowrap flex items-center gap-1.5 border ${item.is_parcel || orderType === 'TAKEAWAY' ? 'bg-orange-50 text-orange-600 border-orange-200 shadow-sm shadow-orange-100' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50 hover:text-slate-500'}`}
+                            disabled={orderType === 'TAKEAWAY'}
+                          >
+                            <ShoppingBag size={12} className={item.is_parcel || orderType === 'TAKEAWAY' ? 'fill-orange-100' : ''} />
+                            PARCEL
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

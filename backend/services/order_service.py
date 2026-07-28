@@ -6,15 +6,22 @@ from models.menu import MenuItem
 from schemas.order import OrderCreate
 
 def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> Order:
-    # 1. Validate Table Existence
-    from models.table import Table
-    table = db.query(Table).filter(Table.id == order_in.table_id).first()
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
+    # 1. Validate Table Existence (if provided)
+    restaurant_id = order_in.restaurant_id
+    table = None
+    if order_in.table_id:
+        from models.table import Table
+        table = db.query(Table).filter(Table.id == order_in.table_id).first()
+        if not table:
+            raise HTTPException(status_code=404, detail="Table not found")
+        restaurant_id = table.restaurant_id
+        
+    if not restaurant_id:
+        raise HTTPException(status_code=400, detail="restaurant_id is required if table_id is missing")
 
     # 2. Rate Limiting (30s cooldown for CUSTOMER orders)
     from datetime import datetime, timezone, timedelta
-    if order_in.source == "CUSTOMER" and table.last_order_at:
+    if order_in.source == "CUSTOMER" and table and table.last_order_at:
         # Ensure we compare timezone-aware datetimes
         time_diff = datetime.now(timezone.utc) - table.last_order_at
         if time_diff < timedelta(seconds=30):
@@ -24,11 +31,13 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
             )
 
     # 3. Check for existing active unpaid order for the table
-    existing_order = db.query(Order).filter(
-        Order.table_id == order_in.table_id,
-        Order.payment_status != 'PAID',
-        Order.status != OrderStatus.CANCELLED
-    ).first()
+    existing_order = None
+    if order_in.table_id:
+        existing_order = db.query(Order).filter(
+            Order.table_id == order_in.table_id,
+            Order.payment_status != 'PAID',
+            Order.status != OrderStatus.CANCELLED
+        ).first()
 
     initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
 
@@ -43,8 +52,9 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     else:
         # Initialize new Order record safely
         new_order = Order(
-            restaurant_id=table.restaurant_id,
+            restaurant_id=restaurant_id,
             table_id=order_in.table_id,
+            order_type=order_in.order_type,
             waiter_id=waiter_id,
             customer_phone=order_in.customer_phone,
             customer_name=order_in.customer_name,
@@ -95,7 +105,11 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         # Only combine if neither has modifiers (to keep it simple and safe)
         existing_item = None
         if not selected_modifiers:
-            existing_item = db.query(OrderItem).filter(OrderItem.order_id == new_order.id, OrderItem.menu_item_id == menu_item.id).first()
+            existing_item = db.query(OrderItem).filter(
+                OrderItem.order_id == new_order.id, 
+                OrderItem.menu_item_id == menu_item.id,
+                OrderItem.is_parcel == item_in.is_parcel
+            ).first()
             
         if existing_item and not db.query(OrderItemModifier).filter(OrderItemModifier.order_item_id == existing_item.id).first():
             existing_item.quantity += item_in.quantity
@@ -107,7 +121,8 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
                 quantity=item_in.quantity,
                 price_at_order_time=unit_price,
                 subtotal=subtotal,
-                notes=item_in.notes
+                notes=item_in.notes,
+                is_parcel=item_in.is_parcel
             )
             db.add(new_order_item)
             db.flush() # get new_order_item.id
@@ -126,7 +141,7 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     new_order.total_amount = subtotal_sum + tax_sum + new_order.tip_amount
     
     # Update table's last order timestamp if customer order
-    if order_in.source == "CUSTOMER":
+    if order_in.source == "CUSTOMER" and table:
         table.last_order_at = datetime.now(timezone.utc)
 
     db.commit()
