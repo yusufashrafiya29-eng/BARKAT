@@ -98,8 +98,23 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
   },
 
   fetchData: async () => {
-    const { activeTab } = get();
-    set({ loading: true });
+    const { activeTab, menuCategories, staff, customers, tables, inventory, historicalOrders, reservations, analytics } = get();
+    
+    // Check if we already have data for the active tab
+    const hasData = 
+      (activeTab === 'menu' && menuCategories.length > 0) ||
+      (activeTab === 'staff' && staff.length > 0) ||
+      (activeTab === 'crm' && customers.length > 0) ||
+      (activeTab === 'tables' && tables.length > 0) ||
+      (activeTab === 'inventory' && inventory.length > 0) ||
+      (activeTab === 'orders' && historicalOrders.length > 0) ||
+      (activeTab === 'reservations' && reservations.length > 0) ||
+      (activeTab === 'analytics' && analytics !== null);
+
+    if (!hasData) {
+      set({ loading: true });
+    }
+    
     try {
       switch (activeTab) {
         case 'analytics':

@@ -3,10 +3,14 @@ from models.menu import Category, MenuItem
 from schemas.menu import CategoryCreate, MenuItemCreate
 
 def get_all_active_categories(db: Session, restaurant_id: str):
-    from sqlalchemy.orm import contains_eager
+    from sqlalchemy.orm import contains_eager, selectinload
+    from models.menu import ModifierGroup
     return db.query(Category).outerjoin(MenuItem, 
         (MenuItem.category_id == Category.id) & (MenuItem.is_deleted == False)
-    ).options(contains_eager(Category.menu_items)).filter(
+    ).options(
+        contains_eager(Category.menu_items).selectinload(MenuItem.recipe_ingredients),
+        contains_eager(Category.menu_items).selectinload(MenuItem.modifier_groups).selectinload(ModifierGroup.modifiers)
+    ).filter(
         Category.is_active == True, 
         Category.restaurant_id == restaurant_id
     ).all()
