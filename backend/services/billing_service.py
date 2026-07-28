@@ -6,10 +6,6 @@ from models.billing import Bill, PaymentStatus, PaymentTransaction
 from schemas.billing import BillCreate, PaymentConfirmation
 
 def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_id: str) -> Bill:
-    existing = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
-    if existing:
-        return existing
-        
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found. Cannot generate bill.")
@@ -20,6 +16,17 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_i
     total_amount = subtotal + tax_amount - discount
     if total_amount < 0:
         total_amount = 0.0
+
+    existing = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
+    if existing:
+        existing.subtotal = subtotal
+        existing.tax_amount = tax_amount
+        existing.discount_amount = discount
+        existing.total_amount = total_amount
+        existing.payment_method = bill_in.payment_method
+        db.commit()
+        db.refresh(existing)
+        return existing
         
     new_bill = Bill(
         restaurant_id=restaurant_id,
