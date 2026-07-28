@@ -374,7 +374,7 @@ export default function WaiterDashboard() {
 
             {/* Custom Floor Plan OR Sections grid */}
             {tables.some((t: any) => t.position_x > 0 || t.position_y > 0) ? (
-              <div className="relative w-full min-h-[600px] sm:min-h-[700px]">
+              <div className="relative w-full aspect-[16/9] md:aspect-[21/9]">
                 {tables.map(table => {
                   const isPending = (table as any).hasPendingCustomerOrder;
                   const isOccupied = table.status === 'Occupied';
@@ -395,7 +395,7 @@ export default function WaiterDashboard() {
                     <button
                       key={table.id}
                       onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className={`absolute w-24 h-24 rounded-3xl flex flex-col items-center justify-center gap-1 transition-all duration-300 hover:scale-110 hover:shadow-xl ${isReserved ? 'ring-4 ring-amber-400' : ''}`}
+                      className={`absolute w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all duration-300 hover:scale-110 hover:shadow-xl ${isReserved ? 'ring-4 ring-amber-400' : ''}`}
                       style={{
                         left: `${x}%`,
                         top: `${y}%`,
@@ -406,9 +406,9 @@ export default function WaiterDashboard() {
                         boxShadow: isPending ? '0 10px 25px -5px rgb(245 158 11 / .3)' : isOccupied ? '0 10px 25px -5px rgb(79 70 229 / .25)' : '0 4px 15px -3px rgb(0 0 0 / .05)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10 border border-white" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 4px 12px rgb(245 158 11 / .4)' }}>⚡ NEW</span>}
-                      <span className="font-black text-[32px] leading-none tracking-tight">{table.table_number}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
+                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10 border border-white" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 4px 12px rgb(245 158 11 / .4)' }}>⚡ NEW</span>}
+                      <span className="font-black text-[24px] sm:text-[32px] leading-none tracking-tight">{table.table_number}</span>
+                      <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest opacity-80">
                         {isPending ? 'Pending' : isOccupied ? table.status : isReserved ? `Rsv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
                       </span>
                     </button>
