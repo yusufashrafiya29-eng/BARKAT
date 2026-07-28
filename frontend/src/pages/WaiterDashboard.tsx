@@ -395,20 +395,20 @@ export default function WaiterDashboard() {
                     <button
                       key={table.id}
                       onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className={`absolute w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-extrabold text-[16px] transition-transform duration-200 hover:scale-110 ${isReserved ? 'ring-2 ring-amber-400' : ''}`}
+                      className={`absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-center font-extrabold text-[28px] transition-transform duration-200 hover:scale-110 ${isReserved ? 'ring-2 ring-amber-400' : ''}`}
                       style={{
                         left: `${x}%`,
                         top: `${y}%`,
                         transform: 'translate(-50%, -50%)',
                         background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
                         color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
-                        border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
+                        border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
                         boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .25)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .2)' : '0 1px 4px rgb(0 0 0 / .05)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡</span>}
+                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡ NEW</span>}
                       {table.table_number}
-                      <span className="absolute -bottom-2.5 text-[9px] font-bold opacity-75 uppercase bg-white px-1.5 rounded shadow-sm border border-slate-100">{isPending ? 'Pending' : isOccupied ? table.status : isReserved ? `Rsv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}</span>
+                      <span className="absolute -bottom-3 text-[11px] font-bold opacity-90 uppercase bg-white px-2 py-0.5 rounded shadow-sm border border-slate-100">{isPending ? 'Pending' : isOccupied ? table.status : isReserved ? `Rsv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}</span>
                     </button>
                   );
                 })}
