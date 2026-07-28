@@ -462,13 +462,13 @@ export default function WaiterDashboard() {
                           }}
                         >
                           {isPending && (
-                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
                               ⚡ NEW
                             </span>
                           )}
                           {/* Table number box */}
                           <div
-                            className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] transition-transform duration-200 group-hover:scale-105"
+                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] transition-transform duration-200 group-hover:scale-105"
                             style={{
                               background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
                               color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
@@ -524,8 +524,8 @@ export default function WaiterDashboard() {
                         boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : isReserved ? '0 4px 20px rgb(245 158 11 / .12)' : '0 1px 4px rgb(0 0 0 / .04)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff' }}>⚡ NEW</span>}
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
+                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡ NEW</span>}
+                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
                         {table.table_number}
                       </div>
                       <div className="text-center">
