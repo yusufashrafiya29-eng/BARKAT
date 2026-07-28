@@ -19,7 +19,7 @@ import CustomizationModal from '../components/CustomizationModal';
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; modifier_groups?: any[]; }
 interface Category { id: string; name: string; menu_items: MenuItem[]; }
 interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
-interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; is_parcel: boolean; modifiers?: any[]; }
+interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; is_parcel?: boolean; modifiers?: any[]; }
 interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; is_parcel?: boolean; modifiers?: any[]; menu_item?: { name: string; price: number }; }
 interface Order { id: string; table_id: string | null; order_type?: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
