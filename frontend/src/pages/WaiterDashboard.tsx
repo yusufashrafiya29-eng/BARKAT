@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Plus, Minus,
@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
-import { ownerApi } from '../api/owner';
 import toast from 'react-hot-toast';
 import ReceiptPrinter from '../components/ReceiptPrinter';
 import CustomizationModal from '../components/CustomizationModal';
@@ -62,12 +61,6 @@ export default function WaiterDashboard() {
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
 
-  // Drag and Drop State
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [draggingTableId, setDraggingTableId] = useState<string | null>(null);
-  const wasDragging = useRef(false);
-  const dragStartPos = useRef({ x: 0, y: 0 });
-
   const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
 
   const handlePrintReceipt = (order: Order) => {
@@ -75,57 +68,6 @@ export default function WaiterDashboard() {
     setTimeout(() => {
       window.print();
     }, 100); // Wait for React to render the invisible component
-  };
-
-  /* ── Drag and Drop Handlers ─────────────────────────────── */
-  const handlePointerDown = (e: React.PointerEvent, id: string) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setDraggingTableId(id);
-    wasDragging.current = false;
-    dragStartPos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingTableId || !containerRef.current) return;
-    
-    if (Math.abs(e.clientX - dragStartPos.current.x) > 5 || Math.abs(e.clientY - dragStartPos.current.y) > 5) {
-      wasDragging.current = true;
-    }
-
-    if (wasDragging.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      let newX = ((e.clientX - rect.left) / rect.width) * 100;
-      let newY = ((e.clientY - rect.top) / rect.height) * 100;
-      
-      newX = Math.max(0, Math.min(100, newX));
-      newY = Math.max(0, Math.min(100, newY));
-
-      setTables(prev => prev.map((t: any) => 
-        t.id === draggingTableId ? { ...t, position_x: newX, position_y: newY } : t
-      ));
-    }
-  };
-
-  const handlePointerUp = async (e: React.PointerEvent) => {
-    if (!draggingTableId) return;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    
-    if (wasDragging.current) {
-      const draggedTable = tables.find(t => t.id === draggingTableId);
-      if (draggedTable) {
-        try {
-          await ownerApi.updateTablePositions([{ 
-            id: draggedTable.id, 
-            position_x: (draggedTable as any).position_x || 0, 
-            position_y: (draggedTable as any).position_y || 0 
-          }]);
-          toast.success("Table position saved");
-        } catch (error) {
-          console.error("Failed to save table position", error);
-        }
-      }
-    }
-    setDraggingTableId(null);
   };
 
   /* ── Data fetching ─────────────────────────────────────────── */
@@ -430,65 +372,8 @@ export default function WaiterDashboard() {
               </div>
             </div>
 
-            {/* Custom Floor Plan OR Sections grid */}
-            {tables.some((t: any) => t.position_x > 0 || t.position_y > 0) ? (
-              <div 
-                ref={containerRef}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                style={{ touchAction: 'none' }}
-                className="relative w-full aspect-[16/9] md:aspect-[21/9]"
-              >
-                {tables.map(table => {
-                  const isPending = (table as any).hasPendingCustomerOrder;
-                  const isOccupied = table.status === 'Occupied';
-                  
-                  const today = new Date().toISOString().split('T')[0];
-                  const tableReservations = reservations.filter(r => 
-                    r.table_id === table.id && 
-                    (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
-                    r.reservation_date.startsWith(today)
-                  );
-                  const isReserved = tableReservations.length > 0;
-                  
-                  // Use existing positions or fallback to center if they somehow have 0
-                  const x = (table as any).position_x || 50;
-                  const y = (table as any).position_y || 50;
-
-                  return (
-                    <button
-                      key={table.id}
-                      onPointerDown={(e) => handlePointerDown(e, table.id)}
-                      onClick={(e) => { 
-                        if (wasDragging.current) {
-                          e.preventDefault();
-                          return;
-                        }
-                        setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); 
-                      }}
-                      className={`absolute w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all duration-300 hover:scale-110 hover:shadow-xl cursor-pointer select-none ${isReserved ? 'ring-4 ring-amber-400' : ''} ${draggingTableId === table.id ? 'z-50 scale-110 shadow-2xl ring-4 ring-indigo-500' : ''}`}
-                      style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        transform: 'translate(-50%, -50%)',
-                        background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#ffffff,#f8fafc)',
-                        color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#64748b',
-                        border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
-                        boxShadow: isPending ? '0 10px 25px -5px rgb(245 158 11 / .3)' : isOccupied ? '0 10px 25px -5px rgb(79 70 229 / .25)' : '0 4px 15px -3px rgb(0 0 0 / .05)',
-                      }}
-                    >
-                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10 border border-white" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 4px 12px rgb(245 158 11 / .4)' }}>⚡ NEW</span>}
-                      <span className="font-black text-[24px] sm:text-[32px] leading-none tracking-tight">{table.table_number}</span>
-                      <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest opacity-80">
-                        {isPending ? 'Pending' : isOccupied ? table.status : isReserved ? `Rsv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              // Fallback to sections grid if no custom layout
+            {/* Sections grid */}
+            {!tables.every((t: any) => !t.category && !t.section) && (
               ['AC', 'Non-AC'].map(section => {
               const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);
               if (sectionTables.length === 0) return null;
