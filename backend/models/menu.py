@@ -65,6 +65,7 @@ class ModifierGroup(Base):
     is_required = Column(Boolean, default=False)
     min_selections = Column(Integer, default=0)
     max_selections = Column(Integer, default=1)
+    price_replaces_base = Column(Boolean, default=False)
 
     menu_item = relationship("MenuItem", back_populates="modifier_groups")
     modifiers = relationship("Modifier", back_populates="group", cascade="all, delete-orphan")

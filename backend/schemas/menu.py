@@ -22,6 +22,7 @@ class ModifierGroupBase(BaseModel):
     is_required: bool = False
     min_selections: int = 0
     max_selections: int = 1
+    price_replaces_base: bool = False
 
 class ModifierGroupCreate(ModifierGroupBase):
     modifiers: List[ModifierCreate] = []
