@@ -7,6 +7,13 @@ class TableBase(BaseModel):
     capacity: int = 4
     category: str = "Non-AC"
     qr_code_url: Optional[str] = None
+    position_x: Optional[float] = 0.0
+    position_y: Optional[float] = 0.0
+
+class TablePositionUpdate(BaseModel):
+    id: UUID
+    position_x: float
+    position_y: float
 
 class TableCreate(TableBase):
     pass

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy import ForeignKey, UniqueConstraint
@@ -17,6 +17,10 @@ class Table(Base):
     category = Column(String, nullable=False, default="Non-AC")
     qr_code_url = Column(String, nullable=True)
     last_order_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Floor Plan Coordinates (percentages 0-100)
+    position_x = Column(Float, nullable=True, default=0.0)
+    position_y = Column(Float, nullable=True, default=0.0)
 
     # Relationships
     orders = relationship("Order", back_populates="table")

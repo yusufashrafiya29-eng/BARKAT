@@ -74,6 +74,11 @@ export const ownerApi = {
     const response = await axios.delete(`${BASE_URL}/tables/${tableId}`, getHeaders());
     return response.data;
   },
+
+  updateTablePositions: async (positions: { id: string; position_x: number; position_y: number }[]) => {
+    const response = await axios.put(`${BASE_URL}/tables/positions`, positions, getHeaders());
+    return response.data;
+  },
   
   // Staff Native Create
   createVerifiedStaff: async (payload: any) => {

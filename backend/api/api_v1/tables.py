@@ -4,7 +4,7 @@ from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_restaurant, get_current_user_token
 from core.config import settings
-from schemas.table import TableCreate, TableRead
+from schemas.table import TableCreate, TableRead, TablePositionUpdate
 from models.table import Table
 
 router = APIRouter()
@@ -62,6 +62,8 @@ def delete_table(
     token: dict = Depends(get_current_user_token)
 ):
     from fastapi import HTTPException
+    from sqlalchemy.exc import IntegrityError
+    
     if token.get("role") != "OWNER":
         raise HTTPException(status_code=403, detail="Owner access required")
     
@@ -69,6 +71,43 @@ def delete_table(
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
         
-    db.delete(table)
+    try:
+        db.delete(table)
+        db.commit()
+        return {"message": "Table deleted successfully"}
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete this table because it has existing orders or reservations associated with it."
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete table: {str(e)}")
+
+@router.put("/positions", response_model=List[TableRead])
+def update_table_positions(
+    positions: List[TablePositionUpdate],
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from fastapi import HTTPException
+    
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    updated_tables = []
+    
+    for pos in positions:
+        table = db.query(Table).filter(Table.id == pos.id, Table.restaurant_id == restaurant_id).first()
+        if table:
+            table.position_x = pos.position_x
+            table.position_y = pos.position_y
+            updated_tables.append(table)
+            
     db.commit()
-    return {"message": "Table deleted successfully"}
+    for t in updated_tables:
+        db.refresh(t)
+        
+    return updated_tables
