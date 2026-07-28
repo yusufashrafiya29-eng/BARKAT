@@ -69,3 +69,16 @@ class OrderItem(Base):
     # Relationships
     order = relationship("Order", back_populates="items")
     menu_item = relationship("MenuItem")
+    modifiers = relationship("OrderItemModifier", back_populates="order_item", cascade="all, delete-orphan")
+class OrderItemModifier(Base):
+    __tablename__ = "order_item_modifiers"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_item_id = Column(UUID(as_uuid=True), ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
+    modifier_id = Column(UUID(as_uuid=True), ForeignKey("modifiers.id", ondelete="CASCADE"), nullable=False)
+    
+    price_at_order_time = Column(Float, nullable=False, default=0.0)
+
+    # Relationships
+    order_item = relationship("OrderItem", back_populates="modifiers")
+    modifier = relationship("Modifier")

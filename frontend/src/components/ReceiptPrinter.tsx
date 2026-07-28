@@ -66,11 +66,18 @@ export default function ReceiptPrinter({ order, tableNumber, restaurantName, gst
             const price = item.price_at_order_time || 0;
             const amt = price * item.quantity;
             return (
-              <div key={idx} className="flex text-[11px] items-start">
-                <div className="flex-1 pr-1 break-words">{itemName}</div>
-                <div className="w-8 text-center">{item.quantity}</div>
-                <div className="w-12 text-right">{fmt(price)}</div>
-                <div className="w-16 text-right">{fmt(amt)}</div>
+              <div key={idx} className="flex flex-col text-[11px]">
+                <div className="flex items-start">
+                  <div className="flex-1 pr-1 break-words">{itemName}</div>
+                  <div className="w-8 text-center">{item.quantity}</div>
+                  <div className="w-12 text-right">{fmt(price)}</div>
+                  <div className="w-16 text-right">{fmt(amt)}</div>
+                </div>
+                {item.modifiers && item.modifiers.length > 0 && (
+                  <div className="text-[9px] text-gray-600 pl-2">
+                    {item.modifiers.map((m: any) => `+ ${m.modifier?.name || 'Add-on'}`).join(', ')}
+                  </div>
+                )}
               </div>
             );
           })}

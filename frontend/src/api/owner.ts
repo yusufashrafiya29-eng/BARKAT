@@ -49,6 +49,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  updateMenuItem: async (itemId: string, payload: any) => {
+    const response = await axios.put(`${BASE_URL}/menu/items/${itemId}`, payload, getHeaders());
+    return response.data;
+  },
+
   updateMenuItemRecipe: async (itemId: string, payload: any) => {
     const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/recipe`, payload, getHeaders());
     return response.data;

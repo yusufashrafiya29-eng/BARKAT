@@ -10,6 +10,7 @@ import { authApi } from '../api/auth';
 import { useOwnerStore } from '../store/ownerStore';
 
 import AnalyticsTab from '../components/owner-dashboard/AnalyticsTab';
+import EditMenuItemModal from '../components/owner-dashboard/EditMenuItemModal';
 import OrdersTab from '../components/owner-dashboard/OrdersTab';
 import MenuTab from '../components/owner-dashboard/MenuTab';
 import InventoryTab from '../components/owner-dashboard/InventoryTab';
@@ -57,6 +58,7 @@ export default function OwnerDashboard() {
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'basic' | 'pro' | 'max'>('pro');
   const [platformConfig, setPlatformConfig] = useState<any[]>([]);
   const [editingRecipeItemId, setEditingRecipeItemId] = useState<string | null>(null);
+  const [editingMenuItem, setEditingMenuItem] = useState<any | null>(null);
   const [recipeIngredients, setRecipeIngredients] = useState<{stock_item_id: string, quantity: number, unit: string}[]>([]);
 
   const isFeatureLocked = (tabName: string) => {
@@ -92,6 +94,10 @@ export default function OwnerDashboard() {
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
+  };
+
+  const handleOpenEditMenu = (item: any) => {
+    setEditingMenuItem(item);
   };
 
   const handleOpenRecipeEditor = (item: MenuItem) => {
@@ -426,7 +432,7 @@ export default function OwnerDashboard() {
               
               {activeTab === 'analytics' && <AnalyticsTab />}
               {activeTab === 'orders' && <OrdersTab />}
-              {activeTab === 'menu' && <MenuTab handleOpenRecipeEditor={handleOpenRecipeEditor} />}
+              {activeTab === 'menu' && <MenuTab handleOpenRecipeEditor={handleOpenRecipeEditor} handleOpenEditMenu={handleOpenEditMenu} />}
               {activeTab === 'inventory' && <InventoryTab />}
               {activeTab === 'cash_register' && <CashRegisterTab />}
               {activeTab === 'tables' && <TablesTab setShowQRModal={setShowQRModal} />}
@@ -1036,6 +1042,18 @@ export default function OwnerDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {editingMenuItem && (
+        <EditMenuItemModal 
+          item={editingMenuItem} 
+          categories={menuCategories} 
+          onClose={() => setEditingMenuItem(null)} 
+          onSuccess={() => {
+            setEditingMenuItem(null);
+            fetchData();
+          }} 
+        />
       )}
     </div>
   );

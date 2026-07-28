@@ -56,3 +56,25 @@ class MenuItem(Base):
     # Relationships
     category = relationship("Category", back_populates="menu_items")
     recipe_ingredients = relationship("RecipeIngredient", back_populates="menu_item", cascade="all, delete-orphan")
+    modifier_groups = relationship("ModifierGroup", back_populates="menu_item", cascade="all, delete-orphan")
+class ModifierGroup(Base):
+    __tablename__ = "modifier_groups"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id = Column(UUID(as_uuid=True), ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    is_required = Column(Boolean, default=False)
+    min_selections = Column(Integer, default=0)
+    max_selections = Column(Integer, default=1)
+
+    menu_item = relationship("MenuItem", back_populates="modifier_groups")
+    modifiers = relationship("Modifier", back_populates="group", cascade="all, delete-orphan")
+
+class Modifier(Base):
+    __tablename__ = "modifiers"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(UUID(as_uuid=True), ForeignKey("modifier_groups.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    price = Column(Float, default=0.0)
+    is_available = Column(Boolean, default=True)
+
+    group = relationship("ModifierGroup", back_populates="modifiers")

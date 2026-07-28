@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import CustomizationModal from '../components/CustomizationModal';
 import { useParams } from 'react-router-dom';
 import { 
   UtensilsCrossed, Plus, Minus, 
@@ -21,6 +22,7 @@ interface MenuItem {
   is_available: boolean;
   image_url?: string;
   model_3d_url?: string;
+  modifier_groups?: any[];
 }
 
 interface Category {
@@ -30,14 +32,18 @@ interface Category {
 }
 
 interface CartItem extends MenuItem {
+  cartItemId: string;
   quantity: number;
   notes: string;
+  modifiers?: any[];
 }
 
 interface OrderItem {
   menu_item_id: string;
   quantity: number;
   price_at_order_time: number;
+  notes?: string;
+  modifiers?: any[];
   menu_item?: { name: string; price: number };
 }
 
@@ -58,6 +64,7 @@ const CustomerMenu: React.FC = () => {
   const [tableInfo, setTableInfo] = useState<{ id: string, table_number: number, restaurant_id: string, restaurant_name: string, restaurant_logo: string | null, restaurant_upi_id: string | null, restaurant_gstin: string | null, restaurant_fssai: string | null } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
   
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [customerPhone, setCustomerPhone] = useState<string>('');
@@ -233,15 +240,30 @@ const CustomerMenu: React.FC = () => {
     }
   };
 
-  const addToCart = (item: MenuItem, skipUpsell: boolean = false) => {
+  const handleAddToCartClick = (item: MenuItem, skipUpsell: boolean = false) => {
     if (!item.is_available) return;
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setCustomizingItem(item);
+    } else {
+      addToCart(item, [], 1, '', skipUpsell);
+    }
+  };
+
+  const addToCart = (item: MenuItem, modifiers: any[] = [], quantity: number = 1, notes: string = '', skipUpsell: boolean = false) => {
+    if (!item.is_available) return;
+    
+    // Sort modifier IDs to create a unique signature for this exact combination
+    const modifierSignature = modifiers.map(m => m.id).sort().join('|');
+    const cartItemId = `${item.id}-${modifierSignature}`;
+
     setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
+      const existing = prev.find(i => i.cartItemId === cartItemId);
       if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: i.quantity + quantity } : i);
       }
-      return [...prev, { ...item, quantity: 1, notes: '' }];
+      return [...prev, { ...item, cartItemId, quantity, notes, modifiers }];
     });
+    setCustomizingItem(null);
     toast.success(`${item.name} added`, { position: 'top-center' });
     
     if (!skipUpsell) {
@@ -259,9 +281,9 @@ const CustomerMenu: React.FC = () => {
     }
   };
 
-  const updateQuantity = (id: string, delta: number) => {
+  const updateQuantity = (cartItemId: string, delta: number) => {
     setCart(prev => prev.map(i => {
-      if (i.id === id) {
+      if (i.cartItemId === cartItemId) {
         const newQty = Math.max(0, i.quantity + delta);
         return { ...i, quantity: newQty };
       }
@@ -269,7 +291,10 @@ const CustomerMenu: React.FC = () => {
     }).filter(i => i.quantity > 0));
   };
   
-  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) + tipAmount;
+  const totalAmount = cart.reduce((sum, item) => {
+    const modsTotal = item.modifiers?.reduce((a, m) => a + m.price, 0) || 0;
+    return sum + ((item.price + modsTotal) * item.quantity);
+  }, 0) + tipAmount;
 
   const handlePlaceOrder = async () => {
     if (!tableInfo || cart.length === 0) return;
@@ -281,7 +306,8 @@ const CustomerMenu: React.FC = () => {
         items: cart.map(i => ({
           menu_item_id: i.id,
           quantity: i.quantity,
-          notes: i.notes
+          notes: i.notes,
+          modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || []
         })),
         customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
         customer_name: customerName || undefined,
@@ -521,7 +547,7 @@ const CustomerMenu: React.FC = () => {
                                 <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 text-black hover:bg-black/30"><Plus size={12} /></button>
                               </div>
                             ) : (
-                              <button onClick={() => addToCart(item)} className="bg-[#e6c27a] text-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                              <button onClick={() => handleAddToCartClick(item)} className="bg-[#e6c27a] text-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
                                 <Plus size={16} strokeWidth={3} />
                               </button>
                             )}
@@ -580,11 +606,18 @@ const CustomerMenu: React.FC = () => {
  
                     <div className="space-y-3">
                       {order.items?.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-[13px] text-gray-400">
-                          <span className="flex items-center gap-3">
-                            <span className="font-bold text-white w-5">{item.quantity}x</span> 
-                            {item.menu_item?.name || 'Item'}
-                          </span>
+                        <div key={idx} className="flex flex-col text-[13px] text-gray-400">
+                          <div className="flex justify-between">
+                            <span className="flex items-center gap-3">
+                              <span className="font-bold text-white w-5">{item.quantity}x</span> 
+                              {item.menu_item?.name || 'Item'}
+                            </span>
+                          </div>
+                          {item.modifiers && item.modifiers.length > 0 && (
+                            <div className="pl-8 text-[11px] text-gray-500 mt-0.5">
+                              {item.modifiers.map(m => `+ ${m.modifier?.name || 'Add-on'}`).join(', ')}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -793,7 +826,7 @@ const CustomerMenu: React.FC = () => {
               <button onClick={closeActiveModal} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200">No, thanks</button>
               <button 
                 onClick={() => {
-                  addToCart(showUpsell, true);
+                  handleAddToCartClick(showUpsell, true);
                   closeActiveModal();
                 }} 
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200"
@@ -877,7 +910,7 @@ const CustomerMenu: React.FC = () => {
                  
                  <button 
                    onClick={() => {
-                     addToCart(selectedItem);
+                     handleAddToCartClick(selectedItem);
                      closeActiveModal();
                    }}
                    disabled={!selectedItem.is_available}
@@ -934,6 +967,14 @@ const CustomerMenu: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {customizingItem && (
+        <CustomizationModal
+          item={customizingItem}
+          onClose={() => setCustomizingItem(null)}
+          onAddToCart={(item, modifiers, quantity, notes) => addToCart(item, modifiers, quantity, notes, false)}
+        />
       )}
 
       <style>{`

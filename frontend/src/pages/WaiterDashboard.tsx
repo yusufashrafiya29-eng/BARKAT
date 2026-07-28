@@ -13,13 +13,14 @@ import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
 import toast from 'react-hot-toast';
 import ReceiptPrinter from '../components/ReceiptPrinter';
+import CustomizationModal from '../components/CustomizationModal';
 
 /* ── Types ──────────────────────────────────────────────────── */
-interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; }
+interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; modifier_groups?: any[]; }
 interface Category { id: string; name: string; menu_items: MenuItem[]; }
 interface Table { id: string; table_number: number; capacity: number; category: string; status?: 'Free' | 'Occupied' | 'Ordering'; }
-interface CartItem extends MenuItem { quantity: number; notes: string; }
-interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; menu_item?: { name: string; price: number }; }
+interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; modifiers?: any[]; }
+interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: number; subtotal?: number; notes?: string; modifiers?: any[]; menu_item?: { name: string; price: number }; }
 interface Order { id: string; table_id: string; status: 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'SERVED'; payment_status: 'PENDING' | 'PAID' | 'FAILED' | 'VERIFYING'; total_amount: number; created_at: string; items?: OrderItem[]; source?: 'CUSTOMER' | 'WAITER'; is_accepted?: boolean; razorpay_order_id?: string | null; }
 
 /* ── Status helpers ──────────────────────────────────────────── */
@@ -41,6 +42,7 @@ export default function WaiterDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
@@ -114,19 +116,35 @@ export default function WaiterDashboard() {
   };
 
   /* ── Cart actions ───────────────────────────────────────────── */
-  const addToCart = (item: MenuItem) => {
+  const handleAddToCartClick = (item: MenuItem) => {
+    if (!item.is_available) return;
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setCustomizingItem(item);
+    } else {
+      addToCart(item, [], 1, '');
+    }
+  };
+
+  const addToCart = (item: MenuItem, modifiers: any[] = [], quantity: number = 1, notes: string = '') => {
+    const modifierSignature = modifiers.map(m => m.id).sort().join('|');
+    const cartItemId = `${item.id}-${modifierSignature}`;
+    
     setCart(prev => {
-      const ex = prev.find(i => i.id === item.id);
-      if (ex) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { ...item, quantity: 1, notes: '' }];
+      const ex = prev.find(i => i.cartItemId === cartItemId);
+      if (ex) return prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: i.quantity + quantity } : i);
+      return [...prev, { ...item, cartItemId, quantity, notes, modifiers }];
     });
+    setCustomizingItem(null);
     toast.success(`${item.name} added`, { position: 'top-center' });
   };
-  const updateQuantity = (id: string, delta: number) =>
-    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
-  const updateNotes = (id: string, notes: string) =>
-    setCart(prev => prev.map(i => i.id === id ? { ...i, notes } : i));
-  const totalAmount = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const updateQuantity = (cartItemId: string, delta: number) =>
+    setCart(prev => prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
+  const updateNotes = (cartItemId: string, notes: string) =>
+    setCart(prev => prev.map(i => i.cartItemId === cartItemId ? { ...i, notes } : i));
+  const totalAmount = cart.reduce((s, i) => {
+    const modsTotal = i.modifiers?.reduce((a, m) => a + m.price, 0) || 0;
+    return s + (i.price + modsTotal) * i.quantity;
+  }, 0);
 
   /* ── Order actions ──────────────────────────────────────────── */
   const placeOrder = async () => {
@@ -134,13 +152,17 @@ export default function WaiterDashboard() {
     setIsPlacingOrder(true);
     try {
       if (editingOrderId) {
-        await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })));
+        await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ 
+          menu_item_id: i.id, quantity: i.quantity, notes: i.notes, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+        })));
         toast.success('Order updated!');
         setEditingOrderId(null);
       } else {
         await waiterApi.placeOrder({
           table_id: selectedTable.id,
-          items: cart.map(i => ({ menu_item_id: i.id, quantity: i.quantity, notes: i.notes })),
+          items: cart.map(i => ({ 
+            menu_item_id: i.id, quantity: i.quantity, notes: i.notes, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+          })),
           customer_name: customerName || undefined,
           customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
         });
@@ -520,7 +542,7 @@ export default function WaiterDashboard() {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => addToCart(item)}
+                        onClick={() => handleAddToCartClick(item)}
                         className="group bg-white rounded-2xl border border-slate-200 p-3 flex flex-row items-center text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 gap-3"
                         style={{ boxShadow: inCart ? '0 0 0 2px #6366f1, 0 4px 12px rgb(79 70 229 / .15)' : undefined, borderColor: inCart ? '#6366f1' : undefined }}
                         disabled={!item.is_available}
@@ -612,9 +634,16 @@ export default function WaiterDashboard() {
                             </div>
                             <div className="space-y-1">
                               {order.items?.map((item, idx) => (
-                                <p key={idx} className="text-[12px]" style={{ color: st.text }}>
-                                  <span className="font-bold">{item.quantity}×</span> {item.menu_item?.name || 'Item'}
-                                </p>
+                                <div key={idx} className="flex flex-col">
+                                  <p className="text-[12px]" style={{ color: st.text }}>
+                                    <span className="font-bold">{item.quantity}×</span> {item.menu_item?.name || 'Item'}
+                                  </p>
+                                  {item.modifiers && item.modifiers.length > 0 && (
+                                    <div className="pl-6 text-[10px] opacity-80" style={{ color: st.text }}>
+                                      {item.modifiers.map(m => `+ ${m.modifier?.name || 'Add-on'}`).join(', ')}
+                                    </div>
+                                  )}
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -637,23 +666,28 @@ export default function WaiterDashboard() {
                 ) : (
                   <div className="space-y-2">
                     {cart.map(item => (
-                      <div key={item.id} className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2.5">
-                        <div className="flex justify-between items-center">
+                      <div key={item.cartItemId} className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2.5">
+                        <div className="flex justify-between items-start">
                           <div>
                             <h4 className="font-semibold text-[13px] text-slate-800">{item.name}</h4>
-                            <p className="text-[11px] text-indigo-600 font-bold">₹{item.price * item.quantity}</p>
+                            {item.modifiers && item.modifiers.length > 0 && (
+                              <div className="text-[11px] text-slate-500 my-1">
+                                {item.modifiers.map(m => `+ ${m.name}`).join(', ')}
+                              </div>
+                            )}
+                            <p className="text-[11px] text-indigo-600 font-bold">₹{((item.price + (item.modifiers?.reduce((a,m) => a + m.price, 0) || 0)) * item.quantity).toFixed(2)}</p>
                           </div>
                           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1">
-                            <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"><Minus size={11} className="text-slate-600" /></button>
+                            <button onClick={() => updateQuantity(item.cartItemId, -1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"><Minus size={11} className="text-slate-600" /></button>
                             <span className="text-[13px] font-bold text-slate-800 min-w-[20px] text-center">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 transition-colors"><Plus size={11} className="text-indigo-600" /></button>
+                            <button onClick={() => updateQuantity(item.cartItemId, 1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 transition-colors"><Plus size={11} className="text-indigo-600" /></button>
                           </div>
                         </div>
                         <input
                           placeholder="Chef notes (optional)..."
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[12px] focus:outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
                           value={item.notes}
-                          onChange={e => updateNotes(item.id, e.target.value)}
+                          onChange={e => updateNotes(item.cartItemId, e.target.value)}
                         />
                       </div>
                     ))}
@@ -805,7 +839,14 @@ export default function WaiterDashboard() {
                             </div>
                             <div className="space-y-1 pb-3 mb-3 border-b border-dashed" style={{ borderColor: st.border }}>
                               {order.items?.map((item, idx) => (
-                                <p key={idx} className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name || 'Item'}</p>
+                                <div key={idx} className="flex flex-col">
+                                  <p className="text-[12px] text-slate-600"><span className="font-bold">{item.quantity}×</span> {item.menu_item?.name || 'Item'}</p>
+                                  {item.modifiers && item.modifiers.length > 0 && (
+                                    <div className="pl-6 text-[10px] text-slate-400">
+                                      {item.modifiers.map(m => `+ ${m.modifier?.name || 'Add-on'}`).join(', ')}
+                                    </div>
+                                  )}
+                                </div>
                               ))}
                             </div>
                             <div className="flex justify-end gap-2 mt-2">
@@ -970,6 +1011,14 @@ export default function WaiterDashboard() {
           restaurantName={localStorage.getItem('restaurantName') || 'BARKAT POS'}
           gstin={localStorage.getItem('restaurantGstin') || undefined}
           fssai={localStorage.getItem('restaurantFssai') || undefined}
+        />
+      )}
+
+      {customizingItem && (
+        <CustomizationModal
+          item={customizingItem}
+          onClose={() => setCustomizingItem(null)}
+          onAddToCart={(item, modifiers, quantity, notes) => addToCart(item, modifiers, quantity, notes)}
         />
       )}
     </div>

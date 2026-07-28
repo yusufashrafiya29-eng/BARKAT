@@ -70,15 +70,34 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         if not menu_item.is_available:
             raise HTTPException(status_code=400, detail=f"Menu item {menu_item.name} is currently unavailable")
             
-        subtotal = menu_item.price * item_in.quantity
+        from models.menu import Modifier
+        from models.order import OrderItemModifier
+        
+        base_price = menu_item.price
+        modifiers_total = 0.0
+        selected_modifiers = []
+        
+        if hasattr(item_in, 'modifiers') and item_in.modifiers:
+            for mod_in in item_in.modifiers:
+                modifier = db.query(Modifier).filter(Modifier.id == mod_in.modifier_id).first()
+                if modifier and modifier.is_available:
+                    modifiers_total += modifier.price
+                    selected_modifiers.append(modifier)
+                    
+        unit_price = base_price + modifiers_total
+        subtotal = unit_price * item_in.quantity
         item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
         
         subtotal_sum += subtotal
         tax_sum += item_tax
         
         # Check if item already exists in this order to increment quantity instead of adding new row
-        existing_item = db.query(OrderItem).filter(OrderItem.order_id == new_order.id, OrderItem.menu_item_id == menu_item.id).first()
-        if existing_item:
+        # Only combine if neither has modifiers (to keep it simple and safe)
+        existing_item = None
+        if not selected_modifiers:
+            existing_item = db.query(OrderItem).filter(OrderItem.order_id == new_order.id, OrderItem.menu_item_id == menu_item.id).first()
+            
+        if existing_item and not db.query(OrderItemModifier).filter(OrderItemModifier.order_item_id == existing_item.id).first():
             existing_item.quantity += item_in.quantity
             existing_item.subtotal += subtotal
         else:
@@ -86,11 +105,20 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
                 order_id=new_order.id,
                 menu_item_id=menu_item.id,
                 quantity=item_in.quantity,
-                price_at_order_time=menu_item.price,
+                price_at_order_time=unit_price,
                 subtotal=subtotal,
                 notes=item_in.notes
             )
             db.add(new_order_item)
+            db.flush() # get new_order_item.id
+            
+            for modifier in selected_modifiers:
+                new_modifier_record = OrderItemModifier(
+                    order_item_id=new_order_item.id,
+                    modifier_id=modifier.id,
+                    price_at_order_time=modifier.price
+                )
+                db.add(new_modifier_record)
         
     # 5. Apply exact total and commit atomic transaction
     new_order.subtotal_amount = subtotal_sum

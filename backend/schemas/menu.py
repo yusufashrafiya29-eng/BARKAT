@@ -1,6 +1,37 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from uuid import UUID
+from uuid import UUID
+
+class ModifierBase(BaseModel):
+    name: str
+    price: float = 0.0
+    is_available: bool = True
+
+class ModifierCreate(ModifierBase):
+    pass
+
+class ModifierRead(ModifierBase):
+    id: UUID
+    group_id: UUID
+    class Config:
+        from_attributes = True
+
+class ModifierGroupBase(BaseModel):
+    name: str
+    is_required: bool = False
+    min_selections: int = 0
+    max_selections: int = 1
+
+class ModifierGroupCreate(ModifierGroupBase):
+    modifiers: List[ModifierCreate] = []
+
+class ModifierGroupRead(ModifierGroupBase):
+    id: UUID
+    menu_item_id: UUID
+    modifiers: List[ModifierRead] = []
+    class Config:
+        from_attributes = True
 
 class MenuItemBase(BaseModel):
     name: str
@@ -36,6 +67,7 @@ class MenuItemRead(MenuItemBase):
     id: UUID
     category_id: UUID
     recipe_ingredients: List[RecipeIngredientRead] = []
+    modifier_groups: List[ModifierGroupRead] = []
 
     class Config:
         from_attributes = True
@@ -51,6 +83,7 @@ class MenuItemUpdate(BaseModel):
     tax_rate: Optional[float] = None
     model_3d_url: Optional[str] = None
     model_3d_task_id: Optional[str] = None
+    modifier_groups: Optional[List[ModifierGroupCreate]] = None
 
 class CategoryBase(BaseModel):
     name: str

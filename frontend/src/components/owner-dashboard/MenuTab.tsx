@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ImagePlus, Loader2, FileText, Trash2, Box } from 'lucide-react';
+import { ImagePlus, Loader2, FileText, Trash2, Box, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
 
-export default function MenuTab({ handleOpenRecipeEditor }: { handleOpenRecipeEditor: (item: any) => void }) {
+export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: { handleOpenRecipeEditor: (item: any) => void, handleOpenEditMenu: (item: any) => void }) {
   const { menuCategories, fetchData } = useOwnerStore();
   const [isUploadingImage, setIsUploadingImage] = useState<Record<string, boolean>>({});
   const [isGenerating3D, setIsGenerating3D] = useState<Record<string, boolean>>({});
@@ -166,6 +166,13 @@ export default function MenuTab({ handleOpenRecipeEditor }: { handleOpenRecipeEd
                         <Box size={14} />
                       </div>
                     )}
+                    <button 
+                      onClick={() => handleOpenEditMenu(item)}
+                      className="text-muted hover:text-indigo-500 transition-colors p-1 rounded hover:bg-indigo-50"
+                      title="Edit Menu Item"
+                    >
+                      <Edit3 size={14} />
+                    </button>
                     <button 
                       onClick={() => handleDeleteMenuItem(item.id, item.name)}
                       className="text-muted hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-50"

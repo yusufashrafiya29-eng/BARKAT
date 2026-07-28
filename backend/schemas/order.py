@@ -1,14 +1,30 @@
 import re
 from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime
 from models.order import OrderStatus
+
+class OrderItemModifierBase(BaseModel):
+    modifier_id: UUID
+
+class OrderItemModifierCreate(OrderItemModifierBase):
+    pass
+
+class OrderItemModifierRead(OrderItemModifierBase):
+    id: UUID
+    order_item_id: UUID
+    price_at_order_time: float
+    modifier: Optional[Any] = None
+    
+    class Config:
+        from_attributes = True
 
 class OrderItemCreate(BaseModel):
     menu_item_id: UUID
     quantity: int = 1
     notes: Optional[str] = None
+    modifiers: List[OrderItemModifierCreate] = []
 
 class OrderItemRead(BaseModel):
     id: UUID
@@ -18,6 +34,7 @@ class OrderItemRead(BaseModel):
     subtotal: float
     notes: Optional[str] = None
     status: str = "PENDING"
+    modifiers: List[OrderItemModifierRead] = []
 
     class Config:
         from_attributes = True
