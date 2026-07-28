@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Plus, Minus,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
+import { ownerApi } from '../api/owner';
 import toast from 'react-hot-toast';
 import ReceiptPrinter from '../components/ReceiptPrinter';
 import CustomizationModal from '../components/CustomizationModal';
@@ -61,6 +62,12 @@ export default function WaiterDashboard() {
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
 
+  // Drag and Drop State
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [draggingTableId, setDraggingTableId] = useState<string | null>(null);
+  const wasDragging = useRef(false);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+
   const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
 
   const handlePrintReceipt = (order: Order) => {
@@ -68,6 +75,57 @@ export default function WaiterDashboard() {
     setTimeout(() => {
       window.print();
     }, 100); // Wait for React to render the invisible component
+  };
+
+  /* ── Drag and Drop Handlers ─────────────────────────────── */
+  const handlePointerDown = (e: React.PointerEvent, id: string) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDraggingTableId(id);
+    wasDragging.current = false;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!draggingTableId || !containerRef.current) return;
+    
+    if (Math.abs(e.clientX - dragStartPos.current.x) > 5 || Math.abs(e.clientY - dragStartPos.current.y) > 5) {
+      wasDragging.current = true;
+    }
+
+    if (wasDragging.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      let newX = ((e.clientX - rect.left) / rect.width) * 100;
+      let newY = ((e.clientY - rect.top) / rect.height) * 100;
+      
+      newX = Math.max(0, Math.min(100, newX));
+      newY = Math.max(0, Math.min(100, newY));
+
+      setTables(prev => prev.map((t: any) => 
+        t.id === draggingTableId ? { ...t, position_x: newX, position_y: newY } : t
+      ));
+    }
+  };
+
+  const handlePointerUp = async (e: React.PointerEvent) => {
+    if (!draggingTableId) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    if (wasDragging.current) {
+      const draggedTable = tables.find(t => t.id === draggingTableId);
+      if (draggedTable) {
+        try {
+          await ownerApi.updateTablePositions([{ 
+            id: draggedTable.id, 
+            position_x: (draggedTable as any).position_x || 0, 
+            position_y: (draggedTable as any).position_y || 0 
+          }]);
+          toast.success("Table position saved");
+        } catch (error) {
+          console.error("Failed to save table position", error);
+        }
+      }
+    }
+    setDraggingTableId(null);
   };
 
   /* ── Data fetching ─────────────────────────────────────────── */
@@ -374,7 +432,14 @@ export default function WaiterDashboard() {
 
             {/* Custom Floor Plan OR Sections grid */}
             {tables.some((t: any) => t.position_x > 0 || t.position_y > 0) ? (
-              <div className="relative w-full aspect-[16/9] md:aspect-[21/9]">
+              <div 
+                ref={containerRef}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                style={{ touchAction: 'none' }}
+                className="relative w-full aspect-[16/9] md:aspect-[21/9]"
+              >
                 {tables.map(table => {
                   const isPending = (table as any).hasPendingCustomerOrder;
                   const isOccupied = table.status === 'Occupied';
@@ -394,8 +459,15 @@ export default function WaiterDashboard() {
                   return (
                     <button
                       key={table.id}
-                      onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className={`absolute w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all duration-300 hover:scale-110 hover:shadow-xl ${isReserved ? 'ring-4 ring-amber-400' : ''}`}
+                      onPointerDown={(e) => handlePointerDown(e, table.id)}
+                      onClick={(e) => { 
+                        if (wasDragging.current) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); 
+                      }}
+                      className={`absolute w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all duration-300 hover:scale-110 hover:shadow-xl cursor-pointer select-none ${isReserved ? 'ring-4 ring-amber-400' : ''} ${draggingTableId === table.id ? 'z-50 scale-110 shadow-2xl ring-4 ring-indigo-500' : ''}`}
                       style={{
                         left: `${x}%`,
                         top: `${y}%`,
