@@ -14,11 +14,10 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_i
     if not order:
         raise HTTPException(status_code=404, detail="Order not found. Cannot generate bill.")
         
-    subtotal = order.total_amount
-    tax_rate = 0.05 
-    tax_amount = subtotal * tax_rate
-    
-    total_amount = subtotal + tax_amount - bill_in.discount_amount
+    subtotal = order.subtotal_amount or 0.0
+    tax_amount = order.tax_amount or 0.0
+    discount = bill_in.discount_amount or 0.0
+    total_amount = subtotal + tax_amount - discount
     if total_amount < 0:
         total_amount = 0.0
         
@@ -27,7 +26,7 @@ def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_i
         order_id=order_id,
         subtotal=subtotal,
         tax_amount=tax_amount,
-        discount_amount=bill_in.discount_amount,
+        discount_amount=discount,
         total_amount=total_amount,
         payment_method=bill_in.payment_method,
         status=PaymentStatus.PENDING
