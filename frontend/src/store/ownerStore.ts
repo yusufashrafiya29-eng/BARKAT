@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ownerApi } from '../api/owner';
 import { waiterApi } from '../api/waiter';
+import { authApi } from '../api/auth';
 import toast from 'react-hot-toast';
 
 interface OwnerState {
@@ -66,7 +67,6 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
 
   initSubscription: async () => {
     try {
-      const { authApi } = await import('../api/auth');
       const { data } = await authApi.getMe();
       if (data) {
         if (data.restaurant_gstin) localStorage.setItem('restaurantGstin', data.restaurant_gstin);

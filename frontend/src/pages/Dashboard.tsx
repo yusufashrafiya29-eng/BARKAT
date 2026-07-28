@@ -74,6 +74,8 @@ const Dashboard: React.FC = () => {
           toast.error('Session expired. Please log in again.');
           navigate('/login');
         } else {
+          8
+
           toast.error('Server is restarting. Please wait a moment.');
         }
       } finally {
@@ -185,17 +187,17 @@ const Dashboard: React.FC = () => {
           {/* Restaurant Logo — borderless, bigger */}
           {(restaurantLogo && !imageError)
             ? <img
-                src={restaurantLogo}
-                alt="Logo"
-                className="w-16 h-16 shrink-0 object-contain"
-                onError={() => setImageError(true)}
-              />
+              src={restaurantLogo}
+              alt="Logo"
+              className="w-16 h-16 shrink-0 object-contain"
+              onError={() => setImageError(true)}
+            />
             : <span
-                className="text-[28px] font-black leading-none shrink-0"
-                style={{ color: '#4338ca' }}
-              >
-                {restaurantName.charAt(0).toUpperCase()}
-              </span>
+              className="text-[28px] font-black leading-none shrink-0"
+              style={{ color: '#4338ca' }}
+            >
+              {restaurantName.charAt(0).toUpperCase()}
+            </span>
           }
           <div>
             <div className="flex items-center gap-2">
@@ -239,20 +241,20 @@ const Dashboard: React.FC = () => {
             <div className="flex flex-col items-center gap-4 mb-8">
               {(restaurantLogo && !imageError)
                 ? <img
-                    src={restaurantLogo}
-                    alt="Logo"
-                    className="w-44 h-44 object-contain"
-                    onError={() => setImageError(true)}
-                  />
+                  src={restaurantLogo}
+                  alt="Logo"
+                  className="w-44 h-44 object-contain"
+                  onError={() => setImageError(true)}
+                />
                 : <div
-                    className="w-44 h-44 rounded-3xl flex items-center justify-center"
-                    style={{
-                      background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 50%,#7c3aed 100%)',
-                      boxShadow: '0 8px 32px rgb(79 70 229 / .25)',
-                    }}
-                  >
-                    <span className="text-white font-black text-[72px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
-                  </div>
+                  className="w-44 h-44 rounded-3xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg,#4338ca 0%,#6366f1 50%,#7c3aed 100%)',
+                    boxShadow: '0 8px 32px rgb(79 70 229 / .25)',
+                  }}
+                >
+                  <span className="text-white font-black text-[72px] leading-none">{restaurantName.charAt(0).toUpperCase()}</span>
+                </div>
               }
 
               <div>
@@ -284,8 +286,8 @@ const Dashboard: React.FC = () => {
 
           {/* Workspace Cards */}
           <div className={`grid gap-5 ${workspaces.length === 1 ? 'max-w-sm mx-auto' :
-              workspaces.length === 2 ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' :
-                'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            workspaces.length === 2 ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' :
+              'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
             }`}>
             {workspaces.map((ws: any) => (
               <button
