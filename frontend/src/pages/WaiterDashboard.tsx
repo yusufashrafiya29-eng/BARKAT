@@ -372,52 +372,8 @@ export default function WaiterDashboard() {
               </div>
             </div>
 
-            {/* AC / Non-AC sections or Custom Floor Plan */}
-            {tables.some((t: any) => t.position_x > 0 || t.position_y > 0) ? (
-              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="absolute top-4 left-4 text-[12px] font-bold text-slate-400 uppercase tracking-widest pointer-events-none">
-                  Restaurant Floor Plan
-                </div>
-                {tables.map(table => {
-                  const isPending = (table as any).hasPendingCustomerOrder;
-                  const isOccupied = table.status === 'Occupied';
-                  
-                  const today = new Date().toISOString().split('T')[0];
-                  const tableReservations = reservations.filter(r => 
-                    r.table_id === table.id && 
-                    (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
-                    r.reservation_date.startsWith(today)
-                  );
-                  const isReserved = tableReservations.length > 0;
-                  
-                  // Use existing positions or fallback to center if they somehow have 0
-                  const x = (table as any).position_x || 50;
-                  const y = (table as any).position_y || 50;
-
-                  return (
-                    <button
-                      key={table.id}
-                      onClick={() => { setSelectedTable(table); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className={`absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-center font-extrabold text-[24px] transition-transform duration-200 hover:scale-110 ${isReserved ? 'ring-2 ring-amber-400' : ''}`}
-                      style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        transform: 'translate(-50%, -50%)',
-                        background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
-                        color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
-                        border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
-                        boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .25)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .2)' : '0 1px 4px rgb(0 0 0 / .05)',
-                      }}
-                    >
-                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡ NEW</span>}
-                      {table.table_number}
-                      <span className="absolute -bottom-3 text-[10px] font-bold opacity-90 uppercase bg-white px-2 py-0.5 rounded shadow-sm border border-slate-100 whitespace-nowrap">{isPending ? 'Pending' : isOccupied ? table.status : isReserved ? `Rsv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              // Fallback to sections grid if no custom layout
+            {/* Sections grid */}
+            {!tables.every((t: any) => !t.category && !t.section) && (
               ['AC', 'Non-AC'].map(section => {
               const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);
               if (sectionTables.length === 0) return null;
@@ -465,13 +421,13 @@ export default function WaiterDashboard() {
                           }}
                         >
                           {isPending && (
-                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
+                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
                               ⚡ NEW
                             </span>
                           )}
                           {/* Table number box */}
                           <div
-                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] transition-transform duration-200 group-hover:scale-105"
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] transition-transform duration-200 group-hover:scale-105"
                             style={{
                               background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
                               color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
@@ -527,8 +483,8 @@ export default function WaiterDashboard() {
                         boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : isReserved ? '0 4px 20px rgb(245 158 11 / .12)' : '0 1px 4px rgb(0 0 0 / .04)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡ NEW</span>}
-                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
+                      {isPending && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff' }}>⚡ NEW</span>}
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-[18px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
                         {table.table_number}
                       </div>
                       <div className="text-center">
