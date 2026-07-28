@@ -48,12 +48,19 @@ export default function CustomizationModal({ item, onClose, onAddToCart }: Custo
 
   const calculateTotal = () => {
     let modTotal = 0;
-    Object.values(selectedMods).forEach(mods => {
+    let basePrice = item.price;
+    Object.keys(selectedMods).forEach(groupId => {
+      const group = item.modifier_groups?.find((g: any) => g.id === groupId);
+      const mods = selectedMods[groupId];
       mods.forEach(m => {
-        modTotal += m.price;
+        if (group?.price_replaces_base) {
+          basePrice = m.price;
+        } else {
+          modTotal += m.price;
+        }
       });
     });
-    return (item.price + modTotal) * quantity;
+    return (basePrice + modTotal) * quantity;
   };
 
   const handleAdd = () => {

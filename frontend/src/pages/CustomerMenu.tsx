@@ -292,8 +292,19 @@ const CustomerMenu: React.FC = () => {
   };
   
   const totalAmount = cart.reduce((sum, item) => {
-    const modsTotal = item.modifiers?.reduce((a, m) => a + m.price, 0) || 0;
-    return sum + ((item.price + modsTotal) * item.quantity);
+    let basePrice = item.price;
+    let modsTotal = 0;
+    
+    item.modifiers?.forEach(m => {
+      const group = item.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));
+      if (group?.price_replaces_base) {
+        basePrice = m.price;
+      } else {
+        modsTotal += m.price;
+      }
+    });
+    
+    return sum + ((basePrice + modsTotal) * item.quantity);
   }, 0) + tipAmount;
 
   const handlePlaceOrder = async () => {

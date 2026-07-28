@@ -142,8 +142,17 @@ export default function WaiterDashboard() {
   const updateNotes = (cartItemId: string, notes: string) =>
     setCart(prev => prev.map(i => i.cartItemId === cartItemId ? { ...i, notes } : i));
   const totalAmount = cart.reduce((s, i) => {
-    const modsTotal = i.modifiers?.reduce((a, m) => a + m.price, 0) || 0;
-    return s + (i.price + modsTotal) * i.quantity;
+    let basePrice = i.price;
+    let modsTotal = 0;
+    i.modifiers?.forEach(m => {
+      const group = i.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));
+      if (group?.price_replaces_base) {
+        basePrice = m.price;
+      } else {
+        modsTotal += m.price;
+      }
+    });
+    return s + (basePrice + modsTotal) * i.quantity;
   }, 0);
 
   /* ── Order actions ──────────────────────────────────────────── */
@@ -675,7 +684,16 @@ export default function WaiterDashboard() {
                                 {item.modifiers.map(m => `+ ${m.name}`).join(', ')}
                               </div>
                             )}
-                            <p className="text-[11px] text-indigo-600 font-bold">₹{((item.price + (item.modifiers?.reduce((a,m) => a + m.price, 0) || 0)) * item.quantity).toFixed(2)}</p>
+                            <p className="text-[11px] text-indigo-600 font-bold">₹{((() => {
+                              let bp = item.price;
+                              let mt = 0;
+                              item.modifiers?.forEach(m => {
+                                const group = item.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));
+                                if (group?.price_replaces_base) bp = m.price;
+                                else mt += m.price;
+                              });
+                              return bp + mt;
+                            })() * item.quantity).toFixed(2)}</p>
                           </div>
                           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1">
                             <button onClick={() => updateQuantity(item.cartItemId, -1)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"><Minus size={11} className="text-slate-600" /></button>

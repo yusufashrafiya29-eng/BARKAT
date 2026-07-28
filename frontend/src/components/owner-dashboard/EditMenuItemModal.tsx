@@ -27,7 +27,7 @@ export default function EditMenuItemModal({ item, categories, onClose, onSuccess
       ...formData,
       modifier_groups: [
         ...formData.modifier_groups,
-        { name: '', is_required: false, min_selections: 0, max_selections: 1, modifiers: [] }
+        { name: '', is_required: false, min_selections: 0, max_selections: 1, price_replaces_base: false, modifiers: [] }
       ]
     });
   };
@@ -198,6 +198,15 @@ export default function EditMenuItemModal({ item, categories, onClose, onSuccess
                         className="w-4 h-4 rounded"
                       />
                       <span className="text-sm">Required</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={group.price_replaces_base || false}
+                        onChange={e => handleUpdateGroup(gIndex, 'price_replaces_base', e.target.checked)}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[12px] leading-tight text-gray-600 dark:text-gray-400">Price replaces base<br/>(e.g., for Sizes)</span>
                     </label>
                     <button type="button" onClick={() => handleRemoveGroup(gIndex)} className="text-rose-500 hover:bg-rose-50 p-2 rounded mt-0.5">
                       <Trash2 size={16} />
