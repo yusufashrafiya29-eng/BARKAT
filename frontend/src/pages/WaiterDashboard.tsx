@@ -391,8 +391,8 @@ export default function WaiterDashboard() {
                   const isReserved = tableReservations.length > 0;
                   
                   // Use existing positions or fallback to center if they somehow have 0
-                  const x = table.position_x || 50;
-                  const y = table.position_y || 50;
+                  const x = (table as any).position_x || 50;
+                  const y = (table as any).position_y || 50;
 
                   return (
                     <button
@@ -499,7 +499,8 @@ export default function WaiterDashboard() {
                   </div>
                 </div>
               );
-            })}
+            })
+            )}
 
             {/* Fallback (if no section data) */}
             {tables.every((t: any) => !t.category && !t.section) && (
