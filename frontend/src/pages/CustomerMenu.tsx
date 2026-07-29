@@ -555,11 +555,15 @@ const CustomerMenu: React.FC = () => {
                          <div className="absolute right-3 bottom-3" onClick={(e) => e.stopPropagation()}>
                             {!item.is_available ? (
                               <span className="flex text-[10px] uppercase font-bold text-gray-600 bg-white/5 px-3 py-1.5 rounded-full">SOLDOUT</span>
+                            ) : (item.modifier_groups && item.modifier_groups.length > 0) ? (
+                              <button onClick={() => handleAddToCartClick(item)} className="bg-[#e6c27a] text-black px-3 py-1.5 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform text-[11px] font-bold tracking-widest uppercase">
+                                ADD {cart.filter(c => c.id === item.id).reduce((sum, c) => sum + c.quantity, 0) > 0 ? `(${cart.filter(c => c.id === item.id).reduce((sum, c) => sum + c.quantity, 0)})` : ''}
+                              </button>
                             ) : cartItem ? (
                               <div className="flex items-center justify-between bg-[#e6c27a] px-1 py-1 rounded-full w-24">
-                                <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 text-black hover:bg-black/30"><Minus size={12} /></button>
+                                <button onClick={() => updateQuantity(cartItem.cartItemId, -1)} className="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 text-black hover:bg-black/30"><Minus size={12} /></button>
                                 <span className="text-[13px] font-black text-black">{cartItem.quantity}</span>
-                                <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 text-black hover:bg-black/30"><Plus size={12} /></button>
+                                <button onClick={() => updateQuantity(cartItem.cartItemId, 1)} className="w-6 h-6 flex items-center justify-center rounded-full bg-black/20 text-black hover:bg-black/30"><Plus size={12} /></button>
                               </div>
                             ) : (
                               <button onClick={() => handleAddToCartClick(item)} className="bg-[#e6c27a] text-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform">

@@ -505,10 +505,10 @@ export default function WaiterDashboard() {
           VIEW: ORDER (MENU + CART)
           ════════════════════════════════════════════════ */}
       {view === 'order' && (
-        <div className="flex-grow flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
+        <div className="flex-grow flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-y-auto md:overflow-hidden">
 
           {/* ── LEFT: Menu ── */}
-          <div className="flex-[1.6] flex flex-col border-r border-slate-200 h-full" style={{ background: '#f8fafc' }}>
+          <div className="flex-[1.6] flex flex-col border-b md:border-b-0 md:border-r border-slate-200 shrink-0 min-h-[65vh] md:min-h-0 md:h-full" style={{ background: '#f8fafc' }}>
 
             {/* Search + Filter bar */}
             <div className="p-4 border-b border-slate-200 bg-white space-y-3">
@@ -595,7 +595,7 @@ export default function WaiterDashboard() {
           </div>
 
           {/* ── RIGHT: Cart / Order Ticket ── */}
-          <div className="flex-1 flex flex-col h-full lg:min-w-[380px] bg-white">
+          <div className="flex-1 flex flex-col shrink-0 min-h-[50vh] md:min-h-0 md:h-full lg:min-w-[380px] bg-white">
 
             {/* Cart header */}
             <div className="h-[60px] px-5 border-b border-slate-100 flex items-center justify-between shrink-0">

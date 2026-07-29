@@ -82,7 +82,7 @@ export default function CustomizationModal({ item, onClose, onAddToCart }: Custo
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center sm:p-4">
       <div className="bg-white dark:bg-gray-900 w-full sm:max-w-md sm:rounded-2xl shadow-xl flex flex-col max-h-[90vh] rounded-t-2xl sm:rounded-t-2xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-4">
         
         <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
