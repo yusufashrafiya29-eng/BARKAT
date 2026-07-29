@@ -210,6 +210,24 @@ def update_menu_item_recipe(
 from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead, Model3DGenerateRequest
 from services import meshy_service
 
+def _upload_model_to_supabase(file_url: str) -> str:
+    import requests
+    import uuid
+    from db.supabase import supabase_client
+    try:
+        resp = requests.get(file_url)
+        resp.raise_for_status()
+        file_name = f"{uuid.uuid4().hex}.glb"
+        supabase_client.storage.from_('logos').upload(
+            path=f"models/{file_name}",
+            file=resp.content,
+            file_options={"content-type": "model/gltf-binary"}
+        )
+        return supabase_client.storage.from_('logos').get_public_url(f"models/{file_name}")
+    except Exception as e:
+        print(f"Failed to upload model to Supabase: {e}")
+        return file_url
+
 @router.post("/items/{item_id}/generate-3d")
 def generate_3d_model(
     item_id: str,
@@ -294,7 +312,8 @@ def check_3d_model_status(
         
         if status_info["status"] == "success" and status_info["model_url"]:
             if item.model_3d_task_id.startswith("resize_"):
-                item.model_3d_url = status_info["model_url"]
+                permanent_url = _upload_model_to_supabase(status_info["model_url"])
+                item.model_3d_url = permanent_url
                 item.model_3d_task_id = None  # Clear task ID on completion
                 db.commit()
             else:
@@ -311,7 +330,8 @@ def check_3d_model_status(
                 except Exception as resize_err:
                     print(f"Failed to submit Resize task: {resize_err}")
                     # Fallback: Save original GLB if resizing fails
-                    item.model_3d_url = status_info["model_url"]
+                    permanent_url = _upload_model_to_supabase(status_info["model_url"])
+                    item.model_3d_url = permanent_url
                     item.model_3d_task_id = None
                     db.commit()
                     return status_info
