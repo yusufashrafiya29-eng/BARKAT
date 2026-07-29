@@ -23,7 +23,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
 
   // Global polling for items that have a task_id but no url
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: ReturnType<typeof setInterval>;
     
     const pendingItems = menuCategories.flatMap(cat => cat.menu_items || []).filter(item => item.model_3d_task_id && !item.model_3d_url);
     
