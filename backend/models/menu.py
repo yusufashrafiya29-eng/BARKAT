@@ -52,6 +52,8 @@ class MenuItem(Base):
     image_url = Column(String, nullable=True)
     model_3d_url = Column(String, nullable=True)
     model_3d_task_id = Column(String, nullable=True)
+    model_3d_height = Column(Float, default=12.0, nullable=False)
+
 
     # Relationships
     category = relationship("Category", back_populates="menu_items")

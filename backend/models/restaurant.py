@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, func, Float, Boolean
+from sqlalchemy import Column, String, DateTime, func, Float, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
 from sqlalchemy.orm import relationship
@@ -24,6 +24,8 @@ class Restaurant(Base):
     subscription_plan = Column(String, default="basic") # "basic", "pro", "max"
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
+    model_3d_credits = Column(Integer, default=10, nullable=False)
+
     
     # Audit timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

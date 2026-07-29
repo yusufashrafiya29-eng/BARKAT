@@ -19,6 +19,7 @@ export default function EditMenuItemModal({ item, categories, onClose, onSuccess
     tax_rate: item.tax_rate ?? 5.0,
     category_id: item.category_id || '',
     is_veg: item.is_veg || false,
+    model_3d_height: item.model_3d_height ?? 12.0,
     modifier_groups: item.modifier_groups ? JSON.parse(JSON.stringify(item.modifier_groups)) : []
   });
 
@@ -151,6 +152,23 @@ export default function EditMenuItemModal({ item, categories, onClose, onSuccess
               rows={2}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Default 3D Model Height (cm)</label>
+              <input
+                required
+                type="number"
+                min="1"
+                max="100"
+                step="0.5"
+                value={formData.model_3d_height}
+                onChange={e => setFormData({ ...formData, model_3d_height: parseFloat(e.target.value) || 12.0 })}
+                className="form-input"
+              />
+            </div>
+          </div>
+
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input

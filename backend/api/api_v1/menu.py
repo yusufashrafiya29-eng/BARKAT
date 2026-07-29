@@ -168,6 +168,18 @@ def generate_3d_model(
     if token.get("role") != "OWNER":
         raise HTTPException(status_code=403, detail="Owner access required")
         
+    from models.restaurant import Restaurant
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    # Check 3D credit balance
+    if restaurant.model_3d_credits <= 0:
+        raise HTTPException(
+            status_code=403, 
+            detail="Insufficient 3D credits. Please purchase more credits to generate 3D models."
+        )
+        
     from models.menu import MenuItem
     item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
     if not item:
@@ -177,10 +189,19 @@ def generate_3d_model(
         raise HTTPException(status_code=400, detail="Menu item must have an image_url to generate a 3D model")
         
     try:
+        # Start generation task
         task_id = meshy_service.generate_3d_model_task(item.image_url)
         item.model_3d_task_id = task_id
+        
+        # Deduct 1 credit from restaurant
+        restaurant.model_3d_credits -= 1
+        
         db.commit()
-        return {"message": "3D generation started", "task_id": task_id}
+        return {
+            "message": "3D generation started", 
+            "task_id": task_id, 
+            "remaining_credits": restaurant.model_3d_credits
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -202,13 +223,49 @@ def check_3d_model_status(
         return {"status": "none", "message": "No 3D generation task found"}
         
     try:
-        status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
-        if status_info["status"] == "success" and status_info["model_url"]:
-            item.model_3d_url = status_info["model_url"]
-            item.model_3d_task_id = None # Clear task id
-            db.commit()
+        # Check if the active task is a resize task (prefixed with "resize_")
+        if item.model_3d_task_id.startswith("resize_"):
+            resize_task_id = item.model_3d_task_id.replace("resize_", "")
+            status_info = meshy_service.check_resize_status(resize_task_id)
             
-        return status_info
+            if status_info["status"] == "success" and status_info["model_url"]:
+                item.model_3d_url = status_info["model_url"]
+                item.model_3d_task_id = None  # Clear task id on completion
+                db.commit()
+            elif status_info["status"] == "failed":
+                item.model_3d_task_id = None  # Clear failed task id so they can retry
+                db.commit()
+                
+            return status_info
+        else:
+            # Regular generation task
+            status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
+            
+            if status_info["status"] == "success" and status_info["model_url"]:
+                # Generation succeeded! Now trigger Resize API
+                # Default is 12cm, convert to meters (12.0 / 100.0 = 0.12m)
+                target_height_m = (item.model_3d_height or 12.0) / 100.0
+                try:
+                    resize_task_id = meshy_service.resize_3d_model_task(
+                        input_task_id=item.model_3d_task_id,
+                        resize_height_meters=target_height_m
+                    )
+                    item.model_3d_task_id = f"resize_{resize_task_id}"
+                    db.commit()
+                    return {"status": "running", "message": "Optimizing & resizing model to target height..."}
+                except Exception as resize_err:
+                    print(f"Failed to submit Resize task: {resize_err}")
+                    # Fallback: Save original GLB if resizing fails
+                    item.model_3d_url = status_info["model_url"]
+                    item.model_3d_task_id = None
+                    db.commit()
+                    return status_info
+            elif status_info["status"] == "failed":
+                item.model_3d_task_id = None  # Clear failed task id so they can retry
+                db.commit()
+                
+            return status_info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 

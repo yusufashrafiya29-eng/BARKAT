@@ -1,13 +1,42 @@
 import { useState } from 'react';
-import { ImagePlus, Loader2, FileText, Trash2, Box, Edit3 } from 'lucide-react';
+import { ImagePlus, Loader2, FileText, Trash2, Box, Edit3, X, Sparkles, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
 
+
 export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: { handleOpenRecipeEditor: (item: any) => void, handleOpenEditMenu: (item: any) => void }) {
-  const { menuCategories, fetchData } = useOwnerStore();
+  const { menuCategories, fetchData, model3dCredits } = useOwnerStore();
   const [isUploadingImage, setIsUploadingImage] = useState<Record<string, boolean>>({});
   const [isGenerating3D, setIsGenerating3D] = useState<Record<string, boolean>>({});
+  
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedItemFor3D, setSelectedItemFor3D] = useState<any>(null);
+  const [targetHeight, setTargetHeight] = useState<number>(12);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleOpenConfirmModal = (item: any) => {
+    setSelectedItemFor3D(item);
+    setTargetHeight(item.model_3d_height || 12.0);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmGenerate = async () => {
+    if (!selectedItemFor3D) return;
+    setIsSubmitting(true);
+    try {
+      // Update default height on the item first
+      await ownerApi.updateMenuItem(selectedItemFor3D.id, { model_3d_height: targetHeight });
+      setShowConfirmModal(false);
+      // Trigger AI generation
+      await handleGenerate3D(selectedItemFor3D);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to update item size settings");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const handleGenerate3D = async (item: any) => {
     if (!item.image_url) {
@@ -91,6 +120,20 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
 
   return (
     <div className="space-y-12">
+      {/* Credit Balance Header */}
+      <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-6">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse animate-duration-1000 animate-ease-in-out shrink-0" />
+          <div>
+            <h4 className="text-[13px] font-bold text-indigo-950 uppercase tracking-wider">AI 3D AR Model Credits</h4>
+            <p className="text-[11px] text-indigo-700/80 leading-normal">Generate realistic 3D AR models from food images using AI</p>
+          </div>
+        </div>
+        <div className="bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-full text-[13px] shadow-[0_4px_10px_rgba(79,70,229,0.2)] shrink-0">
+          {model3dCredits} Credits Remaining
+        </div>
+      </div>
+
       {menuCategories.length === 0 ? (
           <div className="surface p-12 text-center border-dashed border-subtle">
             <p className="text-[13px] text-muted">No items found in catalog.</p>
@@ -153,7 +196,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                     </button>
                     {item.image_url && !item.model_3d_url && (
                       <button 
-                        onClick={() => handleGenerate3D(item)}
+                        onClick={() => handleOpenConfirmModal(item)}
                         disabled={isGenerating3D[item.id] || !!item.model_3d_task_id}
                         className={`text-muted transition-colors p-1 rounded ${isGenerating3D[item.id] || item.model_3d_task_id ? 'text-indigo-500 animate-pulse bg-indigo-50' : 'hover:text-indigo-500 hover:bg-indigo-50'}`}
                         title="Generate 3D AR Model"
@@ -204,5 +247,146 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
         </div>
       ))}
     </div>
+
+      {/* 3D GENERATION CONFIRMATION MODAL */}
+      {showConfirmModal && selectedItemFor3D && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => !isSubmitting && setShowConfirmModal(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150 flex flex-col">
+            
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse animate-duration-1000 animate-ease-in-out" />
+                <h3 className="text-[18px] font-bold text-slate-900">Generate 3D AR Model</h3>
+              </div>
+              <button 
+                disabled={isSubmitting}
+                onClick={() => setShowConfirmModal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Item Info Card */}
+              <div className="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                {selectedItemFor3D.image_url ? (
+                  <img 
+                    src={selectedItemFor3D.image_url} 
+                    alt={selectedItemFor3D.name} 
+                    className="w-16 h-16 rounded-lg object-cover border border-slate-200" 
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400">
+                    <Box size={24} />
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-[14px] font-bold text-slate-900">{selectedItemFor3D.name}</h4>
+                  <p className="text-[12px] text-slate-500 leading-normal line-clamp-2 mt-0.5">{selectedItemFor3D.description || 'No description provided.'}</p>
+                </div>
+              </div>
+
+              {/* Height Settings Section */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Target Model Height</label>
+                  <span className="bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full text-[12px] border border-indigo-100">
+                    {targetHeight} cm
+                  </span>
+                </div>
+                
+                <input 
+                  type="range"
+                  min="5"
+                  max="40"
+                  step="0.5"
+                  value={targetHeight}
+                  onChange={(e) => setTargetHeight(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+
+                {/* Presets Grid */}
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {[
+                    { label: 'Beverage', size: 8.0, desc: '8cm (Glass/Cup)' },
+                    { label: 'Standard', size: 12.0, desc: '12cm (Burger/Plate)' },
+                    { label: 'Large/Pizza', size: 18.0, desc: '18cm (Pan/Platter)' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setTargetHeight(preset.size)}
+                      className={`py-1.5 px-2 rounded-lg text-center border transition-colors ${
+                        targetHeight === preset.size 
+                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700' 
+                          : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                      }`}
+                    >
+                      <p className="text-[11px] font-bold">{preset.label}</p>
+                      <p className="text-[9px] opacity-85 mt-0.5">{preset.size}cm</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Credit Status / Warn Box */}
+              <div className={`p-3.5 rounded-xl border flex gap-3 ${
+                model3dCredits > 0 
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                  : 'bg-rose-50 border-rose-100 text-rose-800'
+              }`}>
+                {model3dCredits > 0 ? (
+                  <>
+                    <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-[12px] font-bold">1 Credit will be deducted</p>
+                      <p className="text-[11px] opacity-85 mt-0.5">Remaining Balance: {model3dCredits} Credits</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <div>
+                      <p className="text-[12px] font-bold">Insufficient Credit Balance</p>
+                      <p className="text-[11px] opacity-85 mt-0.5">You have 0 credits. Please contact support or purchase more credits to generate models.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Buttons Row */}
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100">
+              <button 
+                type="button" 
+                disabled={isSubmitting}
+                onClick={() => setShowConfirmModal(false)}
+                className="py-2.5 px-4 rounded-xl text-[13px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors flex-1"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                disabled={isSubmitting || model3dCredits <= 0}
+                onClick={handleConfirmGenerate}
+                className="py-2.5 px-4 rounded-xl text-[13px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:pointer-events-none transition-colors flex-1 flex items-center justify-center gap-1.5"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin animate-duration-1000" />
+                ) : (
+                  <>
+                    <Sparkles size={14} /> Confirm & Generate
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
+

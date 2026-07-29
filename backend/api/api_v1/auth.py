@@ -325,8 +325,11 @@ def get_current_user_info(
             "restaurant_email": local_user.restaurant_email,
             "subscription_status": local_user.restaurant.subscription_status if local_user.restaurant else None,
             "subscription_plan": local_user.restaurant.subscription_plan if local_user.restaurant else None,
+
             "trial_ends_at": local_user.restaurant.trial_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.trial_ends_at else None,
             "subscription_ends_at": local_user.restaurant.subscription_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.subscription_ends_at else None,
+            "model_3d_credits": local_user.restaurant.model_3d_credits if local_user.restaurant else 0,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
         }
     )
+

@@ -45,6 +45,7 @@ class MenuItemBase(BaseModel):
     tax_rate: float = 5.0
     model_3d_url: Optional[str] = None
     model_3d_task_id: Optional[str] = None
+    model_3d_height: float = 12.0
 
 class MenuItemCreate(MenuItemBase):
     category_id: UUID
@@ -84,7 +85,9 @@ class MenuItemUpdate(BaseModel):
     tax_rate: Optional[float] = None
     model_3d_url: Optional[str] = None
     model_3d_task_id: Optional[str] = None
+    model_3d_height: Optional[float] = None
     modifier_groups: Optional[List[ModifierGroupCreate]] = None
+
 
 class CategoryBase(BaseModel):
     name: str

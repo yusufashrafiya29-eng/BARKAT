@@ -185,7 +185,8 @@ export default function OwnerDashboard() {
             category_id: data.category_id as string,
             is_veg: data.is_veg === 'true',
             is_available: true,
-            tax_rate: parseFloat((data.tax_rate as string) || "5.0")
+            tax_rate: parseFloat((data.tax_rate as string) || "5.0"),
+            model_3d_height: parseFloat((data.model_3d_height as string) || "12.0")
           });
         }
       } else if (showAddModal === 'reservations') {
@@ -677,6 +678,13 @@ export default function OwnerDashboard() {
                           </select>
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[12px] font-medium text-main">Default 3D Model Height (cm)</label>
+                          <input name="model_3d_height" type="number" step="0.5" className="form-input" defaultValue="12" min="1" max="100" />
+                        </div>
+                      </div>
+
                     </>
                   )}
                 </>

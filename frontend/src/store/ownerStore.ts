@@ -31,6 +31,7 @@ interface OwnerState {
   subscriptionStatus: string | null;
   subscriptionPlan: string;
   daysRemaining: number | null;
+  model3dCredits: number;
 
   fetchData: () => Promise<void>;
   silentlyFetchData: () => Promise<void>;
@@ -64,6 +65,8 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
   subscriptionStatus: null,
   subscriptionPlan: 'basic',
   daysRemaining: null,
+  model3dCredits: 0,
+
 
   initSubscription: async () => {
     try {
@@ -89,8 +92,10 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
           subscriptionStatus: status || 'trial',
           subscriptionPlan: data.subscription_plan || 'basic',
           daysRemaining: diff !== null ? Math.max(0, diff) : null,
+          model3dCredits: data.model_3d_credits || 0,
         });
         localStorage.setItem('subscriptionPlan', data.subscription_plan || 'basic');
+
       }
     } catch (e) {
       console.error("Failed to init subscription", e);
