@@ -22,6 +22,7 @@ interface MenuItem {
   is_available: boolean;
   image_url?: string;
   model_3d_url?: string;
+  model_3d_active?: boolean;
   modifier_groups?: any[];
 }
 
@@ -520,7 +521,7 @@ const CustomerMenu: React.FC = () => {
                            ) : (
                              <span className="text-gray-700 font-serif text-3xl">{item.name.charAt(0)}</span>
                            )}
-                           {item.model_3d_url && (
+                           {item.model_3d_url && item.model_3d_active !== false && (
                               <div className="absolute bottom-1 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
                                 <span className="text-[8px] font-bold text-[#e6c27a] tracking-widest uppercase">3D/AR</span>
                               </div>
@@ -911,7 +912,7 @@ const CustomerMenu: React.FC = () => {
 
                {/* Action Buttons */}
                <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
-                 {selectedItem.model_3d_url && (
+                 {selectedItem.model_3d_url && selectedItem.model_3d_active !== false && (
                    <button 
                      onClick={() => {
                        setArModelUrl(selectedItem.model_3d_url || null);

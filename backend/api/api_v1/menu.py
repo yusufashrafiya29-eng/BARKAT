@@ -79,6 +79,7 @@ from fastapi import File, UploadFile
 @router.post("/items/{item_id}/upload-image", response_model=MenuItemRead)
 def upload_menu_item_image(
     item_id: str,
+    slot: str = "main",
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     restaurant_id: UUID = Depends(get_current_restaurant),
@@ -111,7 +112,13 @@ def upload_menu_item_image(
     
     public_url = supabase_client.storage.from_('logos').get_public_url(f"menu/{file_name}")
     
-    item.image_url = public_url
+    if slot == "extra1":
+        item.image_url_extra1 = public_url
+    elif slot == "extra2":
+        item.image_url_extra2 = public_url
+    else:
+        item.image_url = public_url
+        
     db.commit()
     db.refresh(item)
     return item
@@ -155,11 +162,13 @@ def update_menu_item_recipe(
         
     return new_ingredients
 
+from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead, Model3DGenerateRequest
 from services import meshy_service
 
 @router.post("/items/{item_id}/generate-3d")
 def generate_3d_model(
     item_id: str,
+    params: Model3DGenerateRequest,
     db: Session = Depends(get_db),
     restaurant_id: UUID = Depends(get_current_restaurant),
     token: dict = Depends(get_current_user_token)
@@ -189,8 +198,20 @@ def generate_3d_model(
         raise HTTPException(status_code=400, detail="Menu item must have an image_url to generate a 3D model")
         
     try:
-        # Start generation task
-        task_id = meshy_service.generate_3d_model_task(item.image_url)
+        # Construct image URLs array
+        image_urls = [item.image_url]
+        if item.image_url_extra1:
+            image_urls.append(item.image_url_extra1)
+        if item.image_url_extra2:
+            image_urls.append(item.image_url_extra2)
+
+        # Start generation task using advanced parameters
+        task_id = meshy_service.generate_3d_model_task(
+            image_urls=image_urls,
+            ai_model=params.ai_model,
+            enable_pbr=params.enable_pbr,
+            texture_resolution=params.texture_resolution
+        )
         item.model_3d_task_id = task_id
         
         # Deduct 1 credit from restaurant
@@ -223,34 +244,23 @@ def check_3d_model_status(
         return {"status": "none", "message": "No 3D generation task found"}
         
     try:
-        # Check if the active task is a resize task (prefixed with "resize_")
-        if item.model_3d_task_id.startswith("resize_"):
-            resize_task_id = item.model_3d_task_id.replace("resize_", "")
-            status_info = meshy_service.check_resize_status(resize_task_id)
-            
-            if status_info["status"] == "success" and status_info["model_url"]:
+        # Unified status check using meshy_service which handles prefixes automatically
+        status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
+        
+        if status_info["status"] == "success" and status_info["model_url"]:
+            if item.model_3d_task_id.startswith("resize_"):
                 item.model_3d_url = status_info["model_url"]
-                item.model_3d_task_id = None  # Clear task id on completion
+                item.model_3d_task_id = None  # Clear task ID on completion
                 db.commit()
-            elif status_info["status"] == "failed":
-                item.model_3d_task_id = None  # Clear failed task id so they can retry
-                db.commit()
-                
-            return status_info
-        else:
-            # Regular generation task
-            status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
-            
-            if status_info["status"] == "success" and status_info["model_url"]:
+            else:
                 # Generation succeeded! Now trigger Resize API
-                # Default is 12cm, convert to meters (12.0 / 100.0 = 0.12m)
                 target_height_m = (item.model_3d_height or 12.0) / 100.0
                 try:
                     resize_task_id = meshy_service.resize_3d_model_task(
                         input_task_id=item.model_3d_task_id,
                         resize_height_meters=target_height_m
                     )
-                    item.model_3d_task_id = f"resize_{resize_task_id}"
+                    item.model_3d_task_id = resize_task_id
                     db.commit()
                     return {"status": "running", "message": "Optimizing & resizing model to target height..."}
                 except Exception as resize_err:
@@ -260,12 +270,35 @@ def check_3d_model_status(
                     item.model_3d_task_id = None
                     db.commit()
                     return status_info
-            elif status_info["status"] == "failed":
-                item.model_3d_task_id = None  # Clear failed task id so they can retry
-                db.commit()
-                
-            return status_info
+        elif status_info["status"] == "failed":
+            item.model_3d_task_id = None  # Clear failed task ID so they can retry
+            db.commit()
+            
+        return status_info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/items/{item_id}/3d")
+def delete_3d_model(
+    item_id: str,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Clear/delete the generated 3D model for this item."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    item.model_3d_url = None
+    item.model_3d_task_id = None
+    db.commit()
+    return {"message": "3D model deleted successfully"}
+
 
 

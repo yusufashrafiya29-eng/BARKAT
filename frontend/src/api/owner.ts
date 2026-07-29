@@ -172,8 +172,8 @@ export const ownerApi = {
     return response.data;
   },
 
-  uploadMenuItemImage: async (itemId: string, formData: FormData) => {
-    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/upload-image`, formData, {
+  uploadMenuItemImage: async (itemId: string, formData: FormData, slot: string = "main") => {
+    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/upload-image?slot=${slot}`, formData, {
       headers: {
         ...getHeaders().headers,
         'Content-Type': 'multipart/form-data'
@@ -210,13 +210,18 @@ export const ownerApi = {
   },
 
   // 3D AR Methods
-  generate3DModel: async (itemId: string) => {
-    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/generate-3d`, {}, getHeaders());
+  generate3DModel: async (itemId: string, payload: any = {}) => {
+    const response = await axios.post(`${BASE_URL}/menu/items/${itemId}/generate-3d`, payload, getHeaders());
     return response.data;
   },
 
   check3DModelStatus: async (itemId: string) => {
     const response = await axios.get(`${BASE_URL}/menu/items/${itemId}/3d-status`, getHeaders());
+    return response.data;
+  },
+
+  delete3DModel: async (itemId: string) => {
+    const response = await axios.delete(`${BASE_URL}/menu/items/${itemId}/3d`, getHeaders());
     return response.data;
   }
 };

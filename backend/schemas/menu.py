@@ -46,6 +46,10 @@ class MenuItemBase(BaseModel):
     model_3d_url: Optional[str] = None
     model_3d_task_id: Optional[str] = None
     model_3d_height: float = 12.0
+    model_3d_active: bool = True
+    image_url_extra1: Optional[str] = None
+    image_url_extra2: Optional[str] = None
+
 
 class MenuItemCreate(MenuItemBase):
     category_id: UUID
@@ -86,7 +90,16 @@ class MenuItemUpdate(BaseModel):
     model_3d_url: Optional[str] = None
     model_3d_task_id: Optional[str] = None
     model_3d_height: Optional[float] = None
+    model_3d_active: Optional[bool] = None
+    image_url_extra1: Optional[str] = None
+    image_url_extra2: Optional[str] = None
     modifier_groups: Optional[List[ModifierGroupCreate]] = None
+
+class Model3DGenerateRequest(BaseModel):
+    ai_model: str = "meshy-6"
+    enable_pbr: bool = True
+    texture_resolution: str = "2k"
+
 
 
 class CategoryBase(BaseModel):

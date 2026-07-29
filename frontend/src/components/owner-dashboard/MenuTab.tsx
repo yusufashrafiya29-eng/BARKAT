@@ -15,9 +15,19 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
   const [targetHeight, setTargetHeight] = useState<number>(12);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // New advanced generation configurations
+  const [aiModel, setAiModel] = useState<string>("meshy-6");
+  const [removeLighting, setRemoveLighting] = useState<boolean>(true);
+  const [enablePbr, setEnablePbr] = useState<boolean>(true);
+  const [textureResolution, setTextureResolution] = useState<string>("2k");
+
   const handleOpenConfirmModal = (item: any) => {
     setSelectedItemFor3D(item);
     setTargetHeight(item.model_3d_height || 12.0);
+    setAiModel("meshy-6");
+    setRemoveLighting(true);
+    setEnablePbr(true);
+    setTextureResolution("2k");
     setShowConfirmModal(true);
   };
 
@@ -28,17 +38,52 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
       // Update default height on the item first
       await ownerApi.updateMenuItem(selectedItemFor3D.id, { model_3d_height: targetHeight });
       setShowConfirmModal(false);
-      // Trigger AI generation
-      await handleGenerate3D(selectedItemFor3D);
+      // Trigger AI generation with advanced options
+      await handleGenerate3D(selectedItemFor3D, {
+        ai_model: aiModel,
+        enable_pbr: enablePbr,
+        texture_resolution: textureResolution
+      });
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to update item size settings");
+      toast.error(err.response?.data?.detail || "Failed to start generation");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleToggleActive = async () => {
+    if (!selectedItemFor3D) return;
+    setIsSubmitting(true);
+    try {
+      const nextActive = !selectedItemFor3D.model_3d_active;
+      await ownerApi.updateMenuItem(selectedItemFor3D.id, { model_3d_active: nextActive });
+      toast.success(`3D Model ${nextActive ? 'activated' : 'deactivated'}`);
+      setSelectedItemFor3D((prev: any) => ({ ...prev, model_3d_active: nextActive }));
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Action failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const handleGenerate3D = async (item: any) => {
+  const handleDeleteModel = async () => {
+    if (!selectedItemFor3D) return;
+    if (!window.confirm("Are you sure you want to delete this 3D model?")) return;
+    setIsSubmitting(true);
+    try {
+      await ownerApi.delete3DModel(selectedItemFor3D.id);
+      toast.success("3D Model deleted successfully");
+      setShowConfirmModal(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Delete failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerate3D = async (item: any, payload: any) => {
     if (!item.image_url) {
       toast.error("Please upload an image first");
       return;
@@ -46,12 +91,8 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
     
     setIsGenerating3D(prev => ({ ...prev, [item.id]: true }));
     try {
-      if (!item.model_3d_task_id) {
-        await ownerApi.generate3DModel(item.id);
-        toast.success("AI 3D Generation started! This takes about 30 seconds.");
-      } else {
-        toast.success("Resuming 3D generation check...");
-      }
+      await ownerApi.generate3DModel(item.id, payload);
+      toast.success("AI 3D Generation started! This takes about 30-40 seconds.");
       
       const interval = setInterval(async () => {
         try {
@@ -65,6 +106,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
             clearInterval(interval);
             setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
             toast.error(`Failed to generate 3D model for ${item.name}`);
+            fetchData();
           }
         } catch (e) {
           console.error("Polling error", e);
@@ -77,25 +119,25 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
     }
   };
 
-  const handleImageUpload = async (itemId: string, file: File) => {
+  const handleImageUpload = async (itemId: string, file: File, slot: string = "main") => {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image size must be less than 2MB");
       return;
     }
     
-    setIsUploadingImage(prev => ({ ...prev, [itemId]: true }));
+    setIsUploadingImage(prev => ({ ...prev, [`${itemId}_${slot}`]: true }));
     const formData = new FormData();
     formData.append('image', file);
     
     try {
-      await ownerApi.uploadMenuItemImage(itemId, formData);
-      toast.success("Image uploaded successfully");
+      await ownerApi.uploadMenuItemImage(itemId, formData, slot);
+      toast.success(`${slot === 'main' ? 'Main' : slot === 'extra1' ? 'Angle 1' : 'Angle 2'} image uploaded successfully`);
       fetchData(); // refresh menu to get new image URL
     } catch (e: any) {
       toast.error(e.response?.data?.detail || "Failed to upload image");
     } finally {
-      setIsUploadingImage(prev => ({ ...prev, [itemId]: false }));
+      setIsUploadingImage(prev => ({ ...prev, [`${itemId}_${slot}`]: false }));
     }
   };
 
@@ -150,7 +192,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
               <div key={item.id} className="surface p-4 flex flex-col relative group">
                 
                 {/* Image Section */}
-                <div className="w-full h-32 rounded-xl bg-subtle/30 overflow-hidden mb-4 relative group/image">
+                <div className="w-full h-32 rounded-xl bg-subtle/30 overflow-hidden mb-2 relative group/image">
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
@@ -159,28 +201,105 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                       <span className="text-[10px] font-medium uppercase tracking-wider">No Photo</span>
                     </div>
                   )}
-                  
-                  {/* Hover Upload Overlay */}
-                  <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity">
-                    {isUploadingImage[item.id] ? (
-                      <Loader2 size={24} className="animate-spin text-white" />
+                </div>
+
+                {/* Multiple Angle Image Slots */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {/* Main Photo Slot */}
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt="Main" className="w-full h-full object-cover" />
                     ) : (
-                      <>
-                        <ImagePlus size={20} className="text-white mb-1" />
-                        <span className="text-white text-[10px] font-bold uppercase tracking-wider">{item.image_url ? 'Change Photo' : 'Upload Photo'}</span>
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/jpeg, image/png, image/webp" 
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handleImageUpload(item.id, e.target.files[0]);
-                            }
-                          }}
-                        />
-                      </>
+                      <div className="flex flex-col items-center justify-center text-muted">
+                        <ImagePlus size={14} className="opacity-60" />
+                        <span className="text-[8px] font-medium uppercase tracking-wider mt-0.5">Main</span>
+                      </div>
                     )}
-                  </label>
+                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity">
+                      {isUploadingImage[`${item.id}_main`] ? (
+                        <Loader2 size={12} className="animate-spin text-white" />
+                      ) : (
+                        <>
+                          <ImagePlus size={10} className="text-white mb-0.5" />
+                          <span className="text-[8px] text-white font-bold uppercase">Main</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleImageUpload(item.id, e.target.files[0], "main");
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Extra Photo 1 Slot */}
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                    {item.image_url_extra1 ? (
+                      <img src={item.image_url_extra1} alt="Extra 1" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-muted">
+                        <ImagePlus size={14} className="opacity-60" />
+                        <span className="text-[8px] font-medium uppercase tracking-wider mt-0.5">Angle 1</span>
+                      </div>
+                    )}
+                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity">
+                      {isUploadingImage[`${item.id}_extra1`] ? (
+                        <Loader2 size={12} className="animate-spin text-white" />
+                      ) : (
+                        <>
+                          <ImagePlus size={10} className="text-white mb-0.5" />
+                          <span className="text-[8px] text-white font-bold uppercase">Angle 1</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleImageUpload(item.id, e.target.files[0], "extra1");
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Extra Photo 2 Slot */}
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                    {item.image_url_extra2 ? (
+                      <img src={item.image_url_extra2} alt="Extra 2" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-muted">
+                        <ImagePlus size={14} className="opacity-60" />
+                        <span className="text-[8px] font-medium uppercase tracking-wider mt-0.5">Angle 2</span>
+                      </div>
+                    )}
+                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity">
+                      {isUploadingImage[`${item.id}_extra2`] ? (
+                        <Loader2 size={12} className="animate-spin text-white" />
+                      ) : (
+                        <>
+                          <ImagePlus size={10} className="text-white mb-0.5" />
+                          <span className="text-[8px] text-white font-bold uppercase">Angle 2</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleImageUpload(item.id, e.target.files[0], "extra2");
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex justify-between items-start mb-2">
@@ -194,20 +313,23 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                     >
                       <FileText size={14} />
                     </button>
-                    {item.image_url && !item.model_3d_url && (
+                    {item.image_url && (
                       <button 
                         onClick={() => handleOpenConfirmModal(item)}
-                        disabled={isGenerating3D[item.id] || !!item.model_3d_task_id}
-                        className={`text-muted transition-colors p-1 rounded ${isGenerating3D[item.id] || item.model_3d_task_id ? 'text-indigo-500 animate-pulse bg-indigo-50' : 'hover:text-indigo-500 hover:bg-indigo-50'}`}
-                        title="Generate 3D AR Model"
+                        disabled={isGenerating3D[item.id]}
+                        className={`transition-colors p-1 rounded ${
+                          item.model_3d_url 
+                            ? item.model_3d_active 
+                              ? 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100' 
+                              : 'text-amber-500 bg-amber-50 hover:bg-amber-100'
+                            : isGenerating3D[item.id] || item.model_3d_task_id 
+                              ? 'text-indigo-500 animate-pulse bg-indigo-50' 
+                              : 'text-muted hover:text-indigo-500 hover:bg-indigo-50'
+                        }`}
+                        title={item.model_3d_url ? item.model_3d_active ? "3D Model Active (Click to manage)" : "3D Model Inactive (Click to manage)" : "Generate 3D AR Model"}
                       >
                         <Box size={14} />
                       </button>
-                    )}
-                    {item.model_3d_url && (
-                      <div className="text-emerald-500 p-1 bg-emerald-50 rounded" title="3D AR Active">
-                        <Box size={14} />
-                      </div>
                     )}
                     <button 
                       onClick={() => handleOpenEditMenu(item)}
@@ -256,7 +378,9 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse animate-duration-1000 animate-ease-in-out" />
-                <h3 className="text-[18px] font-bold text-slate-900">Generate 3D AR Model</h3>
+                <h3 className="text-[18px] font-bold text-slate-900">
+                  {selectedItemFor3D.model_3d_url ? "Manage 3D AR Model" : "Generate 3D AR Model"}
+                </h3>
               </div>
               <button 
                 disabled={isSubmitting}
@@ -287,73 +411,172 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                 </div>
               </div>
 
-              {/* Height Settings Section */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Target Model Height</label>
-                  <span className="bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full text-[12px] border border-indigo-100">
-                    {targetHeight} cm
-                  </span>
-                </div>
-                
-                <input 
-                  type="range"
-                  min="5"
-                  max="40"
-                  step="0.5"
-                  value={targetHeight}
-                  onChange={(e) => setTargetHeight(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                />
-
-                {/* Presets Grid */}
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  {[
-                    { label: 'Beverage', size: 8.0, desc: '8cm (Glass/Cup)' },
-                    { label: 'Standard', size: 12.0, desc: '12cm (Burger/Plate)' },
-                    { label: 'Large/Pizza', size: 18.0, desc: '18cm (Pan/Platter)' }
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setTargetHeight(preset.size)}
-                      className={`py-1.5 px-2 rounded-lg text-center border transition-colors ${
-                        targetHeight === preset.size 
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700' 
-                          : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
-                      }`}
-                    >
-                      <p className="text-[11px] font-bold">{preset.label}</p>
-                      <p className="text-[9px] opacity-85 mt-0.5">{preset.size}cm</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Credit Status / Warn Box */}
-              <div className={`p-3.5 rounded-xl border flex gap-3 ${
-                model3dCredits > 0 
-                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
-                  : 'bg-rose-50 border-rose-100 text-rose-800'
-              }`}>
-                {model3dCredits > 0 ? (
-                  <>
+              {selectedItemFor3D.model_3d_url ? (
+                /* MANAGEMENT PANEL */
+                <div className="space-y-4 pt-2">
+                  <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-3 rounded-xl flex items-center gap-2.5">
                     <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
                     <div>
-                      <p className="text-[12px] font-bold">1 Credit will be deducted</p>
-                      <p className="text-[11px] opacity-85 mt-0.5">Remaining Balance: {model3dCredits} Credits</p>
+                      <p className="text-[12px] font-bold">3D AR Model Ready</p>
+                      <p className="text-[11px] opacity-90 mt-0.5">Scale size: {selectedItemFor3D.model_3d_height || 12.0} cm</p>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  </div>
+
+                  {/* Active Toggle Option */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
-                      <p className="text-[12px] font-bold">Insufficient Credit Balance</p>
-                      <p className="text-[11px] opacity-85 mt-0.5">You have 0 credits. Please contact support or purchase more credits to generate models.</p>
+                      <h5 className="text-[13px] font-bold text-slate-800">Display Model to Customers</h5>
+                      <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Show or hide the "View in AR" button on customer menu card.</p>
                     </div>
-                  </>
-                )}
-              </div>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleToggleActive}
+                      className={`w-11 h-6 rounded-full transition-colors relative focus:outline-none ${
+                        selectedItemFor3D.model_3d_active ? 'bg-indigo-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                        selectedItemFor3D.model_3d_active ? 'left-6' : 'left-1'
+                      }`} />
+                    </button>
+                  </div>
+
+                  {/* Delete Button Option */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleDeleteModel}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors text-[13px] font-semibold"
+                    >
+                      <Trash2 size={16} /> Delete 3D Model
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* GENERATION CONFIGURATION FORM */
+                <>
+                  {/* Height Settings Section */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Target Model Height</label>
+                      <span className="bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full text-[12px] border border-indigo-100">
+                        {targetHeight} cm
+                      </span>
+                    </div>
+                    
+                    <input 
+                      type="range"
+                      min="5"
+                      max="40"
+                      step="0.5"
+                      value={targetHeight}
+                      onChange={(e) => setTargetHeight(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+
+                    {/* Presets Grid */}
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      {[
+                        { label: 'Beverage', size: 8.0 },
+                        { label: 'Standard', size: 12.0 },
+                        { label: 'Large/Pizza', size: 18.0 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setTargetHeight(preset.size)}
+                          className={`py-1.5 px-2 rounded-lg text-center border transition-colors ${
+                            targetHeight === preset.size 
+                              ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700' 
+                              : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                          }`}
+                        >
+                          <p className="text-[11px] font-bold">{preset.label}</p>
+                          <p className="text-[9px] opacity-85 mt-0.5">{preset.size}cm</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* AI Model Parameter */}
+                  <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">AI Model</label>
+                      <select 
+                        value={aiModel} 
+                        onChange={(e) => setAiModel(e.target.value)} 
+                        className="w-full form-input py-1.5 px-2.5 text-[12px]"
+                      >
+                        <option value="meshy-6">Meshy 6 (Latest)</option>
+                        <option value="meshy-5">Meshy 5</option>
+                        <option value="latest">Auto Select</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Resolution</label>
+                      <select 
+                        value={textureResolution} 
+                        onChange={(e) => setTextureResolution(e.target.value)} 
+                        className="w-full form-input py-1.5 px-2.5 text-[12px]"
+                      >
+                        <option value="2k">2K Quality</option>
+                        <option value="4k">4K Ultra Quality</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Texturing Toggles */}
+                  <div className="grid grid-cols-2 gap-4 pt-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={removeLighting} 
+                        onChange={(e) => setRemoveLighting(e.target.checked)} 
+                        className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[11px] font-medium text-slate-700">Remove Lighting</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={enablePbr} 
+                        onChange={(e) => setEnablePbr(e.target.checked)} 
+                        className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-[11px] font-medium text-slate-700">Generate PBR Maps</span>
+                    </label>
+                  </div>
+
+                  {/* Credit Status Box */}
+                  <div className={`p-3.5 rounded-xl border flex gap-3 ${
+                    model3dCredits > 0 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                      : 'bg-rose-50 border-rose-100 text-rose-800'
+                  }`}>
+                    {model3dCredits > 0 ? (
+                      <>
+                        <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="text-[12px] font-bold">1 Credit will be deducted</p>
+                          <p className="text-[11px] opacity-85 mt-0.5">Remaining Balance: {model3dCredits} Credits</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                        <div>
+                          <p className="text-[12px] font-bold">Insufficient Credit Balance</p>
+                          <p className="text-[11px] opacity-85 mt-0.5">You have 0 credits. Please purchase more credits to generate 3D models.</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Buttons Row */}
@@ -364,22 +587,25 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                 onClick={() => setShowConfirmModal(false)}
                 className="py-2.5 px-4 rounded-xl text-[13px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors flex-1"
               >
-                Cancel
+                {selectedItemFor3D.model_3d_url ? "Close" : "Cancel"}
               </button>
-              <button 
-                type="button" 
-                disabled={isSubmitting || model3dCredits <= 0}
-                onClick={handleConfirmGenerate}
-                className="py-2.5 px-4 rounded-xl text-[13px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:pointer-events-none transition-colors flex-1 flex items-center justify-center gap-1.5"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin animate-duration-1000" />
-                ) : (
-                  <>
-                    <Sparkles size={14} /> Confirm & Generate
-                  </>
-                )}
-              </button>
+              
+              {!selectedItemFor3D.model_3d_url && (
+                <button 
+                  type="button" 
+                  disabled={isSubmitting || model3dCredits <= 0}
+                  onClick={handleConfirmGenerate}
+                  className="py-2.5 px-4 rounded-xl text-[13px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:pointer-events-none transition-colors flex-1 flex items-center justify-center gap-1.5"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin animate-duration-1000" />
+                  ) : (
+                    <>
+                      <Sparkles size={14} /> Confirm & Generate
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
           </div>
