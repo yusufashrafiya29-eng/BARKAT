@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ImagePlus, Loader2, FileText, Trash2, Box, Edit3, X, Sparkles, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
@@ -20,6 +20,40 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
   const [removeLighting, setRemoveLighting] = useState<boolean>(true);
   const [enablePbr, setEnablePbr] = useState<boolean>(true);
   const [textureResolution, setTextureResolution] = useState<string>("2k");
+
+  // Global polling for items that have a task_id but no url
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    const pendingItems = menuCategories.flatMap(cat => cat.menu_items || []).filter(item => item.model_3d_task_id && !item.model_3d_url);
+    
+    if (pendingItems.length > 0) {
+      intervalId = setInterval(async () => {
+        let needsRefresh = false;
+        for (const item of pendingItems) {
+          try {
+            const res = await ownerApi.check3DModelStatus(item.id);
+            if (res.status === 'success') {
+              toast.success(`3D Model for ${item.name} is ready!`);
+              needsRefresh = true;
+            } else if (res.status === 'failed') {
+              toast.error(`Failed to generate 3D model for ${item.name}`);
+              needsRefresh = true;
+            }
+          } catch (e) {
+            console.error("Polling error", e);
+          }
+        }
+        if (needsRefresh) {
+          fetchData();
+        }
+      }, 5000);
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    }
+  }, [menuCategories, fetchData]);
 
   const handleOpenConfirmModal = (item: any) => {
     setSelectedItemFor3D(item);
@@ -316,7 +350,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                     {item.image_url && (
                       <button 
                         onClick={() => handleOpenConfirmModal(item)}
-                        disabled={isGenerating3D[item.id]}
+                        disabled={isGenerating3D[item.id] || (item.model_3d_task_id && !item.model_3d_url)}
                         className={`transition-colors p-1 rounded ${
                           item.model_3d_url 
                             ? item.model_3d_active 
