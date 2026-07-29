@@ -112,7 +112,8 @@ export default function WaiterDashboard() {
         setShiftOpen(true);
       } catch { setShiftOpen(false); }
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to load dashboard');
+      console.error("Dashboard fetch error:", e);
+      toast.error(e.response?.data?.detail || e.message || 'Failed to load dashboard');
     } finally { setLoading(false); }
   };
 
