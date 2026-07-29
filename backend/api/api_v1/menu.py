@@ -100,14 +100,31 @@ def upload_menu_item_image(
         
     from db.supabase import supabase_client
     import uuid
-    file_ext = image.filename.split('.')[-1]
-    file_name = f"{uuid.uuid4()}.{file_ext}"
+    import io
+    from PIL import Image
     
     image_content = image.file.read()
+    
+    try:
+        img = Image.open(io.BytesIO(image_content))
+        if img.mode != 'RGB' and img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        output = io.BytesIO()
+        img.save(output, format="PNG")
+        image_content = output.getvalue()
+        file_ext = "png"
+        content_type = "image/png"
+    except Exception as e:
+        print(f"Image conversion failed: {e}")
+        file_ext = image.filename.split('.')[-1]
+        content_type = image.content_type
+        
+    file_name = f"{uuid.uuid4()}.{file_ext}"
+    
     res = supabase_client.storage.from_('logos').upload(
         path=f"menu/{file_name}",
         file=image_content,
-        file_options={"content-type": image.content_type}
+        file_options={"content-type": content_type}
     )
     
     public_url = supabase_client.storage.from_('logos').get_public_url(f"menu/{file_name}")
