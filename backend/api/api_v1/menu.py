@@ -155,7 +155,7 @@ def update_menu_item_recipe(
         
     return new_ingredients
 
-from services import tripo_service
+from services import meshy_service
 
 @router.post("/items/{item_id}/generate-3d")
 def generate_3d_model(
@@ -164,7 +164,7 @@ def generate_3d_model(
     restaurant_id: UUID = Depends(get_current_restaurant),
     token: dict = Depends(get_current_user_token)
 ):
-    """(Secure) Trigger Tripo3D API to generate a 3D model for this menu item."""
+    """(Secure) Trigger Meshy API to generate a 3D model for this menu item."""
     if token.get("role") != "OWNER":
         raise HTTPException(status_code=403, detail="Owner access required")
         
@@ -177,7 +177,7 @@ def generate_3d_model(
         raise HTTPException(status_code=400, detail="Menu item must have an image_url to generate a 3D model")
         
     try:
-        task_id = tripo_service.generate_3d_model_task(item.image_url)
+        task_id = meshy_service.generate_3d_model_task(item.image_url)
         item.model_3d_task_id = task_id
         db.commit()
         return {"message": "3D generation started", "task_id": task_id}
@@ -202,7 +202,7 @@ def check_3d_model_status(
         return {"status": "none", "message": "No 3D generation task found"}
         
     try:
-        status_info = tripo_service.check_3d_model_status(item.model_3d_task_id)
+        status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
         if status_info["status"] == "success" and status_info["model_url"]:
             item.model_3d_url = status_info["model_url"]
             item.model_3d_task_id = None # Clear task id
@@ -211,3 +211,4 @@ def check_3d_model_status(
         return status_info
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

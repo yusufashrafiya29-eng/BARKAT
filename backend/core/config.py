@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     RAZORPAY_WEBHOOK_SECRET: str = ""
     TRIPO_API_KEY: str = ""
+    MESHY_API_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
