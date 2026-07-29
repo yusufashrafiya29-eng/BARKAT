@@ -103,3 +103,6 @@ class OrderUpdateItems(BaseModel):
 
 class OrderItemStatusUpdate(BaseModel):
     status: str
+
+class ClearHistoryRequest(BaseModel):
+    password: str

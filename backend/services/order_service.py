@@ -292,6 +292,26 @@ def delete_order(db: Session, order_id: UUID, restaurant_id: str):
     db.commit()
     return {"message": "Order deleted"}
 
+def clear_order_history(db: Session, restaurant_id: str, password: str, user_id: str):
+    from models.user import User
+    from core.security import verify_password
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+        
+    orders_to_delete = db.query(Order).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status.in_([OrderStatus.SERVED, OrderStatus.CANCELLED])
+    ).all()
+    
+    count = len(orders_to_delete)
+    for o in orders_to_delete:
+        db.delete(o)
+        
+    db.commit()
+    return {"message": f"Successfully cleared {count} historical orders", "count": count}
+
 def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str) -> Order:
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:

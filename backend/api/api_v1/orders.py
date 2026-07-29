@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_user_token, get_current_restaurant
-from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate
+from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate, ClearHistoryRequest
 from services import order_service
 from models.order import OrderStatus
 from models.notification import MessageType
@@ -184,3 +184,15 @@ def get_owner_order_history(
             "items": items_data
         })
     return result
+
+@router.post("/history/clear")
+def clear_order_history(
+    req: ClearHistoryRequest,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    user_id = token.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return order_service.clear_order_history(db, str(restaurant_id), req.password, user_id)

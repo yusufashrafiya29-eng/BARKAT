@@ -274,6 +274,98 @@ export default function AnalyticsTab() {
           </div>
         </div>
       </div>
+      
+      {/* Data Management Section */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-[15px] font-bold text-slate-800 flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-500" />
+            Data Settings & Management
+          </h4>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center p-4 bg-red-50/50 rounded-xl border border-red-100">
+          <div>
+            <h5 className="text-[13px] font-bold text-red-900 mb-1">Clear Order History</h5>
+            <p className="text-[12px] text-red-700 max-w-lg">
+              This will permanently delete all completed (SERVED) and cancelled orders from your restaurant's database. Active orders will not be affected. This action cannot be undone.
+            </p>
+          </div>
+          <button 
+            onClick={() => document.getElementById('clear-history-modal')?.classList.remove('hidden')}
+            className="shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold rounded-lg shadow-sm shadow-red-500/20 transition-all flex items-center gap-2"
+          >
+            <AlertCircle size={14} />
+            Delete Order History
+          </button>
+        </div>
+      </div>
+
+      {/* Password Modal */}
+      <div id="clear-history-modal" className="hidden fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600 mx-auto">
+            <AlertCircle size={24} />
+          </div>
+          <h3 className="text-center text-[16px] font-extrabold text-slate-900 mb-2">Delete History?</h3>
+          <p className="text-center text-[13px] text-slate-500 mb-6">
+            Please enter your password to confirm deletion of all historical orders.
+          </p>
+          
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const password = (e.target as any).password.value;
+            const btn = (e.target as any).submitBtn;
+            btn.disabled = true;
+            btn.innerHTML = 'Deleting...';
+            try {
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/history/clear`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ password })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                alert(`Success: ${data.message}`);
+                window.location.reload();
+              } else {
+                alert(`Error: ${data.detail || 'Failed to clear history'}`);
+              }
+            } catch (err) {
+              alert('Network error');
+            } finally {
+              btn.disabled = false;
+              btn.innerHTML = 'Confirm Delete';
+            }
+          }}>
+            <input 
+              type="password" 
+              name="password"
+              required
+              placeholder="Enter owner password" 
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[14px] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 mb-4 font-medium"
+            />
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={() => document.getElementById('clear-history-modal')?.classList.add('hidden')}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[13px] font-bold rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                name="submitBtn"
+                type="submit"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold rounded-xl shadow-sm shadow-red-500/20 transition-all"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
