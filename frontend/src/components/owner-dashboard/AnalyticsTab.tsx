@@ -318,7 +318,7 @@ export default function AnalyticsTab() {
             btn.disabled = true;
             btn.innerHTML = 'Deleting...';
             try {
-              const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/history/clear`, {
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/orders/history/clear`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
