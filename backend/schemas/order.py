@@ -11,11 +11,18 @@ class OrderItemModifierBase(BaseModel):
 class OrderItemModifierCreate(OrderItemModifierBase):
     pass
 
+class ModifierSimpleRead(BaseModel):
+    name: str
+    price: float
+    
+    class Config:
+        from_attributes = True
+
 class OrderItemModifierRead(OrderItemModifierBase):
     id: UUID
     order_item_id: UUID
     price_at_order_time: float
-    modifier: Optional[Any] = None
+    modifier: Optional[ModifierSimpleRead] = None
     
     class Config:
         from_attributes = True
