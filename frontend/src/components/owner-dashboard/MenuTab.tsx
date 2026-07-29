@@ -246,7 +246,6 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
           </div>
         </div>
       ))}
-    </div>
 
       {/* 3D GENERATION CONFIRMATION MODAL */}
       {showConfirmModal && selectedItemFor3D && (
