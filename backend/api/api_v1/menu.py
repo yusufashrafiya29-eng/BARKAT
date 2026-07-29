@@ -272,6 +272,13 @@ def check_3d_model_status(
                     return status_info
         elif status_info["status"] == "failed":
             item.model_3d_task_id = None  # Clear failed task ID so they can retry
+            
+            # Refund the credit
+            from models.restaurant import Restaurant
+            restaurant = db.query(Restaurant).filter(Restaurant.id == item.restaurant_id).first()
+            if restaurant:
+                restaurant.model_3d_credits += 1
+                
             db.commit()
             
         return status_info
