@@ -55,6 +55,9 @@ export default function SuperAdminDashboard() {
   // Modals
   const [showSubModal, setShowSubModal] = useState<string | null>(null);
   const [editingSub, setEditingSub] = useState({ plan: 'basic', status: 'trial', expiry_date: '' });
+  
+  const [showCreditsModal, setShowCreditsModal] = useState<string | null>(null);
+  const [editingCredits, setEditingCredits] = useState<number>(0);
 
   const fetchData = async () => {
     try {
@@ -106,6 +109,18 @@ export default function SuperAdminDashboard() {
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to update subscription');
+    }
+  };
+
+  const handleUpdateCredits = async () => {
+    if (!showCreditsModal) return;
+    try {
+      await superadminApi.updateCredits(showCreditsModal, editingCredits);
+      toast.success('3D AR Credits updated successfully');
+      setShowCreditsModal(null);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to update credits');
     }
   };
 
@@ -425,6 +440,15 @@ export default function SuperAdminDashboard() {
                             className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-[12px] font-bold rounded-lg hover:bg-slate-50 transition-colors shadow-sm inline-flex items-center gap-1.5"
                           >
                             <Edit2 size={13}/> Edit Plan
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingCredits((r as any).model_3d_credits || 0);
+                              setShowCreditsModal(r.id);
+                            }}
+                            className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-[12px] font-bold rounded-lg hover:bg-amber-100 transition-colors shadow-sm inline-flex items-center gap-1.5"
+                          >
+                            <Crown size={13}/> Credits
                           </button>
                           <button 
                             onClick={() => handleImpersonate('restaurant', r.id)}
@@ -923,6 +947,51 @@ export default function SuperAdminDashboard() {
                 className="px-6 py-2 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Credits Modal */}
+      {showCreditsModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex gap-3 items-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Crown size={20}/>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">3D AR Credits</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Manage 3D generation credits.</p>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Available Credits</label>
+                <input 
+                  type="number"
+                  min="0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  value={editingCredits}
+                  onChange={e => setEditingCredits(parseInt(e.target.value) || 0)}
+                />
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-normal">
+                  Credits are used when a restaurant generates new 3D AR models using AI. 1 Generation = 1 Credit.
+                </p>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+              <button 
+                onClick={() => setShowCreditsModal(null)}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdateCredits}
+                className="px-6 py-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md shadow-amber-200 transition-all flex items-center gap-1.5"
+              >
+                <Crown size={14}/> Save Credits
               </button>
             </div>
           </div>

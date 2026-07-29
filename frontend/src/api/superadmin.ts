@@ -81,6 +81,11 @@ export const superadminApi = {
     return response.data;
   },
 
+  updateCredits: async (id: string, credits: number) => {
+    const response = await axios.put(`${BASE_URL}/superadmin/restaurants/${id}/credits`, { model_3d_credits: credits }, getHeaders());
+    return response.data;
+  },
+
   deleteRestaurant: async (id: string) => {
     const response = await axios.delete(`${BASE_URL}/superadmin/restaurants/${id}`, getHeaders());
     return response.data;

@@ -10,7 +10,7 @@ from models.restaurant import Restaurant
 from models.announcement import Announcement
 from models.settings import PlatformConfig
 from models.ticket import Ticket
-from schemas.superadmin import RestaurantOverview, SuperAdminDashboardStats, UpdateSubscriptionRequest, UserOverview, PlatformFinancialsResponse, RestaurantFinancial, AnnouncementCreate, AnnouncementResponse, PlatformSettingResponse, PlatformSettingUpdate
+from schemas.superadmin import RestaurantOverview, SuperAdminDashboardStats, UpdateSubscriptionRequest, UpdateCreditsRequest, UserOverview, PlatformFinancialsResponse, RestaurantFinancial, AnnouncementCreate, AnnouncementResponse, PlatformSettingResponse, PlatformSettingUpdate
 from schemas.auth import GenericResponse
 from schemas.ticket import TicketResponse, TicketUpdateStatus
 from models.billing import Bill, PaymentStatus
@@ -125,6 +125,7 @@ def get_all_restaurants(
             subscription_status=r.subscription_status,
             subscription_plan=r.subscription_plan,
             subscription_ends_at=r.subscription_ends_at,
+            model_3d_credits=r.model_3d_credits,
             created_at=r.created_at
         ))
     return result
@@ -154,6 +155,7 @@ def approve_restaurant(
         subscription_status=restaurant.subscription_status,
         subscription_plan=restaurant.subscription_plan,
         subscription_ends_at=restaurant.subscription_ends_at,
+        model_3d_credits=restaurant.model_3d_credits,
         created_at=restaurant.created_at
     )
 
@@ -186,8 +188,25 @@ def update_subscription(
         subscription_status=restaurant.subscription_status,
         subscription_plan=restaurant.subscription_plan,
         subscription_ends_at=restaurant.subscription_ends_at,
+        model_3d_credits=restaurant.model_3d_credits,
         created_at=restaurant.created_at
     )
+
+@router.put("/restaurants/{restaurant_id}/credits", response_model=GenericResponse)
+def update_restaurant_credits(
+    restaurant_id: str,
+    req: UpdateCreditsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    restaurant.model_3d_credits = req.model_3d_credits
+    db.commit()
+    
+    return GenericResponse(success=True, message="3D AR Credits updated successfully")
 
 @router.get("/users", response_model=List[UserOverview])
 def get_all_users(

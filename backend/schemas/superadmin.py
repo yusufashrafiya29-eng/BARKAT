@@ -12,6 +12,7 @@ class RestaurantOverview(BaseModel):
     subscription_status: str
     subscription_plan: str
     subscription_ends_at: Optional[datetime] = None
+    model_3d_credits: int
     created_at: datetime
 
 class SuperAdminDashboardStats(BaseModel):
@@ -24,6 +25,9 @@ class UpdateSubscriptionRequest(BaseModel):
     plan: str
     status: str
     expiry_date: Optional[datetime] = None
+
+class UpdateCreditsRequest(BaseModel):
+    model_3d_credits: int
 
 class UserOverview(BaseModel):
     id: UUID4
