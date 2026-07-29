@@ -182,6 +182,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  deleteMenuItemImage: async (itemId: string, slot: string) => {
+    const response = await axios.delete(`${BASE_URL}/menu/items/${itemId}/image?slot=${slot}`, getHeaders());
+    return response.data;
+  },
+
   // Reservations
   getReservations: async () => {
     const response = await axios.get(`${BASE_URL}/reservations/`, getHeaders());

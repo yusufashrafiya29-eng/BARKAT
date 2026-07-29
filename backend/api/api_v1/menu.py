@@ -123,6 +123,34 @@ def upload_menu_item_image(
     db.refresh(item)
     return item
 
+@router.delete("/items/{item_id}/image")
+def delete_menu_item_image(
+    item_id: str,
+    slot: str = "main",
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Delete an image for a menu item. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if slot == "extra1":
+        item.image_url_extra1 = None
+    elif slot == "extra2":
+        item.image_url_extra2 = None
+    else:
+        item.image_url = None
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
 from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead
 @router.post("/items/{item_id}/recipe", response_model=List[RecipeIngredientRead])
 def update_menu_item_recipe(

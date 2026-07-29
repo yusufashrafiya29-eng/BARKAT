@@ -175,6 +175,17 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
     }
   };
 
+  const handleImageDelete = async (itemId: string, slot: string) => {
+    if (!window.confirm("Are you sure you want to remove this image?")) return;
+    try {
+      await ownerApi.deleteMenuItemImage(itemId, slot);
+      toast.success("Image removed successfully");
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Failed to remove image");
+    }
+  };
+
   const handleToggleMenu = async (itemId: string, currentAvail: boolean, name: string) => {
     try {
       await ownerApi.toggleMenuItemAvailability(itemId, !currentAvail);
@@ -240,7 +251,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                 {/* Multiple Angle Image Slots */}
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   {/* Main Photo Slot */}
-                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center">
                     {item.image_url ? (
                       <img src={item.image_url} alt="Main" className="w-full h-full object-cover" />
                     ) : (
@@ -269,10 +280,19 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                         }}
                       />
                     </label>
+                    {item.image_url && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(item.id, "main"); }}
+                        className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity z-10 hover:bg-rose-600"
+                        title="Remove image"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
                   </div>
 
                   {/* Extra Photo 1 Slot */}
-                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center">
                     {item.image_url_extra1 ? (
                       <img src={item.image_url_extra1} alt="Extra 1" className="w-full h-full object-cover" />
                     ) : (
@@ -301,10 +321,19 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                         }}
                       />
                     </label>
+                    {item.image_url_extra1 && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(item.id, "extra1"); }}
+                        className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity z-10 hover:bg-rose-600"
+                        title="Remove image"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
                   </div>
 
                   {/* Extra Photo 2 Slot */}
-                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center cursor-pointer">
+                  <div className="relative group/thumb border border-subtle rounded-lg overflow-hidden h-14 bg-subtle/25 flex flex-col items-center justify-center text-center">
                     {item.image_url_extra2 ? (
                       <img src={item.image_url_extra2} alt="Extra 2" className="w-full h-full object-cover" />
                     ) : (
@@ -333,6 +362,15 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                         }}
                       />
                     </label>
+                    {item.image_url_extra2 && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleImageDelete(item.id, "extra2"); }}
+                        className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity z-10 hover:bg-rose-600"
+                        title="Remove image"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
