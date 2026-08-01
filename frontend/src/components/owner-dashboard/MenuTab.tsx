@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, FileText, Trash2, Box, Edit3, X, Sparkles, AlertCir
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
+import DishARViewerModal from '../DishARViewerModal';
 
 
 export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: { handleOpenRecipeEditor: (item: any) => void, handleOpenEditMenu: (item: any) => void }) {
@@ -12,6 +13,7 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
   
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedItemFor3D, setSelectedItemFor3D] = useState<any>(null);
+  const [selectedItemForARPreview, setSelectedItemForARPreview] = useState<any>(null);
   const [targetHeight, setTargetHeight] = useState<number>(12);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -375,7 +377,18 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
                 </div>
 
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="text-[14px] font-medium pr-4 text-main">{item.name}</h4>
+                  <div className="flex flex-col">
+                    <h4 className="text-[14px] font-bold pr-4 text-main flex items-center gap-1.5 flex-wrap">
+                      {item.name}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedItemForARPreview(item); }}
+                        className="px-2 py-0.5 rounded-full bg-gradient-to-r from-[#e85d04] to-orange-600 text-white font-extrabold text-[10px] uppercase tracking-wider shadow-xs hover:brightness-110 transition-all transform active:scale-95 flex items-center gap-1"
+                        title="Open 3D AR Interactive Preview"
+                      >
+                        🧊 3D AR View
+                      </button>
+                    </h4>
+                  </div>
                   <div className="flex items-center gap-3">
                     <span className="text-[13px] text-muted">₹{item.price}</span>
                     <button 
@@ -683,6 +696,12 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
           </div>
         </div>
       )}
+
+      {/* DISH AR VIEWER MODAL */}
+      <DishARViewerModal
+        item={selectedItemForARPreview}
+        onClose={() => setSelectedItemForARPreview(null)}
+      />
     </div>
   );
 }

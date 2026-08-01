@@ -14,6 +14,8 @@ import { cashApi } from '../api/cashRegister';
 import toast from 'react-hot-toast';
 import ReceiptPrinter from '../components/ReceiptPrinter';
 import CustomizationModal from '../components/CustomizationModal';
+import LiveTelemetryBanner from '../components/LiveTelemetryBanner';
+import DishARViewerModal from '../components/DishARViewerModal';
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; modifier_groups?: any[]; }
@@ -33,6 +35,16 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; d
   CANCELLED: { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e' },
 };
 
+/* ── Table Status Config (5 states) ─────────────────────────── */
+const TABLE_STATUS_CONFIG = {
+  free:     { color: '#94a3b8', borderColor: '#e2e8f0', bgGrad: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', dotColor: '#cbd5e1', label: 'Free' },
+  customer: { color: '#4338ca', borderColor: '#a5b4fc', bgGrad: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', dotColor: '#6366f1', label: '⚡ New Order' },
+  running:  { color: '#b45309', borderColor: '#fcd34d', bgGrad: 'linear-gradient(135deg,#fffbeb,#fef3c7)', dotColor: '#f59e0b', label: '🔥 KOT Running' },
+  printed:  { color: '#065f46', borderColor: '#6ee7b7', bgGrad: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', dotColor: '#10b981', label: '🖨️ Bill Printed' },
+  reserved: { color: '#d97706', borderColor: '#fde68a', bgGrad: 'linear-gradient(135deg,#fffbeb,#fef9c3)', dotColor: '#fbbf24', label: 'Reserved' },
+} as const;
+type TStatusKey = keyof typeof TABLE_STATUS_CONFIG;
+
 export default function WaiterDashboard() {
   const navigate = useNavigate();
   const [view, setView] = useState<'tables' | 'order' | 'status'>('tables');
@@ -44,6 +56,7 @@ export default function WaiterDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
+  const [selectedItemForAR, setSelectedItemForAR] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
@@ -63,6 +76,21 @@ export default function WaiterDashboard() {
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
 
   const subscriptionPlan = localStorage.getItem('subscriptionPlan') || 'basic';
+
+  /* ── Sprint 1: New billing states ─────────────────────────── */
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2>(1);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [containerCharge, setContainerCharge] = useState(0);
+  const [customerPaidAmount, setCustomerPaidAmount] = useState('');
+
+  /* ── Sprint 1: Reason Modal states ────────────────────────── */
+  const [reasonModalOpen, setReasonModalOpen] = useState(false);
+  const [reasonAction, setReasonAction] = useState<{ type: 'delete' | 'reject', id: string } | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>('Customer Changed Mind');
+  const [customReason, setCustomReason] = useState<string>('');
+  const [isProcessingReason, setIsProcessingReason] = useState(false);
 
   const handlePrintReceipt = (order: Order) => {
     setPrintingOrder(order);
@@ -192,14 +220,49 @@ export default function WaiterDashboard() {
     }
   };
 
-  const handleDeleteOrder = async (id: string) => { if (!confirm('Delete this order?')) return; try { await waiterApi.deleteOrder(id); toast.success('Deleted'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } };
-  const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', is_parcel: !!i.is_parcel, category_id: '', is_veg: false, is_available: true, cartItemId: i.id, modifiers: i.modifiers || [] })) || []); toast('✏️ Editing order'); };
+  const handleDeleteOrder = (id: string) => { 
+    setReasonAction({ type: 'delete', id });
+    setSelectedReason('Customer Changed Mind');
+    setCustomReason('');
+    setReasonModalOpen(true); 
+  };
+  const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', is_parcel: !i.is_parcel, category_id: '', is_veg: false, is_available: true, cartItemId: i.id, modifiers: i.modifiers || [] })) || []); toast('✏️ Editing order'); };
   
   const handleServeOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
   const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
-  const handleRejectOrder = async (id: string) => { if (!confirm('Reject this order?')) return; if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'CANCELLED'); toast.success('Rejected'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleRejectOrder = (id: string) => { 
+    if (processingOrders.has(id)) return; 
+    setReasonAction({ type: 'reject', id });
+    setSelectedReason('Out of Stock');
+    setCustomReason('');
+    setReasonModalOpen(true);
+  };
+
+  const executeReasonAction = async () => {
+    if (!reasonAction || isProcessingReason) return;
+    setIsProcessingReason(true);
+    const finalReason = selectedReason === 'Other' ? customReason || 'No reason specified' : selectedReason;
+    try {
+      if (reasonAction.type === 'delete') {
+        await waiterApi.deleteOrder(reasonAction.id);
+        toast.success(`🗑️ Order deleted (${finalReason})`);
+      } else {
+        setProcessingOrders(prev => new Set(prev).add(reasonAction.id));
+        await waiterApi.updateOrderStatus(reasonAction.id, 'CANCELLED');
+        toast.success(`❌ Order cancelled (${finalReason})`);
+        setProcessingOrders(prev => { const n = new Set(prev); n.delete(reasonAction.id); return n; });
+      }
+      setReasonModalOpen(false);
+      setReasonAction(null);
+      fetchInitialData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Action failed');
+    } finally {
+      setIsProcessingReason(false);
+    }
+  };
   const handleDirectPaymentConfirm = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
-  const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
+  const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutStep(1); setDiscountAmount(0); setDiscountType('percent'); setDeliveryCharge(0); setContainerCharge(0); setCustomerPaidAmount(''); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
   const handleConfirmPayment = async () => {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
@@ -235,7 +298,7 @@ export default function WaiterDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
-
+      <LiveTelemetryBanner />
       {/* ── HEADER ───────────────────────────────────────────────── */}
       <header className="h-[64px] border-b border-slate-200 bg-white flex items-center justify-between px-5 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
@@ -402,54 +465,66 @@ export default function WaiterDashboard() {
                         r.reservation_date.startsWith(today)
                       );
                       const isReserved = tableReservations.length > 0;
+
+                      // Sprint 1: compute live data
+                      const tableOrders = activeOrders.filter(o => o.table_id === table.id && o.status !== 'SERVED');
+                      const tableAmount = tableOrders.reduce((sum, o) => sum + o.total_amount, 0);
+                      const earliestMs = tableOrders.length > 0 ? Math.min(...tableOrders.map(o => new Date(o.created_at).getTime())) : 0;
+                      const elapsedMins = earliestMs > 0 ? Math.floor((Date.now() - earliestMs) / 60000) : 0;
+                      const hasBillPrinted = tableOrders.some(o => o.payment_status === 'VERIFYING');
+                      const tStatusKey: TStatusKey = isPending ? 'customer' : hasBillPrinted ? 'printed' : isOccupied ? 'running' : isReserved ? 'reserved' : 'free';
+                      const tCfg = TABLE_STATUS_CONFIG[tStatusKey];
                       
                       return (
                         <button
                           key={table.id}
                           onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
-                          className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
+                          className="relative group bg-white rounded-2xl transition-all duration-200 hover:-translate-y-1 overflow-hidden"
                           style={{
-                            border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
-                            boxShadow: isPending
-                              ? '0 4px 20px rgb(245 158 11 / .18), 0 1px 4px rgb(0 0 0 / .04)'
-                              : isOccupied
-                                ? '0 4px 20px rgb(79 70 229 / .12), 0 1px 4px rgb(0 0 0 / .04)'
-                                : isReserved
-                                  ? '0 4px 20px rgb(245 158 11 / .12)'
-                                  : '0 1px 4px rgb(0 0 0 / .04)',
+                            border: `1.5px solid ${tCfg.borderColor}`,
+                            boxShadow: tStatusKey !== 'free'
+                              ? `0 4px 24px ${tCfg.dotColor}30, 0 1px 4px rgb(0 0 0/.04)`
+                              : '0 1px 4px rgb(0 0 0/.04)',
                           }}
                         >
-                          {isPending && (
-                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>
-                              ⚡ NEW
-                            </span>
-                          )}
-                          {/* Table number box */}
-                          <div
-                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] transition-transform duration-200 group-hover:scale-105"
-                            style={{
-                              background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
-                              color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8',
-                              border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}`,
-                            }}
-                          >
-                            {table.table_number}
-                          </div>
-                          <div className="text-center">
-                            <p className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase tracking-wide">{table.capacity} seats</p>
-                            <div
-                              className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                              style={{
-                                background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : isReserved ? '#fffbeb' : '#f8fafc',
-                                color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#d97706' : '#94a3b8',
-                                border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
-                              }}
-                            >
-                              {isPending ? '⚡ Pending' : isOccupied ? table.status : isReserved ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
+                          {/* Top accent bar */}
+                            <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${tCfg.dotColor}, ${tCfg.dotColor}80)` }} />
+                            <div className="p-3.5">
+                              {/* Timer + Amount row */}
+                              <div className="flex justify-between items-center mb-2 min-h-[16px]">
+                                {elapsedMins > 0 ? (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: elapsedMins > 30 ? '#f43f5e' : elapsedMins > 15 ? '#f59e0b' : '#94a3b8' }}>
+                                    <Clock size={9} />
+                                    {elapsedMins}m
+                                  </span>
+                                ) : <span />}
+                                {tableAmount > 0 && (
+                                  <span className="text-[11px] font-extrabold" style={{ color: tCfg.color }}>
+                                    ₹{tableAmount.toFixed(0)}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Table number */}
+                              <div
+                                className="w-14 h-14 mx-auto rounded-xl flex items-center justify-center font-extrabold text-[20px] mb-2.5 transition-transform duration-200 group-hover:scale-105"
+                                style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1.5px solid ${tCfg.borderColor}` }}
+                              >
+                                {table.table_number}
+                              </div>
+                              {/* Capacity */}
+                              <p className="text-[9px] text-center text-slate-400 font-semibold mb-2 uppercase tracking-wide">{table.capacity} seats</p>
+                              {/* Status badge */}
+                              <div
+                                className="px-2 py-0.5 rounded-full text-center text-[9px] font-extrabold uppercase tracking-wide leading-5"
+                                style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1px solid ${tCfg.borderColor}` }}
+                              >
+                                {tStatusKey === 'reserved' && tableReservations.length > 0
+                                  ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}`
+                                  : tCfg.label}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
+                          </button>
+                        );
                     })}
                   </div>
                 </div>
@@ -471,25 +546,62 @@ export default function WaiterDashboard() {
                     r.reservation_date.startsWith(today)
                   );
                   const isReserved = tableReservations.length > 0;
+
+                  // Sprint 1: live data
+                  const tableOrders = activeOrders.filter(o => o.table_id === table.id && o.status !== 'SERVED');
+                  const tableAmount = tableOrders.reduce((sum, o) => sum + o.total_amount, 0);
+                  const earliestMs = tableOrders.length > 0 ? Math.min(...tableOrders.map(o => new Date(o.created_at).getTime())) : 0;
+                  const elapsedMins = earliestMs > 0 ? Math.floor((Date.now() - earliestMs) / 60000) : 0;
+                  const hasBillPrinted = tableOrders.some(o => o.payment_status === 'VERIFYING');
+                  const tStatusKey: TStatusKey = isPending ? 'customer' : hasBillPrinted ? 'printed' : isOccupied ? 'running' : isReserved ? 'reserved' : 'free';
+                  const tCfg = TABLE_STATUS_CONFIG[tStatusKey];
                   
                   return (
                     <button
                       key={table.id}
                       onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
-                      className={`relative group bg-white rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-1 ${isReserved ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}`}
+                      className="relative group bg-white rounded-2xl transition-all duration-200 hover:-translate-y-1 overflow-hidden"
                       style={{
-                        border: `1.5px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}`,
-                        boxShadow: isPending ? '0 4px 20px rgb(245 158 11 / .15)' : isOccupied ? '0 4px 20px rgb(79 70 229 / .1)' : isReserved ? '0 4px 20px rgb(245 158 11 / .12)' : '0 1px 4px rgb(0 0 0 / .04)',
+                        border: `1.5px solid ${tCfg.borderColor}`,
+                        boxShadow: tStatusKey !== 'free'
+                          ? `0 4px 24px ${tCfg.dotColor}30, 0 1px 4px rgb(0 0 0/.04)`
+                          : '0 1px 4px rgb(0 0 0/.04)',
                       }}
                     >
-                      {isPending && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase z-10" style={{ background: '#f59e0b', color: '#fff', boxShadow: '0 2px 8px rgb(245 158 11 / .5)' }}>⚡ NEW</span>}
-                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-[24px] group-hover:scale-105 transition-transform" style={{ background: isPending ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : isOccupied ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)' : isReserved ? '#fef3c7' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#b45309' : '#94a3b8', border: `2px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fde68a' : '#e2e8f0'}` }}>
-                        {table.table_number}
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] text-slate-400 font-semibold mb-1.5 uppercase tracking-wide">{table.capacity} seats</p>
-                        <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase" style={{ background: isPending ? '#fef3c7' : isOccupied ? '#eef2ff' : isReserved ? '#fffbeb' : '#f8fafc', color: isPending ? '#b45309' : isOccupied ? '#4338ca' : isReserved ? '#d97706' : '#94a3b8', border: `1px solid ${isPending ? '#fcd34d' : isOccupied ? '#c7d2fe' : isReserved ? '#fcd34d' : '#e2e8f0'}` }}>
-                          {isPending ? '⚡ Pending' : isOccupied ? table.status : isReserved ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}` : table.status}
+                      {/* Top accent bar */}
+                      <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${tCfg.dotColor}, ${tCfg.dotColor}80)` }} />
+                      <div className="p-3.5">
+                        {/* Timer + Amount row */}
+                        <div className="flex justify-between items-center mb-2 min-h-[16px]">
+                          {elapsedMins > 0 ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: elapsedMins > 30 ? '#f43f5e' : elapsedMins > 15 ? '#f59e0b' : '#94a3b8' }}>
+                              <Clock size={9} />
+                              {elapsedMins}m
+                            </span>
+                          ) : <span />}
+                          {tableAmount > 0 && (
+                            <span className="text-[11px] font-extrabold" style={{ color: tCfg.color }}>
+                              ₹{tableAmount.toFixed(0)}
+                            </span>
+                          )}
+                        </div>
+                        {/* Table number */}
+                        <div
+                          className="w-14 h-14 mx-auto rounded-xl flex items-center justify-center font-extrabold text-[20px] mb-2.5 transition-transform duration-200 group-hover:scale-105"
+                          style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1.5px solid ${tCfg.borderColor}` }}
+                        >
+                          {table.table_number}
+                        </div>
+                        {/* Capacity */}
+                        <p className="text-[9px] text-center text-slate-400 font-semibold mb-2 uppercase tracking-wide">{table.capacity} seats</p>
+                        {/* Status badge */}
+                        <div
+                          className="px-2 py-0.5 rounded-full text-center text-[9px] font-extrabold uppercase tracking-wide leading-5"
+                          style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1px solid ${tCfg.borderColor}` }}
+                        >
+                          {tStatusKey === 'reserved' && tableReservations.length > 0
+                            ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}`
+                            : tCfg.label}
                         </div>
                       </div>
                     </button>
@@ -540,6 +652,42 @@ export default function WaiterDashboard() {
               </div>
             </div>
 
+            {/* ── Sprint 1: Quick Items Strip (Favorites / Hot Pick) ── */}
+            {selectedCategory === 'all' && !searchQuery && (() => {
+              const allItems = categories.flatMap(c => c.menu_items).filter(i => i.is_available);
+              const quickItems = allItems.slice(0, 6); // Display up to 6 quick items
+              if (quickItems.length === 0) return null;
+              return (
+                <div className="px-4 pt-3 pb-2 bg-slate-100/60 border-b border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1">
+                      ⚡ Quick Add (Most Ordered)
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400">One-tap billing</span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    {quickItems.map(item => {
+                      const inCart = cart.find(c => c.id === item.id);
+                      return (
+                        <button
+                          key={`quick-${item.id}`}
+                          onClick={() => handleAddToCartClick(item)}
+                          className="px-3 py-2 bg-white rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-2 shrink-0 hover:border-indigo-300 transition-all hover:scale-[1.02]"
+                        >
+                          <div className={`w-3 h-3 shrink-0 rounded-xs border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-xs ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                          </div>
+                          <span className="text-[12px] font-bold text-slate-800">{item.name}</span>
+                          <span className="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">₹{item.price}</span>
+                          {inCart && <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">{inCart.quantity}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Menu grid */}
             <div className="flex-grow overflow-y-auto p-4 scrollbar-thin">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -557,28 +705,36 @@ export default function WaiterDashboard() {
                         style={{ boxShadow: inCart ? '0 0 0 2px #6366f1, 0 4px 12px rgb(79 70 229 / .15)' : undefined, borderColor: inCart ? '#6366f1' : undefined }}
                         disabled={!item.is_available}
                       >
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="w-14 h-14 object-cover rounded-xl shrink-0" />
-                        ) : (
-                          <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center shrink-0 border border-slate-100">
-                             <div className={`w-4 h-4 rounded-sm border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
-                              <div className={`w-2 h-2 rounded-sm ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <div className="relative shrink-0">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.name} className="w-14 h-14 object-cover rounded-xl shrink-0" />
+                          ) : (
+                            <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center shrink-0 border border-slate-100 font-black text-slate-300 text-lg">
+                              {item.name.charAt(0).toUpperCase()}
                             </div>
+                          )}
+                          {/* Sprint 1: Always visible Veg/Non-veg dot on top left corner of thumbnail */}
+                          <div className={`absolute -top-1 -left-1 w-4 h-4 rounded-xs bg-white shadow-xs border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-600' : 'border-rose-600'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-xs ${item.is_veg ? 'bg-emerald-600' : 'bg-rose-600'}`} />
                           </div>
-                        )}
+                        </div>
                         <div className="flex flex-col flex-grow min-w-0">
                           <div className="flex justify-between items-start mb-1 w-full gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              {item.image_url && (
-                                <div className={`w-2.5 h-2.5 shrink-0 rounded-sm border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-500' : 'border-rose-500'}`}>
-                                  <div className={`w-1 h-1 rounded-sm ${item.is_veg ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                </div>
-                              )}
-                              <h4 className="text-[13px] font-semibold text-slate-800 truncate">{item.name}</h4>
+                              <h4 className="text-[13px] font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                {item.name}
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); setSelectedItemForAR(item); }}
+                                  className="px-1.5 py-0.5 rounded bg-orange-100 text-[#e85d04] hover:bg-[#e85d04] hover:text-white font-black text-[9px] uppercase tracking-wider transition-colors cursor-pointer shrink-0"
+                                  title="Open 3D AR Model Preview"
+                                >
+                                  🧊 3D
+                                </span>
+                              </h4>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {inCart && (
-                                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-sm">
+                                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
                                   {inCart.quantity}
                                 </span>
                               )}
@@ -613,6 +769,26 @@ export default function WaiterDashboard() {
                 </span>
               </div>
             </div>
+
+            {/* ── Sprint 1: Customer Details moved to TOP of ticket for fast entry ── */}
+            {!editingOrderId && (
+              <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  placeholder="👤 Customer Name (opt.)"
+                  className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                />
+                <input
+                  type="tel"
+                  placeholder="💬 WhatsApp Phone (opt.)"
+                  className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="flex-grow overflow-y-auto p-4 space-y-5 scrollbar-thin">
 
@@ -728,36 +904,23 @@ export default function WaiterDashboard() {
             {/* Cart footer */}
             <div className="p-4 border-t border-slate-100 bg-white shrink-0 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-[13px] text-slate-500 font-medium">Draft Total</span>
-                <span className="text-[20px] font-extrabold text-slate-900 tracking-tight">₹{totalAmount}</span>
+                <div>
+                  <span className="text-[13px] text-slate-500 font-medium">Draft Total</span>
+                  {cart.length > 0 && (
+                    <p className="text-[10px] text-indigo-600 font-bold tracking-tight">🏷️ Discounts apply at checkout</p>
+                  )}
+                </div>
+                <span className="text-[22px] font-extrabold text-slate-900 tracking-tight">₹{totalAmount}</span>
               </div>
 
-              {!editingOrderId && cart.length > 0 && (
-                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-                  <input
-                    type="text"
-                    placeholder="Customer Name (optional)"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all placeholder:text-slate-400"
-                    value={customerName}
-                    onChange={e => setCustomerName(e.target.value)}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="WhatsApp Number (optional)"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all placeholder:text-slate-400"
-                    value={customerPhone}
-                    onChange={e => setCustomerPhone(e.target.value)}
-                  />
-                </div>
-              )}
               <button
                 onClick={placeOrder}
                 disabled={cart.length === 0 || isPlacingOrder}
-                className="w-full py-3 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={cart.length > 0 ? { background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', boxShadow: '0 4px 16px rgb(79 70 229 / .4)' } : { background: '#f1f5f9', color: '#94a3b8' }}
+                className="w-full py-3.5 rounded-2xl font-extrabold text-[15px] flex items-center justify-center gap-2 transition-all duration-200 transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+                style={cart.length > 0 ? { background: 'linear-gradient(135deg, #e85d04, #fb8c00)', color: '#fff', boxShadow: '0 4px 20px rgba(232, 93, 4, 0.45)', border: '1px solid rgba(251, 140, 0, 0.3)' } : { background: '#f1f5f9', color: '#94a3b8' }}
               >
-                {isPlacingOrder ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                {isPlacingOrder ? 'Processing...' : (editingOrderId ? 'Update Order' : 'Send to Kitchen')}
+                {isPlacingOrder ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.5} />}
+                {isPlacingOrder ? 'Processing...' : (editingOrderId ? 'Update Order' : '🔥 Send to Kitchen (FIRE KOT)')}
               </button>
             </div>
           </div>
@@ -937,81 +1100,262 @@ export default function WaiterDashboard() {
         </div>
       )}
 
-      {/* ── CHECKOUT MODAL ── */}
-      {checkoutModalOpen && billDetails && checkoutOrder && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,.6)', backdropFilter: 'blur(8px)' }}>
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden" style={{ animation: 'zoomIn95 .18s ease both' }}>
+      {/* ── CHECKOUT MODAL (2-Step) ── */}
+      {checkoutModalOpen && billDetails && checkoutOrder && (() => {
+        const discAmt = discountType === 'percent'
+          ? Math.round(billDetails.total_amount * discountAmount / 100 * 100) / 100
+          : discountAmount;
+        const grandTotal = Math.max(0, billDetails.total_amount - discAmt + deliveryCharge + containerCharge);
+        const changeBack = customerPaidAmount && parseFloat(customerPaidAmount) > 0
+          ? Math.max(0, parseFloat(customerPaidAmount) - grandTotal)
+          : null;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: 'rgba(15,23,42,.65)', backdropFilter: 'blur(8px)' }}>
+            <div className="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style={{ maxHeight: '92vh', animation: 'slideUp .2s ease both' }}>
 
-            {/* Header gradient */}
-            <div className="px-6 pt-6 pb-4" style={{ background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)' }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-bold text-indigo-200 uppercase tracking-widest">Checkout</p>
-                  <h2 className="text-[22px] font-extrabold text-white tracking-tight mt-0.5">Table {selectedTable?.table_number}</h2>
+              {/* ── HEADER ── */}
+              <div className="px-5 pt-5 pb-4 shrink-0" style={{ background: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 100%)' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">
+                      Step {checkoutStep}/2 — {checkoutStep === 1 ? 'Bill Review' : 'Payment'}
+                    </p>
+                    <h2 className="text-[20px] font-extrabold text-white mt-0.5">
+                      {orderType === 'TAKEAWAY' ? '📦 Parcel' : `Table ${selectedTable?.table_number}`}
+                    </h2>
+                  </div>
+                  <button onClick={() => !isProcessingPayment && setCheckoutModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                    <X size={15} />
+                  </button>
                 </div>
-                <button onClick={() => !isProcessingPayment && setCheckoutModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-                  <X size={15} />
-                </button>
-              </div>
-              {/* Bill summary */}
-              <div className="mt-4 bg-white/10 rounded-2xl p-4 space-y-2">
-                <div className="flex justify-between text-[13px] text-indigo-200"><span>Subtotal</span><span>₹{billDetails.subtotal}</span></div>
-                <div className="flex justify-between text-[13px] text-indigo-200"><span>Tax</span><span>₹{billDetails.tax_amount}</span></div>
-                <div className="h-px bg-white/20 my-1" />
-                <div className="flex justify-between text-white font-extrabold text-[18px]"><span>Total</span><span>₹{billDetails.total_amount}</span></div>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {/* Payment methods */}
-              <div>
-                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-3">Payment Method</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { id: 'CASH', Icon: Wallet, label: 'Cash' },
-                    { id: 'CARD', Icon: CreditCard, label: 'Card' },
-                    { id: 'UPI', Icon: Smartphone, label: 'UPI' },
-                  ] as const).map(({ id, Icon, label }) => (
-                    <button
-                      key={id}
-                      onClick={() => setPaymentMethod(id)}
-                      className="py-3 rounded-2xl flex flex-col items-center gap-1.5 text-[11px] font-bold transition-all"
-                      style={paymentMethod === id
-                        ? { background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }
-                        : { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }
-                      }
-                    >
-                      <Icon size={18} />
-                      {label}
-                    </button>
+                {/* Step indicator */}
+                <div className="flex gap-1.5">
+                  {[1, 2].map(s => (
+                    <div key={s} className="h-1 flex-1 rounded-full transition-all duration-300"
+                      style={{ background: s <= checkoutStep ? '#818cf8' : '#ffffff20' }} />
                   ))}
                 </div>
               </div>
 
-              {/* UPI QR */}
-              {paymentMethod === 'UPI' && upiId && (
-                <div className="flex flex-col items-center rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=MyRestro&am=${billDetails.total_amount}&cu=INR`)}`}
-                    alt="UPI QR"
-                    className="w-36 h-36 rounded-xl"
-                  />
-                  <p className="text-[11px] text-slate-500 font-medium mt-2">{upiId}</p>
+              {/* ══ STEP 1: BILL ══════════════════════════════════════════════ */}
+              {checkoutStep === 1 && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+                  {/* Items list */}
+                  <div>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2">Items Ordered</p>
+                    <div className="bg-slate-50 rounded-xl overflow-hidden divide-y divide-slate-100 border border-slate-100">
+                      {checkoutOrder.items?.map((item, i) => (
+                        <div key={i} className="flex justify-between px-3.5 py-2.5 text-[13px]">
+                          <span className="text-slate-600">
+                            <span className="font-bold text-slate-800">{item.quantity}×</span> {item.menu_item?.name || 'Item'}
+                          </span>
+                          <span className="font-semibold text-slate-800">₹{(item.price_at_order_time * item.quantity).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Charges & Discount */}
+                  <div>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-3">Adjust Charges</p>
+                    <div className="space-y-2.5 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                      <div className="flex justify-between text-[13px] text-slate-500">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-slate-800">₹{billDetails.subtotal}</span>
+                      </div>
+                      <div className="flex justify-between text-[13px] text-slate-500">
+                        <span>Tax</span>
+                        <span className="font-semibold text-slate-800">₹{billDetails.tax_amount}</span>
+                      </div>
+                      <div className="h-px bg-slate-200" />
+                      {/* Discount row */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-slate-600 w-20 shrink-0">Discount</span>
+                        <select
+                          className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-indigo-400 shrink-0"
+                          value={discountType}
+                          onChange={e => setDiscountType(e.target.value as any)}
+                        >
+                          <option value="percent">%</option>
+                          <option value="fixed">₹</option>
+                        </select>
+                        <input
+                          type="number"
+                          className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-[13px] focus:outline-none focus:border-rose-400 bg-white min-w-0"
+                          placeholder="0"
+                          min="0"
+                          value={discountAmount || ''}
+                          onChange={e => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                        />
+                        {discAmt > 0 && (
+                          <span className="text-[12px] font-bold text-rose-500 shrink-0 w-16 text-right">-₹{discAmt.toFixed(0)}</span>
+                        )}
+                      </div>
+                      {/* Delivery row */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-slate-600 w-20 shrink-0">Delivery</span>
+                        <input
+                          type="number"
+                          className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-[13px] focus:outline-none focus:border-indigo-400 bg-white min-w-0"
+                          placeholder="0"
+                          min="0"
+                          value={deliveryCharge || ''}
+                          onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                        />
+                        {deliveryCharge > 0 && (
+                          <span className="text-[12px] font-semibold text-slate-500 shrink-0 w-16 text-right">+₹{deliveryCharge}</span>
+                        )}
+                      </div>
+                      {/* Container row */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-slate-600 w-20 shrink-0">Container</span>
+                        <input
+                          type="number"
+                          className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-[13px] focus:outline-none focus:border-indigo-400 bg-white min-w-0"
+                          placeholder="0"
+                          min="0"
+                          value={containerCharge || ''}
+                          onChange={e => setContainerCharge(parseFloat(e.target.value) || 0)}
+                        />
+                        {containerCharge > 0 && (
+                          <span className="text-[12px] font-semibold text-slate-500 shrink-0 w-16 text-right">+₹{containerCharge}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grand Total */}
+                  <div className="rounded-2xl p-4 border" style={{ background: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', borderColor: '#c7d2fe' }}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[14px] font-bold text-indigo-900">Grand Total</span>
+                      <span className="text-[26px] font-extrabold text-indigo-700 tracking-tight">₹{grandTotal.toFixed(2)}</span>
+                    </div>
+                    {discAmt > 0 && (
+                      <p className="text-[11px] text-indigo-500 mt-1">You saved ₹{discAmt.toFixed(2)} 🎉</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {checkoutStep === 1 && (
+                <div className="p-4 shrink-0 border-t border-slate-100">
+                  <button
+                    onClick={() => setCheckoutStep(2)}
+                    className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all"
+                    style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 4px 16px rgb(79 70 229 / .4)' }}
+                  >
+                    Next: Choose Payment →
+                  </button>
                 </div>
               )}
 
-              <button
-                onClick={handleConfirmPayment}
-                disabled={isProcessingPayment}
-                className="w-full py-3.5 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}
-              >
-                {isProcessingPayment ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Confirm Payment</>}
-              </button>
+              {/* ══ STEP 2: PAYMENT ═══════════════════════════════════════════ */}
+              {checkoutStep === 2 && (
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+                  {/* Amount reminder */}
+                  <div className="rounded-xl p-3.5 border flex justify-between items-center" style={{ background: '#eef2ff', borderColor: '#c7d2fe' }}>
+                    <span className="text-[13px] font-semibold text-indigo-800">Amount to Pay</span>
+                    <span className="text-[20px] font-extrabold text-indigo-700">₹{grandTotal.toFixed(2)}</span>
+                  </div>
+
+                  {/* Payment methods */}
+                  <div>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-3">Payment Method</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { id: 'CASH', Icon: Wallet, label: 'Cash' },
+                        { id: 'CARD', Icon: CreditCard, label: 'Card' },
+                        { id: 'UPI', Icon: Smartphone, label: 'UPI' },
+                      ] as const).map(({ id, Icon, label }) => (
+                        <button
+                          key={id}
+                          onClick={() => setPaymentMethod(id)}
+                          className="py-3.5 rounded-2xl flex flex-col items-center gap-1.5 text-[11px] font-bold transition-all"
+                          style={paymentMethod === id
+                            ? { background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', boxShadow: '0 2px 8px rgb(79 70 229 / .4)' }
+                            : { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }
+                          }
+                        >
+                          <Icon size={18} />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cash: change calculator */}
+                  {paymentMethod === 'CASH' && (
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Change Calculator</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[13px] text-slate-600 font-medium shrink-0">Customer gave</span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[14px] font-bold text-slate-400">₹</span>
+                          <input
+                            type="number"
+                            className="w-full pl-7 pr-3 py-2.5 border border-slate-200 rounded-xl text-[15px] font-bold text-slate-800 focus:outline-none focus:border-indigo-400 bg-white"
+                            placeholder="0"
+                            value={customerPaidAmount}
+                            onChange={e => setCustomerPaidAmount(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {changeBack !== null && (
+                        <div
+                          className="flex justify-between items-center rounded-xl px-4 py-3 border"
+                          style={{
+                            background: changeBack >= 0 ? '#ecfdf5' : '#fff1f2',
+                            borderColor: changeBack >= 0 ? '#6ee7b7' : '#fecdd3',
+                          }}
+                        >
+                          <span className="text-[13px] font-semibold" style={{ color: changeBack >= 0 ? '#065f46' : '#be123c' }}>
+                            {changeBack >= 0 ? 'Return to customer' : 'Amount short'}
+                          </span>
+                          <span className="text-[22px] font-extrabold" style={{ color: changeBack >= 0 ? '#10b981' : '#f43f5e' }}>
+                            ₹{Math.abs(changeBack).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* UPI QR */}
+                  {paymentMethod === 'UPI' && upiId && (
+                    <div className="flex flex-col items-center rounded-2xl p-4 border border-slate-200 bg-slate-50">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Restaurant&am=${grandTotal.toFixed(2)}&cu=INR`)}`}
+                        alt="UPI QR"
+                        className="w-36 h-36 rounded-xl"
+                      />
+                      <p className="text-[11px] text-slate-500 font-medium mt-2">{upiId}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {checkoutStep === 2 && (
+                <div className="p-4 shrink-0 border-t border-slate-100 flex gap-2">
+                  <button
+                    onClick={() => setCheckoutStep(1)}
+                    className="px-5 py-3.5 rounded-2xl font-bold text-[13px] text-slate-600 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors shrink-0"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={handleConfirmPayment}
+                    disabled={isProcessingPayment}
+                    className="flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}
+                  >
+                    {isProcessingPayment ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> Confirm Payment</>}
+                  </button>
+                </div>
+              )}
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Fixed bottom-left: Navigation Buttons */}
       <div className="fixed bottom-5 left-5 z-50 flex items-center gap-2">
@@ -1037,7 +1381,7 @@ export default function WaiterDashboard() {
         <ReceiptPrinter 
           order={printingOrder}
           tableNumber={tables.find(t => t.id === printingOrder.table_id)?.table_number}
-          restaurantName={localStorage.getItem('restaurantName') || 'BARKAT POS'}
+          restaurantName={localStorage.getItem('restaurantName') || 'MyRestro'}
           gstin={localStorage.getItem('restaurantGstin') || undefined}
           fssai={localStorage.getItem('restaurantFssai') || undefined}
         />
@@ -1050,6 +1394,75 @@ export default function WaiterDashboard() {
           onAddToCart={(item, modifiers, quantity, notes) => addToCart(item, modifiers, quantity, notes)}
         />
       )}
+
+      {/* ── SPRINT 1: REASON MODAL FOR DELETE & REJECT ── */}
+      {reasonModalOpen && reasonAction && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,.65)', backdropFilter: 'blur(6px)' }}>
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-5" style={{ animation: 'zoomIn95 .18s ease both' }}>
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 text-lg font-extrabold border border-rose-100">
+                {reasonAction.type === 'delete' ? '🗑️' : '❌'}
+              </div>
+              <h3 className="text-[18px] font-extrabold text-slate-900">
+                {reasonAction.type === 'delete' ? 'Delete Order Ticket?' : 'Cancel / Reject Order?'}
+              </h3>
+              <p className="text-[12px] text-slate-500 mt-1">
+                Please select a reason for auditing & inventory control:
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {['Customer Changed Mind', 'Out of Stock', 'Entered by Mistake', 'Duplicate Order', 'Other'].map(reason => (
+                <button
+                  key={reason}
+                  onClick={() => setSelectedReason(reason)}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-[13px] font-semibold flex items-center justify-between transition-all"
+                  style={selectedReason === reason 
+                    ? { background: '#fff1f2', color: '#be123c', border: '1.5px solid #f43f5e', fontWeight: 700 } 
+                    : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
+                >
+                  <span>{reason}</span>
+                  {selectedReason === reason && <CheckCircle2 size={16} className="text-rose-600 shrink-0" />}
+                </button>
+              ))}
+            </div>
+
+            {selectedReason === 'Other' && (
+              <textarea
+                placeholder="Type custom reason here..."
+                className="w-full border border-slate-200 rounded-xl p-3 text-[13px] text-slate-800 focus:outline-none focus:border-rose-400 resize-none h-20"
+                value={customReason}
+                onChange={e => setCustomReason(e.target.value)}
+                autoFocus
+              />
+            )}
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={() => { setReasonModalOpen(false); setReasonAction(null); }}
+                disabled={isProcessingReason}
+                className="flex-1 py-3 rounded-xl text-[13px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeReasonAction}
+                disabled={isProcessingReason}
+                className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-rose-200"
+              >
+                {isProcessingReason ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3D AR DISH PREVIEW MODAL */}
+      <DishARViewerModal
+        item={selectedItemForAR}
+        onClose={() => setSelectedItemForAR(null)}
+        onAddToCart={() => selectedItemForAR && handleAddToCartClick(selectedItemForAR)}
+      />
     </div>
   );
 }

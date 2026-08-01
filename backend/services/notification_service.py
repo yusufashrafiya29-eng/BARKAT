@@ -1,4 +1,4 @@
-def send_whatsapp_receipt(order, customer, restaurant_name: str = "Barkat"):
+def send_whatsapp_receipt(order, customer, restaurant_name: str = "MyRestro"):
     """
     MOCK PROVIDER for WhatsApp Receipts.
     This simulates a successful WhatsApp API call.

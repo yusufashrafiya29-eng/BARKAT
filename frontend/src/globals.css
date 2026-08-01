@@ -212,6 +212,7 @@
   @keyframes zoomIn95     { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
   @keyframes spinIn       { from{transform:rotate(-90deg)scale(.8);opacity:0} to{transform:rotate(0)scale(1);opacity:1} }
   @keyframes glowPulse    { 0%,100%{box-shadow:0 0 0 0 rgb(79 70 229/.0)} 50%{box-shadow:0 0 0 6px rgb(79 70 229/.15)} }
+  @keyframes slideUpModal { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
 
   .animate-in          { animation-fill-mode: both; }
   .fade-in             { animation: fadeIn .25s ease both; }

@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Loader2, LayoutGrid, Package, BarChart3,
-  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock, Heart, Info
+  Plus, Trash2, ClipboardList, ShoppingBag, Users, Clock, CreditCard, Banknote, FileText, Lock, Heart, Info, Tag, FileCheck, Wallet, Building2, Truck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../api/owner';
@@ -22,6 +22,12 @@ import SettingsTab from '../components/owner-dashboard/SettingsTab';
 import SupportTab from '../components/owner-dashboard/SupportTab';
 import CashRegisterTab from '../components/CashRegisterTab';
 import CustomersTab from '../components/owner-dashboard/CustomersTab';
+import DayEndTab from '../components/owner-dashboard/DayEndTab';
+import DiscountsTab from '../components/owner-dashboard/DiscountsTab';
+import ExpensesTab from '../components/owner-dashboard/ExpensesTab';
+import FranchiseCommissaryTab from '../components/owner-dashboard/FranchiseCommissaryTab';
+import AggregatorOrdersTab from '../components/owner-dashboard/AggregatorOrdersTab';
+import LiveTelemetryBanner from '../components/LiveTelemetryBanner';
 
 // Interfaces
 interface MenuItem {
@@ -38,7 +44,7 @@ interface MenuItem {
 
 
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support' | 'day_end' | 'discounts' | 'expenses' | 'commissary' | 'aggregators';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -274,46 +280,120 @@ export default function OwnerDashboard() {
           </div>
         </div>
 
-        <div className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6366f1aa' }}>
-          Overview
-        </div>
+        <nav className="flex-1 px-3 space-y-4 overflow-y-auto pt-2 pb-6 text-[13px]">
+          {/* GROUP 1: OPERATIONS */}
+          <div className="space-y-0.5">
+            <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest" style={{ color: '#818cf8' }}>
+              Operations
+            </div>
+            {[
+              { id: 'analytics', label: 'Performance', icon: BarChart3 },
+              { id: 'orders', label: 'Order History', icon: ClipboardList },
+              { id: 'reservations', label: 'Bookings', icon: Clock },
+              { id: 'cash_register', label: 'Cash Register', icon: Banknote },
+              { id: 'day_end', label: 'Day End Close', icon: FileCheck },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+                style={activeTab === tab.id
+                  ? { background: '#6366f1', color: '#fff', fontWeight: 700, boxShadow: '0 4px 12px #6366f150' }
+                  : { color: '#c7d2fe', background: 'transparent', fontWeight: 500 }
+                }
+                onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = '#ffffff12'; }}
+                onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <tab.icon size={16} style={{ color: activeTab === tab.id ? '#fff' : '#818cf8' }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-          {[
-            { id: 'analytics', label: 'Performance', icon: BarChart3 },
-            { id: 'crm', label: 'CRM & Loyalty', icon: Heart },
-            { id: 'orders', label: 'Order History', icon: ClipboardList },
-            { id: 'reservations', label: 'Bookings', icon: Clock },
-            { id: 'reports', label: 'CA Reports', icon: FileText },
-            { id: 'cash_register', label: 'Cash Register', icon: Banknote },
-            { id: 'menu', label: 'Menu Catalog', icon: Package },
-            { id: 'tables', label: 'Floor Plan', icon: LayoutGrid },
-            { id: 'staff', label: 'Staff Roster', icon: Users },
-            { id: 'inventory', label: 'Inventory', icon: ShoppingBag },
-            { id: 'settings', label: 'Settings', icon: CreditCard },
-            { id: 'support', label: 'Help & Support', icon: Info },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as TabType)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all"
-              style={activeTab === tab.id
-                ? { background: '#6366f1', color: '#fff', fontWeight: 600, boxShadow: '0 4px 12px #6366f150' }
-                : { color: '#a5b4fc', background: 'transparent', fontWeight: 400 }
-              }
-              onMouseEnter={e => {
-                if (activeTab !== tab.id)
-                  (e.currentTarget as HTMLElement).style.background = '#ffffff12';
-              }}
-              onMouseLeave={e => {
-                if (activeTab !== tab.id)
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-              }}
-            >
-              <tab.icon size={15} style={{ color: activeTab === tab.id ? '#fff' : '#6366f1' }} />
-              {tab.label}
-            </button>
-          ))}
+          {/* GROUP 2: FINANCE & MARKETING */}
+          <div className="space-y-0.5">
+            <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mt-2" style={{ color: '#818cf8' }}>
+              Finance & Marketing
+            </div>
+            {[
+              { id: 'reports', label: 'CA Reports & GST', icon: FileText },
+              { id: 'expenses', label: 'Petty Cash & Expenses', icon: Wallet },
+              { id: 'discounts', label: 'Discounts & Offers', icon: Tag },
+              { id: 'crm', label: 'CRM & Loyalty', icon: Heart },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+                style={activeTab === tab.id
+                  ? { background: '#6366f1', color: '#fff', fontWeight: 700, boxShadow: '0 4px 12px #6366f150' }
+                  : { color: '#c7d2fe', background: 'transparent', fontWeight: 500 }
+                }
+                onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = '#ffffff12'; }}
+                onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <tab.icon size={16} style={{ color: activeTab === tab.id ? '#fff' : '#818cf8' }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* GROUP 3: SETUP & CONFIG */}
+          <div className="space-y-0.5">
+            <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mt-2" style={{ color: '#818cf8' }}>
+              Setup & Config
+            </div>
+            {[
+              { id: 'menu', label: 'Menu Catalog', icon: Package },
+              { id: 'tables', label: 'Floor Plan & QR', icon: LayoutGrid },
+              { id: 'staff', label: 'Staff Roster', icon: Users },
+              { id: 'inventory', label: 'Inventory Stock', icon: ShoppingBag },
+              { id: 'settings', label: 'Store Settings', icon: CreditCard },
+              { id: 'support', label: 'Help & Support', icon: Info },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+                style={activeTab === tab.id
+                  ? { background: '#6366f1', color: '#fff', fontWeight: 700, boxShadow: '0 4px 12px #6366f150' }
+                  : { color: '#c7d2fe', background: 'transparent', fontWeight: 500 }
+                }
+                onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = '#ffffff12'; }}
+                onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <tab.icon size={16} style={{ color: activeTab === tab.id ? '#fff' : '#818cf8' }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* GROUP 4: ENTERPRISE (SPRINT 5) */}
+          <div className="space-y-0.5">
+            <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center justify-between" style={{ color: '#e85d04' }}>
+              <span>Enterprise Hub</span>
+              <span className="text-[8px] bg-orange-500/20 text-orange-400 px-1 rounded font-black">v5.0</span>
+            </div>
+            {[
+              { id: 'commissary', label: 'Central Kitchen HQ', icon: Building2 },
+              { id: 'aggregators', label: 'Aggregator Net Hub', icon: Truck },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+                style={activeTab === tab.id
+                  ? { background: 'linear-gradient(135deg, #e85d04, #ff6d00)', color: '#fff', fontWeight: 700, boxShadow: '0 4px 15px rgba(232, 93, 4, 0.4)' }
+                  : { color: '#fed7aa', background: 'transparent', fontWeight: 500 }
+                }
+                onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = '#e85d0415'; }}
+                onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <tab.icon size={16} style={{ color: activeTab === tab.id ? '#fff' : '#fb8c00' }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </nav>
 
         {/* Subscription Widget */}
@@ -373,6 +453,7 @@ export default function OwnerDashboard() {
  
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50">
+        <LiveTelemetryBanner />
         {/* Sleek Sub-Header */}
         <header className="h-[60px] border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-40 shadow-sm">
           <div className="flex items-center gap-2 text-[14px]">
@@ -429,8 +510,6 @@ export default function OwnerDashboard() {
             </div>
           ) : (
             <div className="animate-in fade-in duration-300">
-              
-              
               {activeTab === 'analytics' && <AnalyticsTab />}
               {activeTab === 'orders' && <OrdersTab />}
               {activeTab === 'menu' && <MenuTab handleOpenRecipeEditor={handleOpenRecipeEditor} handleOpenEditMenu={handleOpenEditMenu} />}
@@ -443,6 +522,11 @@ export default function OwnerDashboard() {
               {activeTab === 'crm' && <CustomersTab />}
               {activeTab === 'settings' && <SettingsTab />}
               {activeTab === 'support' && <SupportTab />}
+              {activeTab === 'day_end' && <DayEndTab />}
+              {activeTab === 'discounts' && <DiscountsTab />}
+              {activeTab === 'expenses' && <ExpensesTab />}
+              {activeTab === 'commissary' && <FranchiseCommissaryTab />}
+              {activeTab === 'aggregators' && <AggregatorOrdersTab />}
             </div>
           )}
         </div>

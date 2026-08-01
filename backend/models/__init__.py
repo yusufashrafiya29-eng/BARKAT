@@ -12,3 +12,7 @@ from .restaurant import Restaurant
 from .cash_register import CashShift, CashTransaction
 from .announcement import Announcement
 from .ticket import Ticket
+from .enterprise import (
+    ExpenseVoucher, Coupon, HappyHour, BogoRule,
+    BranchOutlet, CentralStockItem, StockTransfer, AggregatorOrder
+)

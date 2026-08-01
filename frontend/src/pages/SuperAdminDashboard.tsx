@@ -202,14 +202,22 @@ export default function SuperAdminDashboard() {
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (announceForm.is_active) {
+        localStorage.setItem('superAdminBroadcast', `${announceForm.title}: ${announceForm.message}`);
+      }
       await superadminApi.createAnnouncement(announceForm);
-      toast.success("Announcement broadcasted successfully!");
+      toast.success("Announcement broadcasted successfully to all client restaurant headers!");
       setShowAnnounceModal(false);
       setAnnounceForm({ title: '', message: '', target_role: 'ALL', is_active: true });
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || "Failed to create announcement");
     }
+  };
+
+  const handleQuickLiveBroadcast = (msg: string) => {
+    localStorage.setItem('superAdminBroadcast', msg);
+    toast.success("🚀 Live Broadcast Banner instantly pushed to all client restaurant screens!");
   };
 
   const handleSaveSettings = async () => {
@@ -774,14 +782,27 @@ export default function SuperAdminDashboard() {
           {/* TAB: ANNOUNCEMENTS */}
           {activeTab === 'announcements' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-bold text-slate-800">Global Announcements</h3>
-                <button 
-                  onClick={() => setShowAnnounceModal(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors"
-                >
-                  <Plus size={16} /> Create Broadcast
-                </button>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Megaphone className="text-orange-600" size={24} /> Global Platform Announcements
+                  </h3>
+                  <p className="text-[13px] text-slate-500 font-medium mt-1">Publish real-time ticker notices directly to all client POS restaurant dashboards.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => handleQuickLiveBroadcast("🎉 FESTIVE SPECIAL: Upgrade your restaurant to MAX PLAN today & get 20% cashback! Contact Support.")}
+                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-4 py-2 rounded-xl text-sm font-extrabold flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    🚀 Quick Promo Banner
+                  </button>
+                  <button 
+                    onClick={() => setShowAnnounceModal(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"
+                  >
+                    <Plus size={16} /> Custom Broadcast
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

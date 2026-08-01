@@ -228,5 +228,98 @@ export const ownerApi = {
   delete3DModel: async (itemId: string) => {
     const response = await axios.delete(`${BASE_URL}/menu/items/${itemId}/3d`, getHeaders());
     return response.data;
+  },
+
+  // Enterprise DB Methods (Expenses, Discounts, Commissary, Aggregators)
+  getExpenses: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/expenses`, getHeaders());
+    return response.data;
+  },
+  createExpense: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/expenses`, data, getHeaders());
+    return response.data;
+  },
+  deleteExpense: async (id: string) => {
+    const response = await axios.delete(`${BASE_URL}/enterprise/expenses/${id}`, getHeaders());
+    return response.data;
+  },
+
+  getCoupons: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/coupons`, getHeaders());
+    return response.data;
+  },
+  createCoupon: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/coupons`, data, getHeaders());
+    return response.data;
+  },
+
+  getHappyHours: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/happy-hours`, getHeaders());
+    return response.data;
+  },
+  createHappyHour: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/happy-hours`, data, getHeaders());
+    return response.data;
+  },
+
+  getBogoRules: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/bogo`, getHeaders());
+    return response.data;
+  },
+  createBogoRule: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/bogo`, data, getHeaders());
+    return response.data;
+  },
+
+  getBranches: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/branches`, getHeaders());
+    return response.data;
+  },
+  createBranch: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/branches`, data, getHeaders());
+    return response.data;
+  },
+  deleteBranch: async (id: string) => {
+    const response = await axios.delete(`${BASE_URL}/enterprise/branches/${id}`, getHeaders());
+    return response.data;
+  },
+
+  getCentralStock: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/stock`, getHeaders());
+    return response.data;
+  },
+  createCentralStock: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/stock`, data, getHeaders());
+    return response.data;
+  },
+  deleteCentralStock: async (id: string) => {
+    const response = await axios.delete(`${BASE_URL}/enterprise/stock/${id}`, getHeaders());
+    return response.data;
+  },
+
+  getTransfers: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/transfers`, getHeaders());
+    return response.data;
+  },
+  createTransfer: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/transfers`, data, getHeaders());
+    return response.data;
+  },
+  markTransferReceived: async (id: string) => {
+    const response = await axios.put(`${BASE_URL}/enterprise/transfers/${id}/receive`, {}, getHeaders());
+    return response.data;
+  },
+
+  getAggregators: async () => {
+    const response = await axios.get(`${BASE_URL}/enterprise/aggregators`, getHeaders());
+    return response.data;
+  },
+  createAggregatorOrder: async (data: any) => {
+    const response = await axios.post(`${BASE_URL}/enterprise/aggregators`, data, getHeaders());
+    return response.data;
+  },
+  deleteAggregatorOrder: async (order_id: string) => {
+    const response = await axios.delete(`${BASE_URL}/enterprise/aggregators/${order_id}`, getHeaders());
+    return response.data;
   }
 };
