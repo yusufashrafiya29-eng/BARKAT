@@ -9,7 +9,7 @@ import uuid
 import hmac
 import hashlib
 
-from db.session import get_db
+from api.deps import get_db
 from models.saas_payment import SaaSPayment
 from models.restaurant import Restaurant
 from models.user import User
