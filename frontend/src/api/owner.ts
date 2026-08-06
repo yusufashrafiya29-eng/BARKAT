@@ -156,6 +156,16 @@ export const ownerApi = {
     return response.data;
   },
 
+  createSubscriptionOrder: async (plan_name: string, is_yearly: boolean) => {
+    const response = await axios.post(`${BASE_URL}/subscriptions/create-order`, { plan_name, is_yearly }, getHeaders());
+    return response.data;
+  },
+
+  verifySubscriptionPayment: async (data: { razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string }) => {
+    const response = await axios.post(`${BASE_URL}/subscriptions/verify`, data, getHeaders());
+    return response.data;
+  },
+
   // Profile & Security
   changePassword: async (payload: any) => {
     const response = await axios.put(`${BASE_URL}/users/me/password`, payload, getHeaders());

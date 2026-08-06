@@ -50,7 +50,7 @@ export default function LandingPage() {
       {/* 2. TRUSTED BY */}
       <section className="py-10 border-y border-slate-800/50 bg-[#0d1424]">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-8">Trusted by 5,000+ businesses globally</p>
+          <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-8">Trusted by 1,000+ businesses across India</p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
             {/* Abstract placeholders for logos */}
             <div className="flex items-center gap-2 font-black text-xl text-white"><Utensils size={24}/> DineFlow</div>
@@ -211,7 +211,7 @@ export default function LandingPage() {
               </div>
               <div className="text-center md:text-left border-l-2 border-violet-500/30 pl-6">
                 <div className="w-12 h-12 bg-violet-500/10 rounded-full flex items-center justify-center mb-4 mx-auto md:mx-0"><Users className="text-violet-400"/></div>
-                <p className="text-4xl font-black text-white mb-2">5,000+</p>
+                <p className="text-4xl font-black text-white mb-2">1,000+</p>
                 <p className="text-sm text-slate-400 font-bold uppercase tracking-wider">Happy Partners</p>
               </div>
               <div className="text-center md:text-left border-l-2 border-emerald-500/30 pl-6">
@@ -277,26 +277,74 @@ export default function LandingPage() {
               <p className="text-indigo-200">Leave your details and our team will get back to you within 24 hours.</p>
             </div>
 
-            <form className="relative z-10 space-y-6" onSubmit={e => { e.preventDefault(); alert('Message sent!'); }}>
+            <form className="relative z-10 space-y-6" onSubmit={e => {
+              e.preventDefault();
+              const name = (e.currentTarget.querySelector('input[name="fname"]') as HTMLInputElement)?.value || '';
+              const phone = (e.currentTarget.querySelector('input[name="phone"]') as HTMLInputElement)?.value || '';
+              const msg = encodeURIComponent(`Hi MyRestro! I'm *${name}* and I'm interested in your restaurant software. Please contact me on: ${phone}`);
+              window.open(`https://wa.me/919979114665?text=${msg}`, '_blank');
+            }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-400 mb-2">First Name</label>
-                  <input type="text" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
+                   <label className="block text-sm font-bold text-slate-400 mb-2">Your Name</label>
+                   <input name="fname" type="text" placeholder="e.g. Rahul Sharma" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-400 mb-2">Last Name</label>
-                  <input type="text" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
+                   <label className="block text-sm font-bold text-slate-400 mb-2">Restaurant Name</label>
+                   <input name="lname" type="text" placeholder="e.g. The Grand Cafe" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-400 mb-2">Email Address</label>
-                <input type="email" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
+                <label className="block text-sm font-bold text-slate-400 mb-2">WhatsApp Number</label>
+                <input name="phone" type="tel" placeholder="+91-98765 43210" className="w-full bg-[#111827] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all" />
               </div>
-              <button className="w-full py-4 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-lg">
-                Send Message
+              <button type="submit" className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-colors shadow-lg" style={{background:'#25D366'}}>
+                <CheckCircle2 size={18} />
+                Send via WhatsApp
               </button>
             </form>
            </div>
+        </div>
+      </section>
+
+      {/* 8.5 PRICING TEASER */}
+      <section className="py-24 bg-[#0a101d] border-t border-slate-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-black tracking-widest uppercase mb-6">
+            Pricing
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-4">
+            From ₹800/month.<br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Everything you need, nothing you don't.</span>
+          </h2>
+          <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto">Start free for 14 days. No credit card required. Upgrade when your restaurant is ready to scale.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
+            <Link to="/pricing" className="inline-flex items-center justify-center px-8 py-4 rounded-xl text-base font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_30px_rgba(79,70,229,0.3)] transition-all hover:-translate-y-1">
+              See Full Pricing
+              <ArrowRight size={18} className="ml-2" />
+            </Link>
+            <Link to="/signup" className="inline-flex items-center justify-center px-8 py-4 rounded-xl text-base font-bold text-slate-300 border border-slate-700 hover:border-slate-500 transition-all hover:-translate-y-1">
+              Start Free Trial
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
+            {[
+              { name: 'Basic', price: '₹800/mo', tag: null, color: 'slate', desc: 'QR Menu, KDS, Waiter POS, Basic Analytics, 10 Tables' },
+              { name: 'Pro', price: '₹1,400/mo', tag: '⭐ Most Popular', color: 'indigo', desc: 'Everything in Basic + CRM, Reports, Discounts, Aggregators, Unlimited Staff' },
+              { name: 'Max', price: '₹1,999/mo', tag: '🏆 For Chains', color: 'amber', desc: 'Everything in Pro + 3D AR, Franchise Management, Priority Support' },
+            ].map((p) => (
+              <div key={p.name} className={`relative rounded-2xl p-6 border ${
+                p.color === 'indigo' ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-slate-800/50 border-slate-700'
+              }`}>
+                {p.tag && <div className={`absolute -top-3 left-6 px-3 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                  p.color === 'indigo' ? 'bg-indigo-600 text-white' : 'bg-amber-500 text-white'
+                }`}>{p.tag}</div>}
+                <p className="font-black text-white text-xl mb-1">{p.name}</p>
+                <p className={`text-2xl font-black mb-3 ${p.color === 'indigo' ? 'text-indigo-400' : p.color === 'amber' ? 'text-amber-400' : 'text-slate-300'}`}>{p.price}</p>
+                <p className="text-[13px] text-slate-400 leading-relaxed">{p.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

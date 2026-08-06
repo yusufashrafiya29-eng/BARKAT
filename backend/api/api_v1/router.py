@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings, payments, reports, reservations, cash_register, superadmin, crm, enterprise
+from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings, payments, reports, reservations, cash_register, superadmin, crm, enterprise, subscriptions
 
 api_router = APIRouter()
 
@@ -22,3 +22,4 @@ api_router.include_router(reservations.router, prefix="/reservations", tags=["Re
 api_router.include_router(cash_register.router, prefix="/cash", tags=["Cash Register"])
 api_router.include_router(crm.router, prefix="/crm", tags=["CRM & Loyalty"])
 api_router.include_router(enterprise.router, prefix="/enterprise", tags=["Enterprise & Aggregator Hub"])
+api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["SaaS Subscriptions"])

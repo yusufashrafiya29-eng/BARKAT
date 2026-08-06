@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     RAZORPAY_WEBHOOK_SECRET: str = ""
     TRIPO_API_KEY: str = ""
     MESHY_API_KEY: str = ""
+    
+    SAAS_RAZORPAY_KEY_ID: str = ""
+    SAAS_RAZORPAY_KEY_SECRET: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

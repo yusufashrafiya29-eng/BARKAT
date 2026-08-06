@@ -1,0 +1,22 @@
+# Alembic Database Migrations
+
+This directory contains the database migration scripts.
+
+## How to use Alembic in this project:
+
+1. **Apply migrations** (Update your database to the latest schema):
+   ```bash
+   alembic upgrade head
+   ```
+
+2. **Generate a new migration** (After you change a model in `models/`):
+   ```bash
+   alembic revision --autogenerate -m "description_of_change"
+   ```
+
+3. **Rollback one step** (If you made a mistake):
+   ```bash
+   alembic downgrade -1
+   ```
+
+**Note**: Before running alembic commands, make sure you are in the `backend/` directory and your virtual environment is activated, or use `..\venv\Scripts\alembic`.

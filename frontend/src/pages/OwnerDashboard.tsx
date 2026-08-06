@@ -19,6 +19,7 @@ import StaffTab from '../components/owner-dashboard/StaffTab';
 import ReportsTab from '../components/owner-dashboard/ReportsTab';
 import ReservationsTab from '../components/owner-dashboard/ReservationsTab';
 import SettingsTab from '../components/owner-dashboard/SettingsTab';
+import BillingTab from '../components/owner-dashboard/BillingTab';
 import SupportTab from '../components/owner-dashboard/SupportTab';
 import CashRegisterTab from '../components/CashRegisterTab';
 import CustomersTab from '../components/owner-dashboard/CustomersTab';
@@ -44,7 +45,7 @@ interface MenuItem {
 
 
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support' | 'day_end' | 'discounts' | 'expenses' | 'commissary' | 'aggregators';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'billing' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support' | 'day_end' | 'discounts' | 'expenses' | 'commissary' | 'aggregators';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -349,6 +350,7 @@ export default function OwnerDashboard() {
               { id: 'staff', label: 'Staff Roster', icon: Users },
               { id: 'inventory', label: 'Inventory Stock', icon: ShoppingBag },
               { id: 'settings', label: 'Store Settings', icon: CreditCard },
+              { id: 'billing', label: 'Billing & Plan', icon: Zap },
               { id: 'support', label: 'Help & Support', icon: Info },
             ].map(tab => (
               <button
@@ -521,6 +523,7 @@ export default function OwnerDashboard() {
               {activeTab === 'reservations' && <ReservationsTab setShowAddModal={setShowAddModal} />}
               {activeTab === 'crm' && <CustomersTab />}
               {activeTab === 'settings' && <SettingsTab />}
+              {activeTab === 'billing' && <BillingTab />}
               {activeTab === 'support' && <SupportTab />}
               {activeTab === 'day_end' && <DayEndTab />}
               {activeTab === 'discounts' && <DiscountsTab />}

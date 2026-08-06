@@ -33,6 +33,7 @@ export default function KitchenKDS() {
   const [tableMap, setTableMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(new Date());
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'error' | 'polling'>('connecting');
   
   // Real-time 1-second ticker for MM:SS digital stopwatch & SLA alerts
   const [now, setNow] = useState(Date.now());
@@ -105,9 +106,106 @@ export default function KitchenKDS() {
   }, [loading]);
 
   useEffect(() => {
-    fetchMetadata().then(() => fetchOrders());
-    const interval = setInterval(fetchOrders, 4000);
-    return () => clearInterval(interval);
+    let ws: WebSocket | null = null;
+    let pollInterval: any = null;
+    let reconnectTimeout: any = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    let isComponentMounted = true;
+
+    const startPolling = () => {
+      if (!isComponentMounted) return;
+      setWsStatus('polling');
+      fetchOrders();
+      pollInterval = setInterval(fetchOrders, 4000);
+    };
+
+    const connectWS = () => {
+      if (!isComponentMounted) return;
+      const token = localStorage.getItem('auth_token');
+      const restaurantId = localStorage.getItem('restaurantId');
+      
+      if (!token || !restaurantId) {
+        startPolling();
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      // Replace http/https with ws/wss
+      const wsBase = apiUrl.replace(/^http/, 'ws');
+      const wsUrl = `${wsBase}/orders/ws/kitchen/${restaurantId}?token=${token}`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        if (!isComponentMounted) return;
+        setWsStatus('connected');
+        retryCount = 0;
+        fetchOrders(); // Initial full sync on connect
+        if (retryCount > 0) toast.success('Reconnected to real-time KDS!');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.event === 'ORDER_UPDATE') {
+            const incomingOrder = data as Order;
+            setLastSync(new Date());
+            
+            setOrders(prev => {
+              if (incomingOrder.status === 'READY') {
+                return prev.filter(o => o.id !== incomingOrder.id);
+              }
+              const exists = prev.find(o => o.id === incomingOrder.id);
+              if (exists) {
+                return prev.map(o => o.id === incomingOrder.id ? incomingOrder : o);
+              }
+              return [...prev, incomingOrder].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            });
+
+            if (incomingOrder.status === 'READY') {
+              setRecentlyDone(prev => {
+                const filtered = prev.filter(o => o.id !== incomingOrder.id);
+                // Add finished_at formatting
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return [{ ...incomingOrder, finished_at: timeStr }, ...filtered].slice(0, 10);
+              });
+            }
+          }
+        } catch (e) {
+          console.error("WS parse error", e);
+        }
+      };
+
+      ws.onclose = () => {
+        if (!isComponentMounted) return;
+        setWsStatus('error');
+        if (retryCount < MAX_RETRIES) {
+          const delay = Math.pow(2, retryCount) * 1000;
+          retryCount++;
+          toast.error(`Connection lost. Reconnecting in ${delay/1000}s...`);
+          reconnectTimeout = setTimeout(connectWS, delay);
+        } else {
+          toast.error('Real-time connection failed. Falling back to polling.');
+          startPolling();
+        }
+      };
+      
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    fetchMetadata().then(() => {
+      connectWS();
+    });
+
+    return () => {
+      isComponentMounted = false;
+      if (ws) ws.close();
+      if (pollInterval) clearInterval(pollInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
   }, [fetchMetadata, fetchOrders]);
 
   const handleOrderStatusChange = async (orderId: string, newStatus: string) => {
@@ -369,9 +467,21 @@ export default function KitchenKDS() {
                 KDS 2.0
               </span>
             </div>
-            <div className="flex items-center gap-2 mt-1 text-slate-400">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-md shadow-emerald-400/80" />
-              <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">LIVE SYSTEM</p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className={`w-2 h-2 rounded-full shadow-md ${
+                wsStatus === 'connected' ? 'bg-emerald-400 shadow-emerald-400/80 animate-pulse' : 
+                wsStatus === 'polling' ? 'bg-amber-400 shadow-amber-400/80' : 
+                wsStatus === 'connecting' ? 'bg-blue-400 shadow-blue-400/80 animate-ping' : 
+                'bg-red-500 shadow-red-500/80'
+              }`} />
+              <p className={`text-[11px] font-bold uppercase tracking-widest ${
+                wsStatus === 'connected' ? 'text-emerald-400' : 
+                wsStatus === 'polling' ? 'text-amber-400' : 
+                wsStatus === 'connecting' ? 'text-blue-400' : 
+                'text-red-500'
+              }`}>
+                {wsStatus === 'connected' ? 'LIVE SYSTEM' : wsStatus === 'polling' ? 'POLLING FALLBACK' : wsStatus === 'connecting' ? 'CONNECTING...' : 'DISCONNECTED'}
+              </p>
             </div>
           </div>
         </div>

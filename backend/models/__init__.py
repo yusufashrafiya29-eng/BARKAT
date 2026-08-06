@@ -16,3 +16,5 @@ from .enterprise import (
     ExpenseVoucher, Coupon, HappyHour, BogoRule,
     BranchOutlet, CentralStockItem, StockTransfer, AggregatorOrder
 )
+from .customer import Customer
+from .reservation import Reservation

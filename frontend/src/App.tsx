@@ -23,6 +23,7 @@ import SubscriptionLock from './pages/SubscriptionLock';
 import PublicBooking from './pages/PublicBooking';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SuperAdminRoute from './components/SuperAdminRoute';
+import Pricing from './pages/Pricing';
 
 const ImpersonationBanner = () => {
   const isImpersonating = !!localStorage.getItem('superadmin_token');
@@ -62,6 +63,7 @@ const App: React.FC = () => {
       <Routes>
         {/* Landing Page (Public) */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/pricing" element={<Pricing />} />
         
         {/* Customer QR Route (Public — no auth needed) */}
         <Route path="/order/table/:tableId" element={<CustomerMenu />} />

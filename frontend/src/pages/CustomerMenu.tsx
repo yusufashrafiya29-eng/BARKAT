@@ -541,13 +541,6 @@ const CustomerMenu: React.FC = () => {
                             
                             <div className="flex items-center gap-2 mb-2">
                                <span className="font-bold text-[14px] text-[#e6c27a]">₹{item.price}</span>
-                               <span className="text-[11px] text-gray-600 line-through">₹{(item.price * 1.15).toFixed(0)}</span>
-                            </div>
-
-                            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                               <span className="flex items-center gap-1"><span className="text-rose-500">🌶️</span> Medium</span>
-                               <span className="w-1 h-1 rounded-full bg-gray-700"></span>
-                               <span>~320 Cal</span>
                             </div>
                          </div>
                          

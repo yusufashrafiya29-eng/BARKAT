@@ -50,6 +50,7 @@ export default function PublicNavbar() {
           <div className="hidden md:flex items-center space-x-8">
             <button onClick={() => scrollToSection('features')} className="text-[14px] font-medium text-slate-600 hover:text-indigo-600 transition-colors">Features</button>
             <button onClick={() => scrollToSection('about')} className="text-[14px] font-medium text-slate-600 hover:text-indigo-600 transition-colors">About Us</button>
+            <Link to="/pricing" className="text-[14px] font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</Link>
             <button onClick={() => scrollToSection('contact')} className="text-[14px] font-medium text-slate-600 hover:text-indigo-600 transition-colors">Contact</button>
             
             <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-slate-200">
@@ -79,6 +80,7 @@ export default function PublicNavbar() {
           <div className="px-4 pt-2 pb-6 space-y-1">
             <button onClick={() => scrollToSection('features')} className="block w-full text-left px-3 py-4 text-base font-medium text-slate-700 hover:text-indigo-600 hover:bg-slate-50 border-b border-slate-100">Features</button>
             <button onClick={() => scrollToSection('about')} className="block w-full text-left px-3 py-4 text-base font-medium text-slate-700 hover:text-indigo-600 hover:bg-slate-50 border-b border-slate-100">About Us</button>
+            <Link to="/pricing" className="block w-full text-left px-3 py-4 text-base font-medium text-slate-700 hover:text-indigo-600 hover:bg-slate-50 border-b border-slate-100">Pricing</Link>
             <button onClick={() => scrollToSection('contact')} className="block w-full text-left px-3 py-4 text-base font-medium text-slate-700 hover:text-indigo-600 hover:bg-slate-50">Contact</button>
             
             <div className="pt-4 flex flex-col space-y-3 px-3">

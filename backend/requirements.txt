@@ -13,3 +13,4 @@ email-validator
 python-multipart
 Pillow
 razorpay
+alembic
