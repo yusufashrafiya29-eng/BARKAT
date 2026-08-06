@@ -9,12 +9,11 @@ import uuid
 import hmac
 import hashlib
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from models.saas_payment import SaaSPayment
 from models.restaurant import Restaurant
 from models.user import User
 from core.config import settings
-from api.api_v1.auth import get_current_user
 
 router = APIRouter()
 
