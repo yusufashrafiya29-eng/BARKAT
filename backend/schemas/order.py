@@ -106,3 +106,29 @@ class OrderItemStatusUpdate(BaseModel):
 
 class ClearHistoryRequest(BaseModel):
     password: str
+
+class AggregatorOrderResponse(BaseModel):
+    id: UUID
+    restaurant_id: UUID
+    platform: str
+    platform_order_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    items_summary: Optional[str] = None
+    raw_payload: Optional[Any] = None
+    gross_amount: float
+    platform_commission_rate: float
+    ad_deduction: float
+    gst_on_commission: float
+    net_payout: float
+    status: str
+    rider_name: Optional[str] = None
+    rider_phone: Optional[str] = None
+    rider_status: str
+    eta: Optional[str] = None
+    ordered_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
