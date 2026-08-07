@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, TrendingUp, DollarSign, Clock, CheckCircle2, Flame, RefreshCw, Filter, ShieldAlert, Zap, Truck, Volume2, VolumeX } from 'lucide-react';
+import { ShoppingBag, TrendingUp, DollarSign, Clock, CheckCircle2, Flame, RefreshCw, Filter, ShieldAlert, Zap, Truck, Volume2, VolumeX, Activity, BellRing, Package, ShoppingCart, Timer, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 
@@ -68,7 +68,7 @@ export default function AggregatorOrdersTab() {
         const data = JSON.parse(event.data);
         if (data.type === 'NEW_AGGREGATOR_ORDER') {
           playAlertSound();
-          toast.success(`🚨 New ${data.platform} Order Received!`, { duration: 5000, icon: '🛎️' });
+          toast.success(`New ${data.platform} Order Received!`, { duration: 5000 });
           fetchOrders(); // instantly fetch latest
         }
       } catch (err) {
@@ -128,7 +128,7 @@ export default function AggregatorOrdersTab() {
     try {
       await ownerApi.createAggregatorOrder(simOrder);
       await fetchOrders();
-      toast.success(`⚡ [Webhook Drop] Incoming order received & stored in PostgreSQL DB from ${selectedPlatform}!`);
+      toast.success(`[Webhook Drop] Incoming order received & stored in PostgreSQL DB from ${selectedPlatform}!`);
     } catch (err) {
       toast.error("Failed to record webhook drop in DB");
     }
@@ -138,14 +138,14 @@ export default function AggregatorOrdersTab() {
     setIsRefreshing(true);
     await fetchOrders();
     setIsRefreshing(false);
-    toast.success("⚡ All aggregator webhooks & PostgreSQL records resynced!");
+    toast.success("All aggregator webhooks & PostgreSQL records resynced!");
   };
 
   const handlePushToKDS = async (id: string) => {
     try {
       await ownerApi.updateAggregatorOrderStatus(id, 'KITCHEN_PREPARING');
       await fetchOrders();
-      toast.success("🔥 Order injected directly into 3-Column Kitchen Display (KDS)! Prep timer initiated.");
+      toast.success("Order injected directly into 3-Column Kitchen Display (KDS)! Prep timer initiated.");
     } catch (err) {
       toast.error("Failed to push to KDS");
     }
@@ -165,7 +165,7 @@ export default function AggregatorOrdersTab() {
     try {
       await ownerApi.deleteAggregatorOrder(id);
       await fetchOrders();
-      toast.success("🛵 Package handed over to rider & completed in server DB!");
+      toast.success("Package handed over to rider & completed in server DB!");
     } catch (err) {
       toast.error("Failed to update order status in DB");
     }
@@ -190,11 +190,11 @@ export default function AggregatorOrdersTab() {
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
       
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white p-8 rounded-3xl shadow-xl border border-white/10">
+      <div className="flex flex-col gap-6 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white p-8 rounded-3xl shadow-xl border border-white/10">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 bg-gradient-to-r from-[#e85d04] to-orange-600 font-black text-[11px] uppercase rounded-lg tracking-widest shadow-sm">
-              🛵 SPRINT 5 AGGREGATOR HUB
+            <span className="px-2.5 py-1 bg-gradient-to-r from-[#e85d04] to-orange-600 font-black text-[11px] uppercase rounded-lg tracking-widest shadow-sm flex items-center gap-1.5">
+              <Activity size={12} /> SPRINT 5 AGGREGATOR HUB
             </span>
             <span className="text-emerald-400 font-bold text-xs flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live API Sync Active
@@ -206,13 +206,13 @@ export default function AggregatorOrdersTab() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleSimulateWebhookDrop}
-            className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-md shadow-indigo-500/20"
+            className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-md shadow-indigo-500/20 flex items-center gap-1.5"
             title="Simulate a live webhook order drop from online aggregators for testing"
           >
-            🧪 Simulate Webhook Order Drop
+            <Zap size={15} /> Simulate Webhook Order Drop
           </button>
           <button
             onClick={handleRefresh}
@@ -233,7 +233,7 @@ export default function AggregatorOrdersTab() {
             onClick={() => toast.success("Opening Commission renegotiation dossier & PDF breakdown...")}
             className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#e85d04] to-orange-600 hover:from-[#c44b00] hover:to-[#e85d04] font-extrabold text-xs shadow-xl shadow-[#e85d04]/30 transition-all transform active:scale-95 flex items-center gap-1.5"
           >
-            <DollarSign size={15} /> Export Commission Report
+            <Download size={15} /> Export Commission Report
           </button>
         </div>
       </div>
@@ -320,8 +320,8 @@ export default function AggregatorOrdersTab() {
                 </div>
 
                 <h4 className="text-lg font-extrabold text-slate-900">{order.customer_name}</h4>
-                <p className="text-xs font-semibold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                  🛒 {order.items_summary}
+                <p className="text-xs font-semibold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-150 flex items-center gap-1.5">
+                  <ShoppingCart size={13} className="text-slate-400" /> {order.items_summary}
                 </p>
               </div>
 
@@ -350,8 +350,8 @@ export default function AggregatorOrdersTab() {
                   <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5 justify-end">
                     <Truck size={15} className="text-[#e85d04]" /> {order.rider_name}
                   </span>
-                  <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mt-1 border border-amber-200 inline-block w-fit ml-auto">
-                    ⏱ {order.eta}
+                  <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mt-1 border border-amber-200 inline-flex items-center gap-1 w-fit ml-auto">
+                    <Timer size={12} /> {order.eta}
                   </span>
                 </div>
 
@@ -378,7 +378,7 @@ export default function AggregatorOrdersTab() {
                     onClick={() => handleMarkHandedOver(order.id)}
                     className="px-5 py-3 rounded-2xl font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 shrink-0"
                   >
-                    <CheckCircle2 size={18} /> 📦 Handover to Rider
+                    <Package size={18} /> Handover to Rider
                   </button>
                 )}
               </div>
