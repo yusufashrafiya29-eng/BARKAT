@@ -8,6 +8,7 @@ from api.deps import get_db, get_current_user
 from models.user import User
 from models.aggregator import AggregatorOrder
 from schemas.order import AggregatorOrderResponse # I will create this schema
+from services.ws_manager import manager
 import uuid
 
 router = APIRouter()
@@ -29,7 +30,7 @@ def get_aggregator_orders(
     return orders
 
 @router.post("/webhooks/simulate")
-def simulate_webhook_drop(
+async def simulate_webhook_drop(
     payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -67,6 +68,14 @@ def simulate_webhook_drop(
     db.add(order)
     db.commit()
     db.refresh(order)
+    
+    # Broadcast to all connected WebSockets for this restaurant
+    await manager.broadcast(str(current_user.restaurant_id), {
+        "type": "NEW_AGGREGATOR_ORDER",
+        "order_id": str(order.id),
+        "platform": order.platform
+    })
+    
     return {"message": "Webhook simulated and saved to DB", "order_id": order.id}
 
 @router.put("/orders/{order_id}/status")

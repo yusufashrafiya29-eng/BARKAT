@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ShoppingBag, TrendingUp, DollarSign, Clock, CheckCircle2, Flame, RefreshCw, Filter, ShieldAlert, Zap, Truck } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ShoppingBag, TrendingUp, DollarSign, Clock, CheckCircle2, Flame, RefreshCw, Filter, ShieldAlert, Zap, Truck, Volume2, VolumeX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 
@@ -23,8 +23,71 @@ interface AggregatorOrder {
 export default function AggregatorOrdersTab() {
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const ws = useRef<WebSocket | null>(null);
 
   const [orders, setOrders] = useState<AggregatorOrder[]>([]);
+
+  const playAlertSound = () => {
+    if (!soundEnabled) return;
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContext();
+      
+      const playBeep = (time: number, freq: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(1, time + 0.05);
+        gain.gain.linearRampToValueAtTime(0, time + 0.3);
+        osc.start(time);
+        osc.stop(time + 0.3);
+      };
+
+      const now = ctx.currentTime;
+      playBeep(now, 800); // Ting
+      playBeep(now + 0.4, 1000); // Ting
+    } catch (e) {
+      console.error("Audio playback failed", e);
+    }
+  };
+
+  const setupWebSocket = () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    const wsUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace('http', 'ws');
+    ws.current = new WebSocket(`${wsUrl}/orders/ws/kitchen?token=${token}`);
+
+    ws.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'NEW_AGGREGATOR_ORDER') {
+          playAlertSound();
+          toast.success(`🚨 New ${data.platform} Order Received!`, { duration: 5000, icon: '🛎️' });
+          fetchOrders(); // instantly fetch latest
+        }
+      } catch (err) {
+        console.error("Failed to parse WS message", err);
+      }
+    };
+
+    ws.current.onclose = () => {
+      setTimeout(setupWebSocket, 5000); // Reconnect
+    };
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    setupWebSocket();
+    return () => {
+      if (ws.current) ws.current.close();
+    };
+  }, [soundEnabled]); // Re-setup WS when soundEnabled changes so the closure has the updated state
 
   const fetchOrders = async () => {
     try {
@@ -156,6 +219,15 @@ export default function AggregatorOrdersTab() {
             className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-colors flex items-center gap-1.5 border border-white/20"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} /> Resync Webhooks
+          </button>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`px-4 py-3 rounded-2xl font-bold text-xs transition-colors flex items-center gap-1.5 border ${
+              soundEnabled ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
+          >
+            {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />} 
+            {soundEnabled ? 'Audio On' : 'Enable Audio'}
           </button>
           <button
             onClick={() => toast.success("Opening Commission renegotiation dossier & PDF breakdown...")}
