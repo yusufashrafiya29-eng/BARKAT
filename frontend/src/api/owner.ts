@@ -320,16 +320,31 @@ export const ownerApi = {
     return response.data;
   },
 
+  // --- Integrations ---
+  getIntegrations: async () => {
+    const res = await axios.get(`${BASE_URL}/settings/integrations`, getHeaders());
+    return res.data;
+  },
+  updateIntegrations: async (data: any) => {
+    const res = await axios.post(`${BASE_URL}/settings/integrations`, data, getHeaders());
+    return res.data;
+  },
+
+  // --- Real Aggregator Webhooks API ---
   getAggregators: async () => {
-    const response = await axios.get(`${BASE_URL}/enterprise/aggregators`, getHeaders());
-    return response.data;
+    const res = await axios.get(`${BASE_URL}/aggregators/orders`, getHeaders());
+    return res.data;
   },
   createAggregatorOrder: async (data: any) => {
-    const response = await axios.post(`${BASE_URL}/enterprise/aggregators`, data, getHeaders());
-    return response.data;
+    const res = await axios.post(`${BASE_URL}/aggregators/webhooks/simulate`, data, getHeaders());
+    return res.data;
   },
-  deleteAggregatorOrder: async (order_id: string) => {
-    const response = await axios.delete(`${BASE_URL}/enterprise/aggregators/${order_id}`, getHeaders());
-    return response.data;
+  updateAggregatorOrderStatus: async (id: string, status: string) => {
+    const res = await axios.put(`${BASE_URL}/aggregators/orders/${id}/status`, { status }, getHeaders());
+    return res.data;
+  },
+  deleteAggregatorOrder: async (id: string) => {
+    const res = await axios.put(`${BASE_URL}/aggregators/orders/${id}/status`, { status: 'DELIVERED' }, getHeaders());
+    return res.data;
   }
 };

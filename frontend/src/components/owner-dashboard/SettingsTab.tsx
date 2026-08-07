@@ -1,11 +1,38 @@
-import { type FormEvent } from 'react';
-import { Loader2 } from 'lucide-react';
+import { type FormEvent, useEffect, useState } from 'react';
+import { Loader2, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
 
 export default function SettingsTab() {
   const { upiId, razorpayKeys, fetchData, setFormLoading, formLoading } = useOwnerStore();
+  const [integrations, setIntegrations] = useState({ zomato_store_id: '', swiggy_store_id: '' });
+
+  useEffect(() => {
+    ownerApi.getIntegrations().then(res => {
+      setIntegrations(res);
+    }).catch(err => console.error(err));
+  }, []);
+
+  const handleSaveIntegrations = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      zomato_store_id: formData.get('zomato_store_id') as string,
+      swiggy_store_id: formData.get('swiggy_store_id') as string
+    };
+
+    try {
+      await ownerApi.updateIntegrations(payload);
+      toast.success("Food Delivery Integrations Saved");
+      setIntegrations(payload);
+    } catch {
+      toast.error("Failed to save integrations");
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   const handleSaveProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -145,6 +172,43 @@ export default function SettingsTab() {
           <div className="pt-2 border-t border-subtle">
             <button disabled={formLoading} className="btn w-full justify-center">
               {formLoading ? <Loader2 size={16} className="animate-spin" /> : "Save Profile"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* FOOD DELIVERY INTEGRATIONS */}
+      <div className="surface p-6 mb-6">
+        <h3 className="text-[15px] font-medium mb-1 flex items-center gap-2">
+          <Store size={18} className="text-orange-500" />
+          Food Delivery Integrations
+        </h3>
+        <p className="text-[13px] text-muted mb-6">Connect your Zomato and Swiggy store accounts to receive orders directly in your POS.</p>
+
+        <form onSubmit={handleSaveIntegrations} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-main">Zomato Store ID</label>
+            <input
+              name="zomato_store_id"
+              defaultValue={integrations.zomato_store_id}
+              placeholder="Ex: 1845920"
+              className="form-input"
+            />
+            <p className="text-[10px] text-muted">Found in your Zomato Restaurant Partner app settings.</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-main">Swiggy Store ID</label>
+            <input
+              name="swiggy_store_id"
+              defaultValue={integrations.swiggy_store_id}
+              placeholder="Ex: 92841"
+              className="form-input"
+            />
+            <p className="text-[10px] text-muted">Found in your Swiggy Partner app.</p>
+          </div>
+          <div className="pt-2 border-t border-subtle">
+            <button disabled={formLoading} className="btn w-full justify-center bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 hover:text-orange-700">
+              {formLoading ? <Loader2 size={16} className="animate-spin" /> : "Save Integrations"}
             </button>
           </div>
         </form>

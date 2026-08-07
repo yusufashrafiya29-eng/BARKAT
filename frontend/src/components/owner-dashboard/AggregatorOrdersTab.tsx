@@ -78,9 +78,24 @@ export default function AggregatorOrdersTab() {
     toast.success("⚡ All aggregator webhooks & PostgreSQL records resynced!");
   };
 
-  const handlePushToKDS = (id: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status: 'KITCHEN_PREPARING' } : o));
-    toast.success("🔥 Order injected directly into 3-Column Kitchen Display (KDS)! Prep timer initiated.");
+  const handlePushToKDS = async (id: string) => {
+    try {
+      await ownerApi.updateAggregatorOrderStatus(id, 'KITCHEN_PREPARING');
+      await fetchOrders();
+      toast.success("🔥 Order injected directly into 3-Column Kitchen Display (KDS)! Prep timer initiated.");
+    } catch (err) {
+      toast.error("Failed to push to KDS");
+    }
+  };
+
+  const handleMarkReady = async (id: string) => {
+    try {
+      await ownerApi.updateAggregatorOrderStatus(id, 'READY_FOR_RIDER');
+      await fetchOrders();
+      toast.success("Valet alerted via push notification!");
+    } catch (err) {
+      toast.error("Failed to mark as ready");
+    }
   };
 
   const handleMarkHandedOver = async (id: string) => {
@@ -279,7 +294,7 @@ export default function AggregatorOrdersTab() {
 
                 {order.status === 'KITCHEN_PREPARING' && (
                   <button
-                    onClick={() => { setOrders(orders.map(o => o.id === order.id ? { ...o, status: 'READY_FOR_RIDER' } : o)); toast.success("Valet alerted via push notification!"); }}
+                    onClick={() => handleMarkReady(order.id)}
                     className="px-5 py-3 rounded-2xl font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 shrink-0"
                   >
                     <CheckCircle2 size={18} /> Mark Ready for Valet

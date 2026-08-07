@@ -17,3 +17,7 @@ class UPIConfig(BaseModel):
 class RazorpayConfig(BaseModel):
     razorpay_key_id: str
     razorpay_key_secret: str
+
+class IntegrationsConfig(BaseModel):
+    zomato_store_id: str
+    swiggy_store_id: str

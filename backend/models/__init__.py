@@ -14,7 +14,8 @@ from .announcement import Announcement
 from .ticket import Ticket
 from .enterprise import (
     ExpenseVoucher, Coupon, HappyHour, BogoRule,
-    BranchOutlet, CentralStockItem, StockTransfer, AggregatorOrder
+    BranchOutlet, CentralStockItem, StockTransfer
 )
+from .aggregator import AggregatorOrder
 from .customer import Customer
 from .reservation import Reservation

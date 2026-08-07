@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 from typing import Optional
 from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user_token, get_current_restaurant
-from schemas.settings import UPIConfig, RazorpayConfig
+from schemas.settings import UPIConfig, RazorpayConfig, IntegrationsConfig
 from services import settings_service
 
 router = APIRouter()
@@ -131,5 +131,39 @@ def update_razorpay_keys(
     
     settings_service.set_config_value(db, "razorpay_key_id", config_in.razorpay_key_id, str(restaurant_id))
     settings_service.set_config_value(db, "razorpay_key_secret", config_in.razorpay_key_secret, str(restaurant_id))
+    
+    return config_in
+
+@router.get("/integrations", response_model=IntegrationsConfig)
+def get_integrations_config(
+    db: Session = Depends(get_db),
+    restaurant_id=Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Fetch the store's configured aggregator integrations. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    z_id = settings_service.get_config_value(db, "zomato_store_id", str(restaurant_id))
+    s_id = settings_service.get_config_value(db, "swiggy_store_id", str(restaurant_id))
+    
+    return {
+        "zomato_store_id": z_id or "",
+        "swiggy_store_id": s_id or ""
+    }
+
+@router.post("/integrations", response_model=IntegrationsConfig)
+def update_integrations_config(
+    config_in: IntegrationsConfig,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """(Secure) Update the store's aggregator integrations. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    settings_service.set_config_value(db, "zomato_store_id", config_in.zomato_store_id, str(restaurant_id))
+    settings_service.set_config_value(db, "swiggy_store_id", config_in.swiggy_store_id, str(restaurant_id))
     
     return config_in
