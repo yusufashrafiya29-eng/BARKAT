@@ -97,6 +97,34 @@ def get_daily_analytics(
     if total_revenue + total_leakage > 0:
         leakage_percent = round((total_leakage / (total_revenue + total_leakage)) * 100, 1)
 
+    # Calculate Yesterday's Stats for Deltas
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= yesterday_start,
+        Order.created_at < today_start,
+        Order.status.in_(valid_statuses)
+    ).all()
+    
+    y_revenue = sum([o.total_amount for o in yesterday_orders if o.total_amount])
+    y_orders = len(yesterday_orders)
+    y_served = len([o for o in yesterday_orders if o.status == OrderStatus.SERVED])
+    
+    today_aov = total_revenue / served_orders if served_orders > 0 else 0
+    y_aov = y_revenue / y_served if y_served > 0 else 0
+    
+    def calc_delta(today_val, yesterday_val):
+        if yesterday_val == 0:
+            return 100.0 if today_val > 0 else 0.0
+        return round(((today_val - yesterday_val) / yesterday_val) * 100, 1)
+        
+    deltas = {
+        "revenue": calc_delta(total_revenue, y_revenue),
+        "orders": calc_delta(total_orders_count, y_orders),
+        "served": calc_delta(served_orders, y_served),
+        "aov": calc_delta(today_aov, y_aov)
+    }
+
     return {
         "today_revenue": total_revenue,
         "total_orders": total_orders_count,
@@ -104,6 +132,7 @@ def get_daily_analytics(
         "served_orders": served_orders,
         "payment_methods": payment_methods,
         "hourly_heatmap": hourly_heatmap,
+        "deltas": deltas,
         "leakage": {
             "percent": leakage_percent,
             "total": total_leakage,

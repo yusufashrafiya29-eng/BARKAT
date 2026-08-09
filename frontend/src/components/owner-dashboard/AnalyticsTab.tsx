@@ -98,6 +98,18 @@ export default function AnalyticsTab() {
               <IndianRupee size={18} strokeWidth={2.5} />
             </div>
           </div>
+          {analytics.deltas && (
+            <div className="mt-4 flex items-center justify-between text-[12px]">
+              <span className={`font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                analytics.deltas.revenue > 0 ? 'bg-emerald-100 text-emerald-800' :
+                analytics.deltas.revenue < 0 ? 'bg-rose-100 text-rose-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {analytics.deltas.revenue > 0 ? '▲' : analytics.deltas.revenue < 0 ? '▼' : '−'} {Math.abs(analytics.deltas.revenue)}%
+              </span>
+              <span className="text-indigo-600/80 font-semibold text-[11px]">vs Yesterday</span>
+            </div>
+          )}
         </div>
 
         {/* Average Order Value (NEW) */}
@@ -115,6 +127,18 @@ export default function AnalyticsTab() {
               <BarChart2 size={18} strokeWidth={2.5} />
             </div>
           </div>
+          {analytics.deltas && (
+            <div className="mt-4 flex items-center justify-between text-[12px]">
+              <span className={`font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                analytics.deltas.aov > 0 ? 'bg-emerald-100 text-emerald-800' :
+                analytics.deltas.aov < 0 ? 'bg-rose-100 text-rose-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {analytics.deltas.aov > 0 ? '▲' : analytics.deltas.aov < 0 ? '▼' : '−'} {Math.abs(analytics.deltas.aov)}%
+              </span>
+              <span className="text-teal-700/80 font-semibold text-[11px]">vs Yesterday</span>
+            </div>
+          )}
         </div>
 
         {/* Total Orders */}
@@ -132,6 +156,18 @@ export default function AnalyticsTab() {
               <ShoppingBag size={18} strokeWidth={2.5} />
             </div>
           </div>
+          {analytics.deltas && (
+            <div className="mt-4 flex items-center justify-between text-[12px]">
+              <span className={`font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                analytics.deltas.orders > 0 ? 'bg-emerald-100 text-emerald-800' :
+                analytics.deltas.orders < 0 ? 'bg-rose-100 text-rose-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {analytics.deltas.orders > 0 ? '▲' : analytics.deltas.orders < 0 ? '▼' : '−'} {Math.abs(analytics.deltas.orders)}%
+              </span>
+              <span className="text-amber-700/80 font-semibold text-[11px]">vs Yesterday</span>
+            </div>
+          )}
         </div>
 
         {/* Active Orders */}
@@ -172,12 +208,19 @@ export default function AnalyticsTab() {
               <CheckCircle2 size={18} strokeWidth={2.5} />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[12px]">
-            <span className="font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
-              ▲ +9.1%
-            </span>
-            <span className="text-emerald-700/80 font-semibold text-[11px]">vs Yesterday</span>
-          </div>
+
+          {analytics.deltas && (
+            <div className="mt-4 flex items-center justify-between text-[12px]">
+              <span className={`font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                analytics.deltas.served > 0 ? 'bg-emerald-100 text-emerald-800' :
+                analytics.deltas.served < 0 ? 'bg-rose-100 text-rose-800' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {analytics.deltas.served > 0 ? '▲' : analytics.deltas.served < 0 ? '▼' : '−'} {Math.abs(analytics.deltas.served)}%
+              </span>
+              <span className="text-emerald-700/80 font-semibold text-[11px]">vs Yesterday</span>
+            </div>
+          )}
         </div>
 
       </div>
