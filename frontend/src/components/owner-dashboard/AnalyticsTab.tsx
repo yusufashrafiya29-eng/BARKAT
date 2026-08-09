@@ -98,12 +98,6 @@ export default function AnalyticsTab() {
               <IndianRupee size={18} strokeWidth={2.5} />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[12px]">
-            <span className="font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center gap-0.5">
-              ▲ +14.2%
-            </span>
-            <span className="text-indigo-600/80 font-semibold text-[11px]">vs Yesterday</span>
-          </div>
         </div>
 
         {/* Average Order Value (NEW) */}
@@ -121,12 +115,6 @@ export default function AnalyticsTab() {
               <BarChart2 size={18} strokeWidth={2.5} />
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[12px]">
-            <span className="font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center gap-0.5">
-              ▲ +6.8%
-            </span>
-            <span className="text-teal-700/80 font-semibold text-[11px]">vs Yesterday</span>
-          </div>
         </div>
 
         {/* Total Orders */}
@@ -143,12 +131,6 @@ export default function AnalyticsTab() {
             <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-500/30 shrink-0">
               <ShoppingBag size={18} strokeWidth={2.5} />
             </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-[12px]">
-            <span className="font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center gap-0.5">
-              ▲ +18.5%
-            </span>
-            <span className="text-amber-700/80 font-semibold text-[11px]">vs Yesterday</span>
           </div>
         </div>
 

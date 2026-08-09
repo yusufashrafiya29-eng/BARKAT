@@ -102,10 +102,7 @@ export default function LiveTelemetryBanner() {
               <span className="text-slate-500 font-normal">Active KOTs:</span>
               <strong className="text-white font-mono bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">{activeKots} running</strong>
             </span>
-            <span className="flex items-center gap-1.5 text-slate-300">
-              <span className="text-slate-500 font-normal">Revenue Pulse:</span>
-              <strong className="text-emerald-400 font-mono">₹{totalRev.toLocaleString()}</strong>
-            </span>
+
             <button
               onClick={handleToggleOfflineMode}
               className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-black uppercase transition-all ${
