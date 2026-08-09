@@ -13,15 +13,22 @@ export default function AnalyticsTab() {
   const aov = Math.round((analytics.today_revenue || 0) / (analytics.served_orders || 1));
 
   // Payment method distribution data
-  const paymentMethods = [
+  const hasOrders = analytics.total_orders > 0;
+  
+  const paymentMethods = hasOrders ? [
     { name: 'Cash Register', value: 58, color: '#10b981' },
     { name: 'Card Payments', value: 26, color: '#6366f1' },
     { name: 'UPI & QR', value: 12, color: '#8b5cf6' },
     { name: 'Customer Due / Ledger', value: 4, color: '#f59e0b' }
+  ] : [
+    { name: 'No Data Yet', value: 100, color: '#e2e8f0' }
   ];
 
   // 24-Hour Peak Activity simulation data
   const hoursData = Array.from({ length: 24 }, (_, i) => {
+    if (!hasOrders) {
+      return { hour: `${i.toString().padStart(2, '0')}:00`, intensity: 'low', ordersCount: 0 };
+    }
     let intensity = 'low';
     let ordersCount = Math.floor(Math.random() * 5);
     if ((i >= 12 && i <= 15) || (i >= 19 && i <= 23)) {
@@ -322,26 +329,30 @@ export default function AnalyticsTab() {
                 <h4 className="text-[16px] font-black text-slate-900">Revenue Leakage Score</h4>
               </div>
               <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold text-[11px] uppercase tracking-wider border border-rose-200">
-                10.8% Leakage Today
+                {hasOrders ? "10.8% Leakage Today" : "0% Leakage Today"}
               </span>
             </div>
 
             <p className="text-[13px] text-slate-600 mb-4 leading-relaxed font-medium">
-              We identified <strong className="text-rose-700 font-black">₹2,540</strong> in potential unrealized revenue lost today from cancelled items, voided KOTs, and unauthorized complimentary discounts.
+              {hasOrders ? (
+                <>We identified <strong className="text-rose-700 font-black">₹2,540</strong> in potential unrealized revenue lost today from cancelled items, voided KOTs, and unauthorized complimentary discounts.</>
+              ) : (
+                <>No revenue leakage detected today. All systems and billing metrics are performing optimally with zero voids.</>
+              )}
             </p>
 
             <div className="space-y-2 text-[12px] bg-white p-4 rounded-xl border border-slate-200 shadow-inner">
               <div className="flex justify-between font-bold text-slate-700">
                 <span>Cancelled Items after KOT:</span>
-                <span className="text-rose-600 font-black">-₹1,120</span>
+                <span className="text-rose-600 font-black">{hasOrders ? "-₹1,120" : "₹0"}</span>
               </div>
               <div className="flex justify-between font-bold text-slate-700">
                 <span>Manager Complimentary Dishes:</span>
-                <span className="text-amber-600 font-black">-₹820</span>
+                <span className="text-amber-600 font-black">{hasOrders ? "-₹820" : "₹0"}</span>
               </div>
               <div className="flex justify-between font-bold text-slate-700">
                 <span>Unverified Coupon Overrides:</span>
-                <span className="text-indigo-600 font-black">-₹600</span>
+                <span className="text-indigo-600 font-black">{hasOrders ? "-₹600" : "₹0"}</span>
               </div>
             </div>
           </div>
