@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from datetime import date
+from pydantic import BaseModel
 
 from api.deps import get_db, get_current_user_token, get_current_restaurant
 from schemas.reservation import ReservationCreateManual, ReservationCreatePublic, ReservationStatusUpdate, ReservationRead
@@ -14,6 +15,13 @@ import razorpay
 from core.config import settings
 
 router = APIRouter()
+
+# FIX BUG-013: Payment credentials must be in request body (NOT query params)
+# Query params appear in server logs and browser history — security risk!
+class ReservationPaymentVerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 # Initialize Razorpay client
 def get_razorpay_client(key_id, key_secret):
@@ -139,9 +147,7 @@ def init_razorpay_payment(res_id: UUID, db: Session = Depends(get_db)):
 @router.post("/{res_id}/verify-payment")
 def verify_payment(
     res_id: UUID,
-    razorpay_order_id: str,
-    razorpay_payment_id: str,
-    razorpay_signature: str,
+    req: ReservationPaymentVerifyRequest,   # FIX: body instead of URL query params
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
@@ -156,14 +162,14 @@ def verify_payment(
     client = get_razorpay_client(key_id, key_secret)
     try:
         client.utility.verify_payment_signature({
-            'razorpay_order_id': razorpay_order_id,
-            'razorpay_payment_id': razorpay_payment_id,
-            'razorpay_signature': razorpay_signature
+            'razorpay_order_id': req.razorpay_order_id,
+            'razorpay_payment_id': req.razorpay_payment_id,
+            'razorpay_signature': req.razorpay_signature
         })
         
         res.status = "CONFIRMED"
         res.payment_status = "PAID"
-        res.razorpay_payment_id = razorpay_payment_id
+        res.razorpay_payment_id = req.razorpay_payment_id
         db.commit()
         
         background_tasks.add_task(

@@ -1,6 +1,7 @@
 import sys
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationError
+from pydantic import ValidationError, field_validator
+from typing import List
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Smart Restaurant Software API"
@@ -20,6 +21,22 @@ class Settings(BaseSettings):
     
     SAAS_RAZORPAY_KEY_ID: str = ""
     SAAS_RAZORPAY_KEY_SECRET: str = ""
+    
+    # CORS: set ALLOWED_ORIGINS in Render env as a JSON list, e.g.:
+    # ["https://your-frontend.onrender.com","https://yourdomain.com"]
+    # Leave as ["*"] for local development only
+    ALLOWED_ORIGINS: List[str] = ["*"]
+    
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_origins(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except Exception:
+                return [o.strip() for o in v.split(",")]
+        return v
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

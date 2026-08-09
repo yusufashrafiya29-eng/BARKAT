@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
 import { ArrowRight, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useOwnerStore } from '../store/ownerStore';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +26,10 @@ const Login: React.FC = () => {
         toast.error('Verification required.');
         navigate('/verify', { state: { email } });
       } else {
+        // CRITICAL: Wipe any previous account's in-memory store data BEFORE
+        // setting new tokens. Prevents cross-account data leakage.
+        useOwnerStore.getState().resetStore();
+
         localStorage.setItem('auth_token', response.data.access_token);
         localStorage.setItem('userRole', response.data.role);
         

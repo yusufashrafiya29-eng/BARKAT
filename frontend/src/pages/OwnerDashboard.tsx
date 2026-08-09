@@ -99,6 +99,10 @@ export default function OwnerDashboard() {
 
   // Actions
   const handleLogout = () => {
+    // CRITICAL: Reset Zustand store BEFORE clearing localStorage.
+    // This wipes all in-memory cached data (analytics, orders, menu, etc.)
+    // so the next user who logs in never sees this account's data.
+    useOwnerStore.getState().resetStore();
     localStorage.clear();
     navigate('/login');
   };

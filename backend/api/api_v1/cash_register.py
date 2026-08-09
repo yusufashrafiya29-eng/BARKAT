@@ -12,12 +12,6 @@ from services import cash_service
 
 router = APIRouter()
 
-
-def _require_owner_or_manager(token: dict):
-    if token.get("role") not in ("OWNER", "WAITER"):
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-
 # ── Open Shift ─────────────────────────────────────────────────────────────────
 @router.post("/shift/open", response_model=CashShiftRead)
 def open_shift(

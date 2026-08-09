@@ -1,9 +1,17 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
+import bcrypt
 from models.order import Order, OrderItem, OrderStatus
 from models.menu import MenuItem
 from schemas.order import OrderCreate
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    """Verify bcrypt password hash."""
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
 
 def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> Order:
     # 1. Validate Table Existence (if provided)
@@ -159,6 +167,8 @@ def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, re
     
     # Deduct BOM inventory when order is READY (KDS completed)
     if new_status == OrderStatus.READY and order.status != OrderStatus.READY and not order.is_inventory_deducted:
+        import logging
+        inv_logger = logging.getLogger(__name__)
         from models.menu import RecipeIngredient
         from models.inventory import StockItem
         for item in order.items:
@@ -166,9 +176,10 @@ def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, re
             for recipe in recipes:
                 stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
                 if stock_item:
-                    stock_item.quantity -= (recipe.quantity * item.quantity)
+                    deduction = recipe.quantity * item.quantity
+                    stock_item.quantity = max(0.0, stock_item.quantity - deduction)  # FIX: floor at 0, never go negative
                     if stock_item.quantity <= stock_item.minimum_threshold:
-                        print(f"🚨 LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
+                        inv_logger.warning(f"LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
         order.is_inventory_deducted = True
 
     order.status = new_status
@@ -294,10 +305,11 @@ def delete_order(db: Session, order_id: UUID, restaurant_id: str):
 
 def clear_order_history(db: Session, restaurant_id: str, password: str, user_id: str):
     from models.user import User
-    from core.security import verify_password
-    
+
     user = db.query(User).filter(User.id == user_id).first()
-    if not user or not verify_password(password, user.hashed_password):
+    # FIX: removed broken core.security import; use local bcrypt check
+    # FIX: correct field name is password_hash (not hashed_password)
+    if not user or not _verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect password")
         
     orders_to_delete = db.query(Order).filter(
@@ -329,6 +341,9 @@ def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_i
         menu_item = db.query(MenuItem).filter(MenuItem.id == item_in.menu_item_id).first()
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item not found")
+        # FIX: check availability when editing order (same guard as create_order)
+        if not menu_item.is_available:
+            raise HTTPException(status_code=400, detail=f"Menu item '{menu_item.name}' is currently unavailable")
         
         subtotal = menu_item.price * item_in.quantity
         item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
@@ -346,10 +361,10 @@ def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_i
         )
         db.add(new_item)
         
-    # 3. Save new total
+    # 3. Save new total — FIX: preserve tip_amount in recalculation
     order.subtotal_amount = subtotal_sum
     order.tax_amount = tax_sum
-    order.total_amount = subtotal_sum + tax_sum
+    order.total_amount = subtotal_sum + tax_sum + (order.tip_amount or 0.0)
     db.commit()
     db.refresh(order)
     return order

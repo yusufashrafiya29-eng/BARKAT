@@ -36,6 +36,8 @@ interface OwnerState {
   fetchData: () => Promise<void>;
   silentlyFetchData: () => Promise<void>;
   initSubscription: () => Promise<void>;
+  // ADDED: reset all store data on logout / account switch
+  resetStore: () => void;
 }
 
 export const useOwnerStore = create<OwnerState>((set, get) => ({
@@ -102,23 +104,38 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
     }
   },
 
-  fetchData: async () => {
-    const { activeTab, menuCategories, staff, customers, tables, inventory, historicalOrders, reservations, analytics } = get();
-    
-    // Check if we already have data for the active tab
-    const hasData = 
-      (activeTab === 'menu' && menuCategories.length > 0) ||
-      (activeTab === 'staff' && staff.length > 0) ||
-      (activeTab === 'crm' && customers.length > 0) ||
-      (activeTab === 'tables' && tables.length > 0) ||
-      (activeTab === 'inventory' && inventory.length > 0) ||
-      (activeTab === 'orders' && historicalOrders.length > 0) ||
-      (activeTab === 'reservations' && reservations.length > 0) ||
-      (activeTab === 'analytics' && analytics !== null);
+  // RESET: clears ALL cached data — must be called on logout or account switch
+  resetStore: () => set({
+    activeTab: 'analytics',
+    loading: true,
+    analytics: null,
+    historyData: [],
+    historicalOrders: [],
+    staff: [],
+    menuCategories: [],
+    tables: [],
+    inventory: [],
+    reservations: [],
+    customers: [],
+    aiInsights: [],
+    inventoryVelocity: [],
+    staffPerformance: [],
+    upiId: '',
+    razorpayKeys: { razorpay_key_id: '', razorpay_key_secret: '' },
+    subscriptionStatus: null,
+    subscriptionPlan: 'basic',
+    daysRemaining: null,
+    model3dCredits: 0,
+  }),
 
-    if (!hasData) {
-      set({ loading: true });
-    }
+  fetchData: async () => {
+    const { activeTab } = get();
+    
+    // FIXED: Always fetch fresh data on every tab switch.
+    // Removed in-memory hasData cache — it caused new accounts to see
+    // previous account's data because Zustand store persists in JS memory.
+    // Backend already filters all data by restaurant_id via JWT token.
+    set({ loading: true });
     
     try {
       switch (activeTab) {

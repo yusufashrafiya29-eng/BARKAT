@@ -12,7 +12,7 @@ import hashlib
 from api.deps import get_db, get_current_user
 from models.saas_payment import SaaSPayment
 from models.restaurant import Restaurant
-from models.user import User
+from models.user import User, UserRole
 from core.config import settings
 
 router = APIRouter()
@@ -40,18 +40,19 @@ def create_subscription_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Only owners can subscribe
-    if current_user.role != "owner":
+    # FIX BUG-004: compare against UserRole enum, not the string "owner"
+    if current_user.role != UserRole.OWNER:
         raise HTTPException(status_code=403, detail="Only owners can manage subscriptions")
     
-    # Calculate amount based on plan
+    # FIX BUG-014: align prices with platform config (basic=499, pro=999, max=1399)
+    # Monthly amounts in INR; yearly = ~10x monthly (2 months free)
     amount = 0
     if req.plan_name == "basic":
-        amount = 8000 if req.is_yearly else 800
+        amount = 4990 if req.is_yearly else 499
     elif req.plan_name == "pro":
-        amount = 14000 if req.is_yearly else 1400
+        amount = 9990 if req.is_yearly else 999
     elif req.plan_name == "max":
-        amount = 19990 if req.is_yearly else 1999
+        amount = 13990 if req.is_yearly else 1399
     else:
         raise HTTPException(status_code=400, detail="Invalid plan name")
         

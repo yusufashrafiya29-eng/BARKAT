@@ -66,11 +66,59 @@ def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, r
     if (bill.amount_paid or 0.0) >= (bill.total_amount or 0.0):
         bill.status = PaymentStatus.COMPLETED
         
+        # FIX BUG-012: Update order payment status inline (same transaction)
+        # Avoids double-commit race condition from calling update_payment_status()
         order = db.query(Order).filter(Order.id == order_id).first()
         if order and order.payment_status != 'PAID':
-            from services.order_service import update_payment_status
-            update_payment_status(db, order_id, "PAID", restaurant_id)
+            order.payment_status = 'PAID'
+            # Trigger CRM & cash register via the service but AFTER our single commit
+            # We pass db without committing inside — the commit below covers everything
+            _handle_order_paid_side_effects(db, order, restaurant_id)
             
-    db.commit()
+    db.commit()  # Single commit covers bill, txn, and order status
     db.refresh(bill)
     return bill
+
+
+def _handle_order_paid_side_effects(db: Session, order, restaurant_id: str):
+    """Handle CRM, loyalty, and cash register updates when an order is paid.
+    Called within an open transaction — does NOT commit itself.
+    """
+    # Auto-record sale in active cash shift
+    from services.cash_service import record_sale
+    record_sale(db, restaurant_id, order.total_amount)
+    
+    # CRM & Loyalty Points
+    if order.customer_phone:
+        from models.customer import Customer
+        from services.notification_service import send_whatsapp_receipt
+        
+        customer = db.query(Customer).filter(
+            Customer.restaurant_id == restaurant_id,
+            Customer.phone_number == order.customer_phone
+        ).first()
+        
+        points_earned = int((order.total_amount or 0) // 100)
+        
+        if not customer:
+            customer = Customer(
+                restaurant_id=restaurant_id,
+                phone_number=order.customer_phone,
+                name=order.customer_name,
+                loyalty_points=points_earned,
+                total_spent=order.total_amount or 0,
+                total_visits=1
+            )
+            db.add(customer)
+        else:
+            customer.loyalty_points += points_earned
+            customer.total_spent += (order.total_amount or 0)
+            customer.total_visits += 1
+            if order.customer_name and not customer.name:
+                customer.name = order.customer_name
+        
+        # Note: send_whatsapp_receipt is fire-and-forget; no DB state change
+        try:
+            send_whatsapp_receipt(order, customer)
+        except Exception:
+            pass  # Non-fatal: receipt failure should not block payment confirmation
