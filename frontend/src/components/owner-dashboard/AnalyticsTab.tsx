@@ -12,34 +12,27 @@ export default function AnalyticsTab() {
 
   const aov = Math.round((analytics.today_revenue || 0) / (analytics.served_orders || 1));
 
-  // Payment method distribution data
   const hasOrders = analytics.total_orders > 0;
   
-  const paymentMethods = hasOrders ? [
-    { name: 'Cash Register', value: 58, color: '#10b981' },
-    { name: 'Card Payments', value: 26, color: '#6366f1' },
-    { name: 'UPI & QR', value: 12, color: '#8b5cf6' },
-    { name: 'Customer Due / Ledger', value: 4, color: '#f59e0b' }
-  ] : [
+  // Use real backend data for payment methods
+  const paymentMethods = analytics.payment_methods?.length > 0 ? analytics.payment_methods : [
     { name: 'No Data Yet', value: 100, color: '#e2e8f0' }
   ];
 
-  // 24-Hour Peak Activity simulation data
-  const hoursData = Array.from({ length: 24 }, (_, i) => {
-    if (!hasOrders) {
-      return { hour: `${i.toString().padStart(2, '0')}:00`, intensity: 'low', ordersCount: 0 };
-    }
-    let intensity = 'low';
-    let ordersCount = Math.floor(Math.random() * 5);
-    if ((i >= 12 && i <= 15) || (i >= 19 && i <= 23)) {
-      intensity = 'high';
-      ordersCount = Math.floor(18 + Math.random() * 20);
-    } else if ((i >= 11 && i < 12) || (i >= 16 && i <= 18)) {
-      intensity = 'medium';
-      ordersCount = Math.floor(8 + Math.random() * 10);
-    }
-    return { hour: `${i.toString().padStart(2, '0')}:00`, intensity, ordersCount };
-  });
+  // Assign colors to payment methods based on index
+  const paymentColors = ['#10b981', '#6366f1', '#8b5cf6', '#f59e0b', '#ec4899'];
+  const coloredPaymentMethods = paymentMethods.map((pm: any, idx: number) => ({
+    ...pm,
+    color: pm.color || paymentColors[idx % paymentColors.length]
+  }));
+
+  // Use real backend data for heatmap
+  const hoursData = analytics.hourly_heatmap || Array.from({ length: 24 }, (_, i) => ({
+    hour: `${i.toString().padStart(2, '0')}:00`, intensity: 'low', ordersCount: 0 
+  }));
+
+  // Revenue Leakage data
+  const leakage = analytics.leakage || { percent: 0, total: 0, cancelled: 0, complimentary: 0 };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -289,7 +282,7 @@ export default function AnalyticsTab() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={paymentMethods}
+                    data={coloredPaymentMethods}
                     cx="50%"
                     cy="50%"
                     innerRadius={45}
@@ -297,7 +290,7 @@ export default function AnalyticsTab() {
                     paddingAngle={4}
                     dataKey="value"
                   >
-                    {paymentMethods.map((entry, idx) => (
+                    {coloredPaymentMethods.map((entry: any, idx: number) => (
                       <Cell key={`cell-${idx}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -307,7 +300,7 @@ export default function AnalyticsTab() {
             </div>
 
             <div className="flex-1 space-y-3 w-full">
-              {paymentMethods.map(pm => (
+              {coloredPaymentMethods.map((pm: any) => (
                 <div key={pm.name} className="flex items-center justify-between text-[13px]">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-md" style={{ background: pm.color }} />
@@ -329,13 +322,13 @@ export default function AnalyticsTab() {
                 <h4 className="text-[16px] font-black text-slate-900">Revenue Leakage Score</h4>
               </div>
               <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold text-[11px] uppercase tracking-wider border border-rose-200">
-                {hasOrders ? "10.8% Leakage Today" : "0% Leakage Today"}
+                {leakage.percent > 0 ? `${leakage.percent}% Leakage Today` : "0% Leakage Today"}
               </span>
             </div>
 
             <p className="text-[13px] text-slate-600 mb-4 leading-relaxed font-medium">
-              {hasOrders ? (
-                <>We identified <strong className="text-rose-700 font-black">₹2,540</strong> in potential unrealized revenue lost today from cancelled items, voided KOTs, and unauthorized complimentary discounts.</>
+              {leakage.total > 0 ? (
+                <>We identified <strong className="text-rose-700 font-black">₹{leakage.total}</strong> in potential unrealized revenue lost today from cancelled items, voided KOTs, and unauthorized complimentary discounts.</>
               ) : (
                 <>No revenue leakage detected today. All systems and billing metrics are performing optimally with zero voids.</>
               )}
@@ -343,16 +336,16 @@ export default function AnalyticsTab() {
 
             <div className="space-y-2 text-[12px] bg-white p-4 rounded-xl border border-slate-200 shadow-inner">
               <div className="flex justify-between font-bold text-slate-700">
-                <span>Cancelled Items after KOT:</span>
-                <span className="text-rose-600 font-black">{hasOrders ? "-₹1,120" : "₹0"}</span>
+                <span>Cancelled Orders/Items:</span>
+                <span className="text-rose-600 font-black">{leakage.cancelled > 0 ? `-₹${leakage.cancelled}` : "₹0"}</span>
               </div>
               <div className="flex justify-between font-bold text-slate-700">
                 <span>Manager Complimentary Dishes:</span>
-                <span className="text-amber-600 font-black">{hasOrders ? "-₹820" : "₹0"}</span>
+                <span className="text-amber-600 font-black">{leakage.complimentary > 0 ? `-₹${leakage.complimentary}` : "₹0"}</span>
               </div>
               <div className="flex justify-between font-bold text-slate-700">
                 <span>Unverified Coupon Overrides:</span>
-                <span className="text-indigo-600 font-black">{hasOrders ? "-₹600" : "₹0"}</span>
+                <span className="text-indigo-600 font-black">₹0</span>
               </div>
             </div>
           </div>
@@ -383,7 +376,7 @@ export default function AnalyticsTab() {
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
-          {hoursData.map((item) => (
+          {hoursData.map((item: any) => (
             <div
               key={item.hour}
               className={`p-2.5 rounded-xl border text-center transition-all duration-200 hover:scale-105 ${

@@ -40,11 +40,76 @@ def get_daily_analytics(
     # 3. Served today
     served_orders = len([o for o in daily_orders if o.status == OrderStatus.SERVED])
     
+    # Calculate Payment Methods
+    from models.billing import Bill, PaymentStatus
+    today_bills = db.query(Bill).filter(
+        Bill.restaurant_id == str(restaurant_id),
+        Bill.created_at >= today_start,
+        Bill.status == PaymentStatus.COMPLETED
+    ).all()
+    
+    pm_stats = {}
+    for b in today_bills:
+        pm = b.payment_method or "Cash"
+        pm_stats[pm] = pm_stats.get(pm, 0) + (b.amount_paid or b.total_amount or 0)
+        
+    payment_methods = []
+    total_paid = sum(pm_stats.values())
+    if total_paid > 0:
+        for pm, amount in pm_stats.items():
+            payment_methods.append({
+                "name": pm,
+                "value": round((amount / total_paid) * 100),
+                "amount": amount
+            })
+            
+    # Calculate Hourly Heatmap
+    hourly_counts = {str(i).zfill(2) + ":00": 0 for i in range(24)}
+    for o in daily_orders:
+        if o.created_at:
+            hour_str = o.created_at.strftime("%H:00")
+            if hour_str in hourly_counts:
+                hourly_counts[hour_str] += 1
+                
+    hourly_heatmap = []
+    for hour, count in hourly_counts.items():
+        intensity = "low"
+        if count > 20: intensity = "high"
+        elif count > 5: intensity = "medium"
+        hourly_heatmap.append({
+            "hour": hour,
+            "ordersCount": count,
+            "intensity": intensity
+        })
+
+    # Calculate Revenue Leakage
+    cancelled_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= today_start,
+        Order.status == OrderStatus.CANCELLED
+    ).all()
+    
+    cancelled_amount = sum([o.total_amount or 0.0 for o in cancelled_orders])
+    complimentary_amount = sum([b.discount_amount or 0.0 for b in today_bills])
+    total_leakage = cancelled_amount + complimentary_amount
+    
+    leakage_percent = 0
+    if total_revenue + total_leakage > 0:
+        leakage_percent = round((total_leakage / (total_revenue + total_leakage)) * 100, 1)
+
     return {
         "today_revenue": total_revenue,
         "total_orders": total_orders_count,
         "active_orders": active_orders,
-        "served_orders": served_orders
+        "served_orders": served_orders,
+        "payment_methods": payment_methods,
+        "hourly_heatmap": hourly_heatmap,
+        "leakage": {
+            "percent": leakage_percent,
+            "total": total_leakage,
+            "cancelled": cancelled_amount,
+            "complimentary": complimentary_amount
+        }
     }
 
 @router.get("/history", response_model=List[Dict[str, Any]])
