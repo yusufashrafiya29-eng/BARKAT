@@ -299,7 +299,7 @@ export default function WaiterDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
-      <LiveTelemetryBanner />
+      <LiveTelemetryBanner activeOrdersCount={activeOrders.length} />
       {/* ── HEADER ───────────────────────────────────────────────── */}
       <header className="h-[64px] border-b border-slate-200 bg-white flex items-center justify-between px-5 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
