@@ -149,12 +149,11 @@ def get_historical_analytics(
 ):
     """Secure endpoint to calculate stats for the last 7 days."""
     
-    # FIX BUG-008: Use naive UTC for DB comparisons.
-    # SQLAlchemy stores datetimes as naive UTC; comparing against tz-aware
-    # datetimes causes silent type errors in Python date filtering.
-    from datetime import datetime, time, timedelta
-    now_utc = datetime.utcnow()  # naive UTC
-    today_start = datetime.combine(now_utc.date(), time.min)  # naive UTC midnight
+    from datetime import datetime, timezone, time, timedelta
+    
+    # Use timezone-aware UTC for DB comparisons
+    now_utc = datetime.now(timezone.utc)
+    today_start = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc)
     start_date = today_start - timedelta(days=6)  # 7 days including today
     
     valid_statuses = [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]
