@@ -375,24 +375,29 @@ def delete_3d_model(
 from fastapi.responses import StreamingResponse
 
 @router.get("/models/serve/{item_id}")
-def serve_3d_model(
+async def serve_3d_model(
     item_id: str,
     db: Session = Depends(get_db)
 ):
-    """Proxy endpoint to serve 3D models with proper CORS headers."""
+    """Proxy endpoint to serve 3D models with proper CORS headers. Uses async streaming for large files."""
     from models.menu import MenuItem
     item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
     if not item or not item.model_3d_url:
         raise HTTPException(status_code=404, detail="Model not found")
         
-    import requests
+    import httpx
     
-    def iterfile():
-        with requests.get(item.model_3d_url, stream=True) as r:
-            r.raise_for_status()
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
+    # We use a larger timeout for 40MB+ files
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    
+    async def iterfile():
+        try:
+            async with client.stream("GET", item.model_3d_url) as r:
+                r.raise_for_status()
+                async for chunk in r.aiter_bytes(chunk_size=1024 * 1024): # 1MB chunks
                     yield chunk
+        finally:
+            await client.aclose()
                     
     return StreamingResponse(
         iterfile(),
