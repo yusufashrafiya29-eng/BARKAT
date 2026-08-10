@@ -6,6 +6,7 @@ const ModelViewer = 'model-viewer' as any;
 
 interface DishARViewerModalProps {
   item: {
+    id: string;
     name: string;
     price: number;
     description?: string;
@@ -21,6 +22,7 @@ export default function DishARViewerModal({ item, onClose, onAddToCart }: DishAR
   const [rotating, setRotating] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activeTab, setActiveTab] = useState<'3d' | 'nutrition' | 'ar'>('3d');
+  const [modelError, setModelError] = useState(false);
 
   if (!item) return null;
 
@@ -92,24 +94,36 @@ export default function DishARViewerModal({ item, onClose, onAddToCart }: DishAR
             <div className="w-full flex flex-col items-center space-y-4">
               {/* True 3D WebGL Interactive Viewport */}
               <div className="relative w-full h-72 sm:h-80 rounded-2xl bg-gradient-to-t from-slate-950 via-slate-900 to-indigo-950/60 p-2 border border-orange-500/30 shadow-2xl shadow-orange-500/10 flex items-center justify-center overflow-hidden">
-                <ModelViewer
-                  src={
-                    item.model_3d_url || (
-                      item.name.toLowerCase().includes('salad') || item.name.toLowerCase().includes('veg') || item.name.toLowerCase().includes('avocado')
-                        ? 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb'
-                        : 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescentDishWithOlives/glTF-Binary/IridescentDishWithOlives.glb'
-                    )
-                  }
-                  camera-controls
-                  auto-rotate={rotating ? true : undefined}
-                  rotation-per-second="30deg"
-                  shadow-intensity="1"
-                  environment-image="neutral"
-                  exposure="1.2"
-                  style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
-                  field-of-view={`${45 / zoomLevel}deg`}
-                >
-                </ModelViewer>
+                {modelError ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <img src={sampleImage} alt={item.name} className="w-48 h-48 object-cover rounded-xl border border-white/10 shadow-lg mb-4 opacity-50" />
+                    <p className="text-sm font-semibold">3D Model failed to load</p>
+                    <p className="text-xs mt-1">Showing image preview instead</p>
+                  </div>
+                ) : (
+                  <ModelViewer
+                    src={
+                      item.model_3d_url
+                        ? `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/menu/models/serve/${item.id}`
+                        : (
+                          item.name.toLowerCase().includes('salad') || item.name.toLowerCase().includes('veg') || item.name.toLowerCase().includes('avocado')
+                            ? 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb'
+                            : 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescentDishWithOlives/glTF-Binary/IridescentDishWithOlives.glb'
+                        )
+                    }
+                    crossorigin="anonymous"
+                    camera-controls
+                    auto-rotate={rotating ? true : undefined}
+                    rotation-per-second="30deg"
+                    shadow-intensity="1"
+                    environment-image="neutral"
+                    exposure="1.2"
+                    style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+                    field-of-view={`${45 / zoomLevel}deg`}
+                    onError={() => setModelError(true)}
+                  >
+                  </ModelViewer>
+                )}
 
                 {/* Overlaid badges */}
                 <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-orange-500/40 text-[11px] font-mono font-black text-orange-400 flex items-center gap-1.5 shadow-md pointer-events-none">

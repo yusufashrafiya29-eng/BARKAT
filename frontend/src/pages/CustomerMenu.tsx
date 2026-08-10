@@ -912,7 +912,7 @@ const CustomerMenu: React.FC = () => {
                  {selectedItem.model_3d_url && selectedItem.model_3d_active !== false && (
                    <button 
                      onClick={() => {
-                       setArModelUrl(selectedItem.model_3d_url || null);
+                       setArModelUrl(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/menu/models/serve/${selectedItem.id}`);
                      }}
                      className="w-full py-4 rounded-full bg-[#1a1a1d] text-[#4dd0e1] border border-[#4dd0e1]/30 font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,208,225,0.1)] active:scale-95 transition-transform"
                    >
@@ -949,16 +949,18 @@ const CustomerMenu: React.FC = () => {
           <div className="w-full h-full max-w-lg mx-auto relative flex flex-col items-center justify-center">
             <ModelViewer
               src={arModelUrl}
+              crossorigin="anonymous"
               ar
               ar-modes="scene-viewer quick-look webxr"
               ar-scale="auto"
-              ar-placement="floor"
+              ar-placement="table"
               camera-controls
               auto-rotate
               shadow-intensity="1"
               environment-image="neutral"
               exposure="1"
               style={{ width: '100%', height: '70vh' }}
+              onError={(e: any) => console.error("ModelViewer Error:", e)}
             >
               <div slot="poster" className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-10 h-10 text-white/50 animate-spin" />

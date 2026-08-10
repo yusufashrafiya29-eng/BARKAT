@@ -130,24 +130,9 @@ export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: 
       await ownerApi.generate3DModel(item.id, payload);
       toast.success("AI 3D Generation started! This takes about 30-40 seconds.");
       
-      const interval = setInterval(async () => {
-        try {
-          const res = await ownerApi.check3DModelStatus(item.id);
-          if (res.status === 'success') {
-            clearInterval(interval);
-            setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
-            toast.success(`3D Model for ${item.name} is ready!`);
-            fetchData();
-          } else if (res.status === 'failed') {
-            clearInterval(interval);
-            setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));
-            toast.error(`Failed to generate 3D model for ${item.name}`);
-            fetchData();
-          }
-        } catch (e) {
-          console.error("Polling error", e);
-        }
-      }, 5000);
+      // The global useEffect polling will take over from here
+      // since the item will now have a model_3d_task_id
+      fetchData();
       
     } catch (e: any) {
       setIsGenerating3D(prev => ({ ...prev, [item.id]: false }));

@@ -372,5 +372,34 @@ def delete_3d_model(
     db.commit()
     return {"message": "3D model deleted successfully"}
 
+from fastapi.responses import StreamingResponse
 
-
+@router.get("/models/serve/{item_id}")
+def serve_3d_model(
+    item_id: str,
+    db: Session = Depends(get_db)
+):
+    """Proxy endpoint to serve 3D models with proper CORS headers."""
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if not item or not item.model_3d_url:
+        raise HTTPException(status_code=404, detail="Model not found")
+        
+    import requests
+    
+    def iterfile():
+        with requests.get(item.model_3d_url, stream=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+                    
+    return StreamingResponse(
+        iterfile(),
+        media_type="model/gltf-binary",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
