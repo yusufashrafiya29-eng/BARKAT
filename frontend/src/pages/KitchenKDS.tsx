@@ -526,8 +526,8 @@ export default function KitchenKDS() {
         </div>
       </header>
 
-      {/* ── Sprint 2: 3-Column KDS Touch Boards ── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 overflow-hidden" style={{ gap: '2px', background: '#ffffff10' }}>
+      {/* ── Sprint 2: 2-Column KDS Touch Boards ── */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden" style={{ gap: '2px', background: '#ffffff10' }}>
 
         {/* Column 1: INCOMING TICKETS */}
         <div className="flex flex-col overflow-hidden bg-[#0d111c]">
@@ -570,29 +570,6 @@ export default function KitchenKDS() {
                 <Flame size={36} className="mb-3 opacity-30 text-amber-400" />
                 <p className="text-[13px] font-bold tracking-wide">Kitchen is currently clear</p>
                 <span className="text-[11px] text-slate-700 mt-1">Tap start on incoming tickets to prepare</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Column 3: DONE / FIRED READY (Last 10) */}
-        <div className="flex flex-col overflow-hidden bg-[#0c131c]">
-          <div className="h-[56px] flex justify-between items-center px-5 shrink-0 bg-[#121c29] border-b border-emerald-500/30">
-            <div className="flex items-center gap-2.5">
-              <CheckCircle2 size={17} className="text-emerald-400" />
-              <h2 className="text-[13px] font-black text-emerald-300 uppercase tracking-widest">Ready / Fired (Last 10)</h2>
-            </div>
-            <span className="text-[12px] font-black text-emerald-300 px-3 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40">
-              {doneTickets.length}
-            </span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4 scrollbar-thin opacity-90">
-            {doneTickets.map(o => <OrderCard key={o.id} order={o} type="done" />)}
-            {doneTickets.length === 0 && (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-600 rounded-2xl m-2 border-2 border-dashed border-white/5">
-                <CheckCircle2 size={36} className="mb-3 opacity-30 text-emerald-400" />
-                <p className="text-[13px] font-bold tracking-wide">No completed tickets yet</p>
-                <span className="text-[11px] text-slate-700 mt-1">Fired orders move here for service</span>
               </div>
             )}
           </div>
