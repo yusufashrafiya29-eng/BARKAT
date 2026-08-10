@@ -63,6 +63,9 @@ def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, r
     
     bill.amount_paid = (bill.amount_paid or 0.0) + payload.amount
     
+    # Update the bill's main payment method to reflect the actual confirmed payment
+    bill.payment_method = payload.payment_method
+    
     if (bill.amount_paid or 0.0) >= (bill.total_amount or 0.0):
         bill.status = PaymentStatus.COMPLETED
         

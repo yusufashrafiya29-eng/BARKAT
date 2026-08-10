@@ -72,10 +72,14 @@ def get_daily_analytics(
                 hourly_counts[hour_str] += 1
                 
     hourly_heatmap = []
+    max_count = max(hourly_counts.values()) if hourly_counts else 0
     for hour, count in hourly_counts.items():
         intensity = "low"
-        if count > 20: intensity = "high"
-        elif count > 5: intensity = "medium"
+        if max_count > 0:
+            if count >= max_count * 0.7:
+                intensity = "high"
+            elif count >= max_count * 0.3:
+                intensity = "medium"
         hourly_heatmap.append({
             "hour": hour,
             "ordersCount": count,
