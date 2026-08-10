@@ -63,6 +63,7 @@ export default function WaiterDashboard() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkoutOrder, setCheckoutOrder] = useState<Order | null>(null);
@@ -690,7 +691,7 @@ export default function WaiterDashboard() {
 
             {/* Menu grid */}
             <div className="flex-grow overflow-y-auto p-4 scrollbar-thin">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-24 md:pb-4">
                 {categories
                   .filter(cat => selectedCategory === 'all' || cat.id === selectedCategory)
                   .flatMap(cat => cat.menu_items)
@@ -701,61 +702,102 @@ export default function WaiterDashboard() {
                       <button
                         key={item.id}
                         onClick={() => handleAddToCartClick(item)}
-                        className="group bg-white rounded-2xl border border-slate-200 p-3 flex flex-row items-center text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 gap-3"
+                        className="group bg-white rounded-2xl border border-slate-200 p-3 flex flex-col items-start text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 gap-2 relative overflow-hidden"
                         style={{ boxShadow: inCart ? '0 0 0 2px #6366f1, 0 4px 12px rgb(79 70 229 / .15)' : undefined, borderColor: inCart ? '#6366f1' : undefined }}
                         disabled={!item.is_available}
                       >
-                        <div className="relative shrink-0">
-                          {item.image_url ? (
-                            <img src={item.image_url} alt={item.name} className="w-14 h-14 object-cover rounded-xl shrink-0" />
-                          ) : (
-                            <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center shrink-0 border border-slate-100 font-black text-slate-300 text-lg">
-                              {item.name.charAt(0).toUpperCase()}
+                        {/* Top row: Image & Price & Badge */}
+                        <div className="flex justify-between items-start w-full">
+                          <div className="relative shrink-0">
+                            {item.image_url ? (
+                              <img src={item.image_url} alt={item.name} className="w-12 h-12 object-cover rounded-xl shrink-0 shadow-sm" />
+                            ) : (
+                              <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center shrink-0 border border-slate-100 font-black text-slate-300 text-lg shadow-sm">
+                                {item.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className={`absolute -top-1.5 -left-1.5 w-4 h-4 rounded-xs bg-white shadow-xs border flex items-center justify-center ${item.is_veg ? 'border-emerald-600' : 'border-rose-600'}`}>
+                              <div className={`w-1.5 h-1.5 rounded-xs ${item.is_veg ? 'bg-emerald-600' : 'bg-rose-600'}`} />
                             </div>
-                          )}
-                          {/* Sprint 1: Always visible Veg/Non-veg dot on top left corner of thumbnail */}
-                          <div className={`absolute -top-1 -left-1 w-4 h-4 rounded-xs bg-white shadow-xs border-2 flex items-center justify-center ${item.is_veg ? 'border-emerald-600' : 'border-rose-600'}`}>
-                            <div className={`w-1.5 h-1.5 rounded-xs ${item.is_veg ? 'bg-emerald-600' : 'bg-rose-600'}`} />
+                          </div>
+                          
+                          <div className="flex flex-col items-end gap-1.5">
+                            <span className="text-[13px] font-extrabold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 tracking-tight">₹{item.price}</span>
+                            {inCart && (
+                              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[11px] font-black flex items-center justify-center shadow-md animate-in zoom-in duration-200">
+                                {inCart.quantity}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex flex-col flex-grow min-w-0">
-                          <div className="flex justify-between items-start mb-1 w-full gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <h4 className="text-[13px] font-bold text-slate-900 truncate flex items-center gap-1.5">
-                                {item.name}
-                                <span
-                                  onClick={(e) => { e.stopPropagation(); setSelectedItemForAR(item); }}
-                                  className="px-1.5 py-0.5 rounded bg-orange-100 text-[#e85d04] hover:bg-[#e85d04] hover:text-white font-black text-[9px] uppercase tracking-wider transition-colors cursor-pointer shrink-0"
-                                  title="Open 3D AR Model Preview"
-                                >
-                                  🧊 3D
-                                </span>
-                              </h4>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {inCart && (
-                                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-                                  {inCart.quantity}
-                                </span>
-                              )}
-                              <span className="text-[13px] font-bold text-slate-900">₹{item.price}</span>
-                            </div>
+
+                        {/* Text row */}
+                        <div className="flex flex-col flex-grow min-w-0 w-full mt-1.5">
+                          <div className="flex items-start justify-between gap-1 w-full">
+                            <h4 className="text-[12px] font-bold text-slate-800 line-clamp-2 leading-tight">
+                              {item.name}
+                            </h4>
+                            <span
+                              onClick={(e) => { e.stopPropagation(); setSelectedItemForAR(item); }}
+                              className="px-1.5 py-0.5 rounded-md bg-orange-50 text-[#e85d04] hover:bg-[#e85d04] hover:text-white font-black text-[9px] uppercase tracking-wider transition-colors cursor-pointer shrink-0 border border-orange-100 shadow-xs"
+                              title="Open 3D AR Model Preview"
+                            >
+                              🧊 3D
+                            </span>
                           </div>
-                          {item.description && <p className="text-[10px] text-slate-400 line-clamp-1 leading-relaxed mt-0.5">{item.description}</p>}
-                          {!item.is_available && <span className="mt-1 text-[9px] font-bold text-rose-500 uppercase">Unavailable</span>}
+                          {item.description && <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed mt-1.5">{item.description}</p>}
+                          {!item.is_available && <span className="mt-2 text-[9px] font-bold text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded border border-rose-100 w-fit">Unavailable</span>}
                         </div>
                       </button>
                     );
                   })}
               </div>
             </div>
+            
+            {/* ── Mobile Floating Cart Button (Visible only on < md) ── */}
+            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-40">
+              <button
+                onClick={() => setIsMobileCartOpen(true)}
+                className="w-full bg-slate-900 text-white shadow-xl rounded-full px-6 py-4 flex items-center justify-between font-bold transform transition-all active:scale-95"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <ShoppingBag size={20} className="text-white" />
+                    {cart.length > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-indigo-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full animate-in zoom-in">
+                        {cart.length}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[14px]">View Cart</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-medium">|</span>
+                  <span className="text-[15px]">₹{cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)}</span>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* ── RIGHT: Cart / Order Ticket ── */}
-          <div className="flex-1 flex flex-col shrink-0 min-h-[50vh] md:min-h-0 md:h-full lg:min-w-[380px] bg-white">
+          {/* Overlay for mobile cart */}
+          {isMobileCartOpen && (
+            <div 
+              className="md:hidden fixed inset-0 bg-slate-900/40 z-[45] backdrop-blur-sm transition-opacity" 
+              onClick={() => setIsMobileCartOpen(false)}
+            />
+          )}
+
+          <div className={`
+            flex-col bg-white shrink-0
+            md:flex md:relative md:min-h-0 md:h-full md:w-[340px] lg:w-[380px] md:z-auto md:border-l md:border-slate-200
+            ${isMobileCartOpen 
+              ? 'fixed inset-x-0 bottom-0 top-[10%] z-50 flex rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] animate-in slide-in-from-bottom-full duration-300' 
+              : 'hidden md:flex'}
+          `}>
 
             {/* Cart header */}
-            <div className="h-[60px] px-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="h-[60px] px-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white md:rounded-none rounded-t-3xl">
               <div className="flex items-center gap-2">
                 <ShoppingCart size={16} className="text-indigo-600" />
                 <h3 className="font-bold text-[15px] text-slate-900">
@@ -767,6 +809,12 @@ export default function WaiterDashboard() {
                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: cart.length ? '#eef2ff' : '#f8fafc', color: cart.length ? '#4338ca' : '#94a3b8', border: `1px solid ${cart.length ? '#c7d2fe' : '#e2e8f0'}` }}>
                   {cart.length} items
                 </span>
+                <button 
+                  onClick={() => setIsMobileCartOpen(false)}
+                  className="md:hidden w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors ml-1"
+                >
+                  <X size={14} strokeWidth={2.5} />
+                </button>
               </div>
             </div>
 
