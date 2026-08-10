@@ -622,7 +622,7 @@ export default function WaiterDashboard() {
         <div className="flex-grow flex flex-row h-[calc(100vh-64px)] overflow-hidden">
 
           {/* ── LEFT: Menu ── */}
-          <div className="flex-[1.6] flex flex-col border-r border-slate-200 shrink-0 h-full" style={{ background: '#f8fafc' }}>
+          <div className="flex-[1.6] flex flex-col border-r border-slate-200 min-w-0 h-full" style={{ background: '#f8fafc' }}>
 
             {/* Search + Filter bar */}
             <div className="p-4 border-b border-slate-200 bg-white space-y-3">
