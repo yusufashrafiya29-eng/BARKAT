@@ -619,10 +619,10 @@ export default function WaiterDashboard() {
           VIEW: ORDER (MENU + CART)
           ════════════════════════════════════════════════ */}
       {view === 'order' && (
-        <div className="flex-grow flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-y-auto md:overflow-hidden">
+        <div className="flex-grow flex flex-col sm:flex-row h-[calc(100vh-64px)] overflow-y-auto sm:overflow-hidden">
 
           {/* ── LEFT: Menu ── */}
-          <div className="flex-[1.6] flex flex-col border-b md:border-b-0 md:border-r border-slate-200 shrink-0 min-h-[65vh] md:min-h-0 md:h-full" style={{ background: '#f8fafc' }}>
+          <div className="flex-[1.6] flex flex-col border-b sm:border-b-0 sm:border-r border-slate-200 shrink-0 min-h-[65vh] sm:min-h-0 sm:h-full" style={{ background: '#f8fafc' }}>
 
             {/* Search + Filter bar */}
             <div className="p-4 border-b border-slate-200 bg-white space-y-3">
@@ -754,8 +754,8 @@ export default function WaiterDashboard() {
               </div>
             </div>
             
-            {/* ── Mobile Floating Cart Button (Visible only on < md) ── */}
-            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-40">
+            {/* ── Mobile Floating Cart Button (Visible only on < sm) ── */}
+            <div className="sm:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-40">
               <button
                 onClick={() => setIsMobileCartOpen(true)}
                 className="w-full bg-slate-900 text-white shadow-xl rounded-full px-6 py-4 flex items-center justify-between font-bold transform transition-all active:scale-95"
@@ -783,21 +783,21 @@ export default function WaiterDashboard() {
           {/* Overlay for mobile cart */}
           {isMobileCartOpen && (
             <div 
-              className="md:hidden fixed inset-0 bg-slate-900/40 z-[45] backdrop-blur-sm transition-opacity" 
+              className="sm:hidden fixed inset-0 bg-slate-900/40 z-[45] backdrop-blur-sm transition-opacity" 
               onClick={() => setIsMobileCartOpen(false)}
             />
           )}
 
           <div className={`
             flex-col bg-white shrink-0
-            md:flex md:relative md:min-h-0 md:h-full md:w-[340px] lg:w-[380px] md:z-auto md:border-l md:border-slate-200
+            sm:flex sm:relative sm:min-h-0 sm:h-full sm:w-[320px] md:w-[340px] lg:w-[380px] sm:z-auto sm:border-l sm:border-slate-200
             ${isMobileCartOpen 
               ? 'fixed inset-x-0 bottom-0 top-[10%] z-50 flex rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] animate-in slide-in-from-bottom-full duration-300' 
-              : 'hidden md:flex'}
+              : 'hidden sm:flex'}
           `}>
 
             {/* Cart header */}
-            <div className="h-[60px] px-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white md:rounded-none rounded-t-3xl">
+            <div className="h-[60px] px-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white sm:rounded-none rounded-t-3xl">
               <div className="flex items-center gap-2">
                 <ShoppingCart size={16} className="text-indigo-600" />
                 <h3 className="font-bold text-[15px] text-slate-900">
@@ -811,7 +811,7 @@ export default function WaiterDashboard() {
                 </span>
                 <button 
                   onClick={() => setIsMobileCartOpen(false)}
-                  className="md:hidden w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors ml-1"
+                  className="sm:hidden w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors ml-1"
                 >
                   <X size={14} strokeWidth={2.5} />
                 </button>
