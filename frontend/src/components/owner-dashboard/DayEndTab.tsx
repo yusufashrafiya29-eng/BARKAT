@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IndianRupee, FileText, Lock, AlertTriangle, CheckCircle, Printer, Calendar, ShieldCheck, ArrowRight, DollarSign, PieChart } from 'lucide-react';
+import { IndianRupee, FileText, Lock, AlertTriangle, CheckCircle, Printer, Calendar, ShieldCheck, ArrowRight, DollarSign, PieChart, Banknote, CreditCard, QrCode } from 'lucide-react';
 import { useOwnerStore } from '../../store/ownerStore';
 import toast from 'react-hot-toast';
 
@@ -117,7 +117,7 @@ export default function DayEndTab() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
                 <div>
-                  <span className="text-[12px] font-bold text-slate-600 block">💵 Cash Register</span>
+                  <span className="text-[12px] font-bold text-slate-600 flex items-center gap-1.5 mb-1"><Banknote size={14} className="text-emerald-600" /> Cash Register</span>
                   <span className="text-[20px] font-black text-slate-900">₹{cashShare.toLocaleString()}</span>
                 </div>
                 <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800">{getPercent(cashShare)}%</span>
@@ -125,7 +125,7 @@ export default function DayEndTab() {
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
                 <div>
-                  <span className="text-[12px] font-bold text-slate-600 block">💳 Credit / Debit Card</span>
+                  <span className="text-[12px] font-bold text-slate-600 flex items-center gap-1.5 mb-1"><CreditCard size={14} className="text-blue-600" /> Credit / Debit Card</span>
                   <span className="text-[20px] font-black text-slate-900">₹{cardShare.toLocaleString()}</span>
                 </div>
                 <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-blue-100 text-blue-800">{getPercent(cardShare)}%</span>
@@ -133,7 +133,7 @@ export default function DayEndTab() {
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
                 <div>
-                  <span className="text-[12px] font-bold text-slate-600 block">📱 UPI / QR Payments</span>
+                  <span className="text-[12px] font-bold text-slate-600 flex items-center gap-1.5 mb-1"><QrCode size={14} className="text-purple-600" /> UPI / QR Payments</span>
                   <span className="text-[20px] font-black text-slate-900">₹{upiShare.toLocaleString()}</span>
                 </div>
                 <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-purple-100 text-purple-800">{getPercent(upiShare)}%</span>
