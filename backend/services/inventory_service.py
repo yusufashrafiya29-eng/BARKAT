@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
 from models.inventory import StockItem
-from schemas.inventory import StockItemCreate
+from schemas.inventory import StockItemCreate, StockItemUpdate
 
 def get_all_stock(db: Session, active_only: bool, restaurant_id: str):
     query = db.query(StockItem).filter(StockItem.restaurant_id == restaurant_id)
@@ -27,3 +27,25 @@ def adjust_stock(db: Session, item_id: UUID, quantity_change: float, restaurant_
     db.commit()
     db.refresh(obj)
     return obj
+
+def update_stock_item(db: Session, item_id: UUID, item_in: StockItemUpdate, restaurant_id: str) -> StockItem:
+    obj = db.query(StockItem).filter(StockItem.id == item_id, StockItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+        
+    update_data = item_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(obj, field, value)
+        
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def delete_stock_item(db: Session, item_id: UUID, restaurant_id: str):
+    obj = db.query(StockItem).filter(StockItem.id == item_id, StockItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+        
+    db.delete(obj)
+    db.commit()
+    return {"message": "Stock item deleted"}

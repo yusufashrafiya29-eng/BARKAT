@@ -14,6 +14,14 @@ class StockItemBase(BaseModel):
 class StockItemCreate(StockItemBase):
     pass
 
+class StockItemUpdate(BaseModel):
+    name: Optional[str] = None
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    minimum_threshold: Optional[float] = None
+    cost_price: Optional[float] = None
+    is_active: Optional[bool] = None
+
 class StockItemRead(StockItemBase):
     id: UUID
     created_at: datetime

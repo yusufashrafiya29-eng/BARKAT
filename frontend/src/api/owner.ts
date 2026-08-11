@@ -97,6 +97,16 @@ export const ownerApi = {
     return response.data;
   },
 
+  updateInventoryItem: async (itemId: string, payload: any) => {
+    const response = await axios.put(`${BASE_URL}/inventory/${itemId}`, payload, getHeaders());
+    return response.data;
+  },
+
+  deleteInventoryItem: async (itemId: string) => {
+    const response = await axios.delete(`${BASE_URL}/inventory/${itemId}`, getHeaders());
+    return response.data;
+  },
+
   // Analytics
   getDailyAnalytics: async () => {
     const response = await axios.get(`${BASE_URL}/analytics/today`, getHeaders());

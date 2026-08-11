@@ -485,7 +485,7 @@ export default function OwnerDashboard() {
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-semibold tracking-tight capitalize">{activeTab.replace('_', ' ')}</h2>
             
-            {['menu', 'tables', 'staff', 'inventory'].includes(activeTab) && (
+            {['menu', 'tables', 'staff'].includes(activeTab) && (
               <button
                 onClick={() => setShowAddModal(activeTab)}
                 className="btn"

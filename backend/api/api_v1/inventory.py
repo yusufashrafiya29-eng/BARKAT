@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_user_token, get_current_restaurant
-from schemas.inventory import StockItemCreate, StockItemRead, StockAdjustment
+from schemas.inventory import StockItemCreate, StockItemRead, StockAdjustment, StockItemUpdate
 from services import inventory_service
 
 router = APIRouter()
@@ -35,3 +35,22 @@ def adjust_stock(
 ):
     """Manually add or remove quantity (e.g., used 5kg of flour -> pass -5 in payload)."""
     return inventory_service.adjust_stock(db, item_id, adjustment.quantity_change, str(restaurant_id))
+
+@router.put("/{item_id}", response_model=StockItemRead)
+def update_stock(
+    item_id: UUID, 
+    item_in: StockItemUpdate, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Edit stock item details."""
+    return inventory_service.update_stock_item(db, item_id, item_in, str(restaurant_id))
+
+@router.delete("/{item_id}")
+def delete_stock(
+    item_id: UUID, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Delete a stock item."""
+    return inventory_service.delete_stock_item(db, item_id, str(restaurant_id))
