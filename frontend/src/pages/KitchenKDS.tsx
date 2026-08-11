@@ -231,7 +231,7 @@ export default function KitchenKDS() {
       toast.error('Failed to update status on server');
       fetchOrders();
     } finally {
-      setTimeout(() => { processingOrdersRef.current.delete(orderId); }, 3000);
+      setTimeout(() => { processingOrdersRef.current.delete(orderId); }, 300);
     }
   };
 
@@ -251,7 +251,7 @@ export default function KitchenKDS() {
       toast.error('Failed to update item status');
       fetchOrders();
     } finally {
-      setTimeout(() => { processingItemsRef.current.delete(itemId); fetchOrders(); }, 3000);
+      setTimeout(() => { processingItemsRef.current.delete(itemId); fetchOrders(); }, 300);
     }
   };
 
@@ -298,18 +298,16 @@ export default function KitchenKDS() {
 
     return (
       <div
-        className="rounded-2xl overflow-hidden relative transition-all duration-300 transform hover:-translate-y-1"
+        className="rounded-2xl overflow-hidden relative transition-all duration-300 bg-white border border-slate-200 shadow-sm"
         style={{
-          background: 'linear-gradient(145deg, #1e2433 0%, #171d2b 100%)',
-          border: `1.5px solid ${accentColor}40`,
           boxShadow: isDanger 
-            ? `0 0 24px ${accentColor}40, 0 4px 12px rgb(0 0 0 / .3)` 
+            ? `0 0 24px ${accentColor}40, 0 4px 12px rgb(0 0 0 / .1)` 
             : isWarning 
-            ? `0 0 16px ${accentColor}30, 0 4px 12px rgb(0 0 0 / .2)` 
-            : `0 4px 16px ${accentColor}15`,
+            ? `0 0 16px ${accentColor}30, 0 4px 12px rgb(0 0 0 / .05)` 
+            : `0 4px 16px rgba(0,0,0,0.05)`,
         }}
       >
-        <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}90)` }} />
+        <div className="h-1.5 w-full" style={{ background: accentColor }} />
 
         <div className="p-4 sm:p-5">
           {/* Ticket Header */}
@@ -317,26 +315,26 @@ export default function KitchenKDS() {
             <div className="flex items-center gap-3">
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-[16px] shadow-sm shrink-0"
-                style={{ background: `${accentColor}25`, color: accentColor, border: `1.5px solid ${accentColor}50` }}
+                style={{ background: `${accentColor}15`, color: accentColor, border: `1.5px solid ${accentColor}30` }}
               >
                 {order.order_type === 'TAKEAWAY' ? 'PKG' : `T${tableMap[order.table_id || ''] ?? '?'}`}
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[15px] font-black text-white tracking-tight">KOT #{order.id.slice(0, 5)}</span>
+                  <span className="text-[15px] font-black text-slate-900 tracking-tight">KOT #{order.id.slice(0, 5)}</span>
                   {order.order_type === 'TAKEAWAY' && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-orange-100 text-orange-600 border border-orange-200">
                       PARCEL
                     </span>
                   )}
                 </div>
                 {type !== 'done' ? (
                   <div
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold mt-1 tracking-wider shadow-inner"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold mt-1 tracking-wider shadow-sm"
                     style={{ 
-                      background: isDanger ? '#fff1f2' : isWarning ? '#fffbeb' : `${accentColor}20`, 
+                      background: isDanger ? '#fff1f2' : isWarning ? '#fffbeb' : `${accentColor}10`, 
                       color: isDanger ? '#e11d48' : isWarning ? '#b45309' : accentColor,
-                      border: isDanger ? '1px solid #f43f5e' : isWarning ? '1px solid #f59e0b' : 'none'
+                      border: isDanger ? '1px solid #fecdd3' : isWarning ? '1px solid #fde68a' : `1px solid ${accentColor}20`
                     }}
                   >
                     <Clock size={11} className={isDanger || isWarning ? 'animate-spin' : ''} />
@@ -344,7 +342,7 @@ export default function KitchenKDS() {
                     {isDanger && <span className="text-[9px] uppercase tracking-tighter font-sans">(! LATE)</span>}
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 bg-emerald-500/20 text-emerald-400">
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 bg-emerald-100 text-emerald-700">
                     <CheckCircle2 size={11} /> Ready at {order.finished_at || 'Done'}
                   </div>
                 )}
@@ -353,7 +351,7 @@ export default function KitchenKDS() {
 
             <span
               className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border shrink-0"
-              style={{ background: `${accentColor}15`, color: accentColor, borderColor: `${accentColor}30` }}
+              style={{ background: `${accentColor}10`, color: accentColor, borderColor: `${accentColor}20` }}
             >
               {type === 'incoming' ? 'NEW' : type === 'preparing' ? 'COOKING' : 'READY'}
             </span>
@@ -364,26 +362,26 @@ export default function KitchenKDS() {
             {itemsForStation.map((item, idx) => {
               const isItemReady = item.status === 'READY' || type === 'done';
               return (
-                <div key={idx} className="flex gap-3 py-2 border-b border-white/5 last:border-0 items-start">
-                  <span className="text-amber-400 font-black text-[15px] min-w-[32px] bg-amber-400/10 px-1.5 py-0.5 rounded text-center shrink-0">
+                <div key={idx} className="flex gap-3 py-2 border-b border-slate-100 last:border-0 items-start">
+                  <span className="text-slate-600 font-black text-[15px] min-w-[32px] bg-slate-100 px-1.5 py-0.5 rounded text-center shrink-0">
                     {item.quantity}×
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-[14px] font-extrabold tracking-tight transition-all ${isItemReady && type !== 'done' ? 'text-emerald-400 line-through opacity-70' : 'text-slate-100'}`}>
+                      <p className={`text-[14px] font-extrabold tracking-tight transition-all ${isItemReady && type !== 'done' ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
                         {menuMap[item.menu_item_id] || 'Item'}
                       </p>
                       {item.is_parcel && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-500/20 text-orange-400 border border-orange-500/40">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200">
                           PARCEL
                         </span>
                       )}
                     </div>
 
                     {item.notes && (
-                      <div className="mt-2 p-2.5 rounded-xl bg-amber-400/25 border-2 border-amber-400/70 flex items-center gap-2 text-amber-300 shadow-md transform hover:scale-[1.01]">
-                        <Bell size={15} className="text-amber-400 shrink-0 animate-bounce" />
-                        <span className="text-[12px] font-black uppercase tracking-wider text-amber-200 leading-tight">
+                      <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 shadow-sm">
+                        <Bell size={15} className="text-amber-500 shrink-0" />
+                        <span className="text-[12px] font-black uppercase tracking-wider leading-tight">
                           NOTE: {item.notes}
                         </span>
                       </div>
@@ -393,14 +391,14 @@ export default function KitchenKDS() {
                   {type === 'preparing' && !isItemReady && (
                     <button 
                       onClick={() => handleItemStatusChange(order.id, item.id, 'READY')}
-                      className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-400/50 hover:bg-emerald-400/10 transition-all shrink-0"
+                      className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 transition-all shrink-0"
                       title="Mark Item Ready"
                     >
                       <CheckSquare size={18} />
                     </button>
                   )}
                   {isItemReady && type === 'preparing' && (
-                    <span className="p-2 text-emerald-400 shrink-0" title="Item Ready">
+                    <span className="p-2 text-emerald-500 shrink-0" title="Item Ready">
                       <CheckCircle2 size={18} />
                     </span>
                   )}
@@ -409,29 +407,27 @@ export default function KitchenKDS() {
             })}
           </div>
 
-          {/* Action CTA Buttons (Fast Touch 1-Tap) */}
+          {/* Action CTA Buttons */}
           {type === 'incoming' && (
             <button
               onClick={() => handleOrderStatusChange(order.id, 'PREPARING')}
-              className="w-full py-3.5 rounded-xl font-black text-[13px] uppercase tracking-wider transition-all duration-200 hover:brightness-110 active:scale-[0.97] flex items-center justify-center gap-2 shadow-xl border border-white/20"
-              style={{ background: 'linear-gradient(135deg, #e85d04, #ff6d00)', color: '#fff', boxShadow: '0 6px 25px rgba(232, 93, 4, 0.55)' }}
+              className="w-full py-3.5 rounded-xl font-black text-[13px] uppercase tracking-wider transition-all duration-200 hover:brightness-110 active:scale-[0.98] flex items-center justify-center gap-2 shadow-md bg-orange-500 text-white"
             >
-              <Flame size={18} className="animate-bounce" /> 🔥 FIRE & START COOKING (1-TAP)
+              <Flame size={18} /> FIRE & START COOKING
             </button>
           )}
 
           {type === 'preparing' && (
             <button
               onClick={() => handleOrderStatusChange(order.id, 'READY')}
-              className="w-full py-3.5 rounded-xl font-black text-[13px] uppercase tracking-wider transition-all duration-200 hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg"
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', boxShadow: '0 6px 20px rgb(16 185 129 / .4)' }}
+              className="w-full py-3.5 rounded-xl font-black text-[13px] uppercase tracking-wider transition-all duration-200 hover:brightness-110 active:scale-[0.98] flex items-center justify-center gap-2 shadow-md bg-emerald-500 text-white"
             >
-              <CheckCircle2 size={17} /> FIRE ENTIRE TICKET!
+              <CheckCircle2 size={17} /> FIRE ENTIRE TICKET
             </button>
           )}
 
           {type === 'done' && (
-            <div className="w-full py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center font-extrabold text-[12px] uppercase tracking-widest flex items-center justify-center gap-2">
+            <div className="w-full py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 text-center font-extrabold text-[12px] uppercase tracking-widest flex items-center justify-center gap-2">
               <Sparkles size={14} /> Ready & Handed to Waiter
             </div>
           )}
@@ -441,44 +437,36 @@ export default function KitchenKDS() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative" style={{ background: '#090d16' }}>
+    <div className="min-h-screen flex flex-col font-sans relative bg-slate-100">
       
       {/* Top Header Bar */}
-      <header className="h-[72px] flex justify-between items-center px-6 shrink-0 z-40"
-        style={{ background: '#131824', borderBottom: '1px solid #ffffff15' }}
-      >
+      <header className="h-[72px] flex justify-between items-center px-6 shrink-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
-          <div
-            className="w-11 h-11 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              boxShadow: '0 4px 16px rgb(245 158 11 / .3)',
-            }}
-          >
+          <div className="w-11 h-11 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center bg-indigo-600 shadow-md">
             <ChefHat size={24} className="text-white" />
           </div>
 
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[17px] font-black text-white tracking-tight leading-none">
+              <h1 className="text-[17px] font-black text-slate-900 tracking-tight leading-none">
                 {localStorage.getItem('restaurantName') || 'MyRestro'}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 border border-slate-200">
                 KDS 2.0
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2 h-2 rounded-full shadow-md ${
-                wsStatus === 'connected' ? 'bg-emerald-400 shadow-emerald-400/80 animate-pulse' : 
-                wsStatus === 'polling' ? 'bg-amber-400 shadow-amber-400/80' : 
-                wsStatus === 'connecting' ? 'bg-blue-400 shadow-blue-400/80 animate-ping' : 
+              <div className={`w-2 h-2 rounded-full shadow-sm ${
+                wsStatus === 'connected' ? 'bg-emerald-500 shadow-emerald-500/80 animate-pulse' : 
+                wsStatus === 'polling' ? 'bg-amber-500 shadow-amber-500/80' : 
+                wsStatus === 'connecting' ? 'bg-blue-500 shadow-blue-500/80 animate-ping' : 
                 'bg-red-500 shadow-red-500/80'
               }`} />
               <p className={`text-[11px] font-bold uppercase tracking-widest ${
-                wsStatus === 'connected' ? 'text-emerald-400' : 
-                wsStatus === 'polling' ? 'text-amber-400' : 
-                wsStatus === 'connecting' ? 'text-blue-400' : 
-                'text-red-500'
+                wsStatus === 'connected' ? 'text-emerald-600' : 
+                wsStatus === 'polling' ? 'text-amber-600' : 
+                wsStatus === 'connecting' ? 'text-blue-600' : 
+                'text-red-600'
               }`}>
                 {wsStatus === 'connected' ? 'LIVE SYSTEM' : wsStatus === 'polling' ? 'POLLING FALLBACK' : wsStatus === 'connecting' ? 'CONNECTING...' : 'DISCONNECTED'}
               </p>
@@ -488,11 +476,11 @@ export default function KitchenKDS() {
 
         {/* Center Station Pills */}
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-[#1b2233] p-1.5 rounded-2xl border border-white/10 shadow-inner">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
             {[
-              { label: 'Kitchen', icon: ChefHat, value: 'Kitchen', color: '#f59e0b' },
-              { label: 'Bar / Drinks', icon: Wine, value: 'Bar', color: '#6366f1' },
-              { label: 'Dessert', icon: Utensils, value: 'Dessert', color: '#ec4899' },
+              { label: 'Kitchen', icon: ChefHat, value: 'Kitchen', color: '#4f46e5' }, // indigo-600
+              { label: 'Bar / Drinks', icon: Wine, value: 'Bar', color: '#0ea5e9' }, // sky-500
+              { label: 'Dessert', icon: Utensils, value: 'Dessert', color: '#ec4899' }, // pink-500
             ].map(s => {
               const Icon = s.icon;
               return (
@@ -501,8 +489,8 @@ export default function KitchenKDS() {
                   onClick={() => setSelectedStation(s.value)}
                   className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[12px] font-extrabold uppercase tracking-wider transition-all duration-200"
                   style={selectedStation === s.value
-                    ? { background: s.color, color: '#fff', boxShadow: `0 2px 12px ${s.color}80` }
-                    : { color: '#94a3b8', background: 'transparent' }
+                    ? { background: s.color, color: '#fff', boxShadow: `0 2px 8px ${s.color}60` }
+                    : { color: '#64748b', background: 'transparent' }
                   }
                 >
                   <Icon size={15} />
@@ -512,13 +500,13 @@ export default function KitchenKDS() {
             })}
           </div>
 
-          <span className="hidden xl:inline text-[11px] font-mono font-semibold text-slate-500 border-l border-white/10 pl-3">
+          <span className="hidden xl:inline text-[11px] font-mono font-semibold text-slate-500 border-l border-slate-200 pl-3">
             Sync: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
 
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold text-slate-300 hover:text-white hover:bg-white/10 transition-colors border border-white/15 ml-2"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors border border-slate-300 ml-2"
           >
             <ArrowLeft size={15} />
             <span>Exit KDS</span>
@@ -527,49 +515,49 @@ export default function KitchenKDS() {
       </header>
 
       {/* ── Sprint 2: 2-Column KDS Touch Boards ── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden" style={{ gap: '2px', background: '#ffffff10' }}>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden gap-1 bg-slate-200">
 
         {/* Column 1: INCOMING TICKETS */}
-        <div className="flex flex-col overflow-hidden bg-[#0d111c]">
-          <div className="h-[56px] flex justify-between items-center px-5 shrink-0 bg-[#131a2b] border-b border-indigo-500/30">
+        <div className="flex flex-col overflow-hidden bg-slate-50">
+          <div className="h-[56px] flex justify-between items-center px-5 shrink-0 bg-white border-b border-slate-200 shadow-sm">
             <div className="flex items-center gap-2.5">
-              <AlertCircle size={17} className="text-indigo-400" />
-              <h2 className="text-[13px] font-black text-indigo-300 uppercase tracking-widest">Incoming Tickets</h2>
+              <AlertCircle size={17} className="text-indigo-600" />
+              <h2 className="text-[13px] font-black text-indigo-900 uppercase tracking-widest">Incoming Tickets</h2>
             </div>
-            <span className="text-[12px] font-black text-indigo-300 px-3 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40">
+            <span className="text-[12px] font-black text-indigo-700 px-3 py-0.5 rounded-full bg-indigo-100 border border-indigo-200">
               {incoming.length}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4 scrollbar-thin">
             {incoming.map(o => <OrderCard key={o.id} order={o} type="incoming" />)}
             {incoming.length === 0 && (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-600 rounded-2xl m-2 border-2 border-dashed border-white/5">
+              <div className="h-64 flex flex-col items-center justify-center text-slate-400 rounded-2xl m-2 border-2 border-dashed border-slate-300 bg-slate-100/50">
                 <Clock size={36} className="mb-3 opacity-30 text-indigo-400" />
                 <p className="text-[13px] font-bold tracking-wide">No new incoming tickets</p>
-                <span className="text-[11px] text-slate-700 mt-1">Orders punched by waiter appear here</span>
+                <span className="text-[11px] text-slate-500 mt-1">Orders punched by waiter appear here</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Column 2: COOKING / PREPARING */}
-        <div className="flex flex-col overflow-hidden bg-[#10131d]">
-          <div className="h-[56px] flex justify-between items-center px-5 shrink-0 bg-[#191b29] border-b border-amber-500/30">
+        <div className="flex flex-col overflow-hidden bg-slate-50">
+          <div className="h-[56px] flex justify-between items-center px-5 shrink-0 bg-white border-b border-slate-200 shadow-sm">
             <div className="flex items-center gap-2.5">
-              <Flame size={17} className="text-amber-400 animate-bounce" />
-              <h2 className="text-[13px] font-black text-amber-300 uppercase tracking-widest">Cooking in Kitchen</h2>
+              <Flame size={17} className="text-orange-500" />
+              <h2 className="text-[13px] font-black text-orange-900 uppercase tracking-widest">Cooking in Kitchen</h2>
             </div>
-            <span className="text-[12px] font-black text-amber-300 px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40">
+            <span className="text-[12px] font-black text-orange-700 px-3 py-0.5 rounded-full bg-orange-100 border border-orange-200">
               {preparing.length}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4 scrollbar-thin">
             {preparing.map(o => <OrderCard key={o.id} order={o} type="preparing" />)}
             {preparing.length === 0 && (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-600 rounded-2xl m-2 border-2 border-dashed border-white/5">
-                <Flame size={36} className="mb-3 opacity-30 text-amber-400" />
+              <div className="h-64 flex flex-col items-center justify-center text-slate-400 rounded-2xl m-2 border-2 border-dashed border-slate-300 bg-slate-100/50">
+                <Flame size={36} className="mb-3 opacity-30 text-orange-400" />
                 <p className="text-[13px] font-bold tracking-wide">Kitchen is currently clear</p>
-                <span className="text-[11px] text-slate-700 mt-1">Tap start on incoming tickets to prepare</span>
+                <span className="text-[11px] text-slate-500 mt-1">Tap start on incoming tickets to prepare</span>
               </div>
             )}
           </div>
@@ -577,20 +565,18 @@ export default function KitchenKDS() {
 
       </div>
 
-      {/* Floating View Switcher at Bottom Left with high Z-index */}
-      <div className="fixed bottom-5 left-5 z-[99] flex items-center gap-2 bg-[#131a28]/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-2xl">
+      {/* Floating View Switcher at Bottom Left */}
+      <div className="fixed bottom-5 left-5 z-[99] flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-xl">
         <button
           onClick={() => navigate('/waiter')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[13px] shadow-lg transition-all hover:scale-105 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', boxShadow: '0 4px 16px rgb(99 102 241 / .4)' }}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[13px] shadow-sm transition-all hover:scale-105 active:scale-95 bg-indigo-600 text-white"
         >
           <ShoppingCart size={15} />
           <span>Waiter View</span>
         </button>
         <button
           onClick={() => navigate('/owner')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[13px] shadow-lg transition-all hover:scale-105 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[13px] shadow-sm transition-all hover:scale-105 active:scale-95 bg-slate-800 text-white"
         >
           <Shield size={15} />
           <span>Owner View</span>
