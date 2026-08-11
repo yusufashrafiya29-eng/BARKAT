@@ -76,20 +76,20 @@ def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, r
             order.payment_status = 'PAID'
             # Trigger CRM & cash register via the service but AFTER our single commit
             # We pass db without committing inside — the commit below covers everything
-            _handle_order_paid_side_effects(db, order, restaurant_id)
+            _handle_order_paid_side_effects(db, order, restaurant_id, payload.payment_method)
             
     db.commit()  # Single commit covers bill, txn, and order status
     db.refresh(bill)
     return bill
 
 
-def _handle_order_paid_side_effects(db: Session, order, restaurant_id: str):
+def _handle_order_paid_side_effects(db: Session, order, restaurant_id: str, payment_method: str = "CASH"):
     """Handle CRM, loyalty, and cash register updates when an order is paid.
     Called within an open transaction — does NOT commit itself.
     """
     # Auto-record sale in active cash shift
     from services.cash_service import record_sale
-    record_sale(db, restaurant_id, order.total_amount)
+    record_sale(db, restaurant_id, order.total_amount, payment_method)
     
     # CRM & Loyalty Points
     if order.customer_phone:

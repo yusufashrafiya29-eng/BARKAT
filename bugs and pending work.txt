@@ -1,0 +1,3 @@
+0 wala bug 
+scrolling bug 
+jab koi tab open hota hai uske bich se background wali screen scroll hoti hai and than glith ata hai page par 

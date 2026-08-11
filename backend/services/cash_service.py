@@ -100,12 +100,16 @@ def add_transaction(
     return tx
 
 
-def record_sale(db: Session, restaurant_id: str, amount: float):
-    """Called automatically when an order is marked PAID. Adds to net_sales of current shift."""
+def record_sale(db: Session, restaurant_id: str, amount: float, payment_method: str = "CASH"):
+    """Called automatically when an order is marked PAID. Adds to net_sales of current shift ONLY IF paid in CASH."""
+    if payment_method.upper() != "CASH":
+        return
+        
     shift = get_current_shift(db, restaurant_id)
     if shift:
         shift.net_sales += amount
-        db.commit()
+        # Intentionally NOT calling db.commit() here. 
+        # The parent caller (billing_service) is responsible for committing the entire transaction atomically.
 
 
 def get_shift_history(db: Session, restaurant_id: str, limit: int = 30):
