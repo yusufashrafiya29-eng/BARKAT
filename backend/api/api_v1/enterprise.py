@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from uuid import UUID
-from api.deps import get_db, get_current_restaurant
+from api.deps import get_db, get_current_restaurant, get_current_user
 from models.enterprise import (
     ExpenseVoucher, Coupon, HappyHour, BogoRule,
     BranchOutlet, CentralStockItem, StockTransfer, AggregatorOrder
@@ -27,7 +27,12 @@ def get_expenses(db: Session = Depends(get_db), restaurant_id: UUID = Depends(ge
     } for i in items]
 
 @router.post("/expenses")
-def create_expense(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+def create_expense(
+    data: dict, 
+    db: Session = Depends(get_db), 
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    user = Depends(get_current_user)
+):
     item = ExpenseVoucher(
         restaurant_id=restaurant_id,
         voucher_id=data.get("id", data.get("voucher_id", "EXP-NEW")),
@@ -53,7 +58,7 @@ def create_expense(data: dict, db: Session = Depends(get_db), restaurant_id: UUI
                 db=db,
                 shift_id=str(shift.id),
                 restaurant_id=str(restaurant_id),
-                user_id=item.verified_by or "Owner Portal",
+                user_id=str(user.id),
                 type=TransactionType.CASH_OUT,
                 amount=item.amount,
                 description=f"Expense Voucher {item.voucher_id}: {item.payee} - {item.remarks}"
