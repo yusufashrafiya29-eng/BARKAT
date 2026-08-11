@@ -106,6 +106,7 @@ const FEATURES: { section: string; items: Feature[] }[] = [
     section: 'Reports & Compliance',
     items: [
       { label: 'Sales CSV Export (for CA/Accountant)', basic: false, pro: true, max: true, highlight: true },
+      { label: 'Advanced Summary Suite (15+ Reports)', basic: false, pro: true, max: true, highlight: true },
       { label: 'Item-wise Sales Report', basic: false, pro: true, max: true },
       { label: 'Shift History Report', basic: false, pro: true, max: true },
       { label: 'GST-ready Billing', basic: true, pro: true, max: true },

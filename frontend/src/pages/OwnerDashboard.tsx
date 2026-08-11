@@ -322,13 +322,20 @@ export default function OwnerDashboard() {
             </div>
             {[
               { id: 'reports', label: 'CA Reports & GST', icon: FileText },
+              { id: 'advanced-reports', label: 'Advanced Summary', icon: FileText },
               { id: 'expenses', label: 'Petty Cash & Expenses', icon: Wallet },
               { id: 'discounts', label: 'Discounts & Offers', icon: Tag },
               { id: 'crm', label: 'CRM & Loyalty', icon: Heart },
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => {
+                  if (tab.id === 'advanced-reports') {
+                    navigate('/owner/reports');
+                  } else {
+                    setActiveTab(tab.id as TabType);
+                  }
+                }}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
                 style={activeTab === tab.id
                   ? { background: '#6366f1', color: '#fff', fontWeight: 700, boxShadow: '0 4px 12px #6366f150' }
@@ -1053,7 +1060,7 @@ export default function OwnerDashboard() {
                     <span className="text-emerald-500 font-bold text-[14px]">✓</span> {f}
                   </div>
                 ))}
-                {selectedUpgradePlan === 'max' && ['Everything in Pro Plan', 'Advanced GST & CA Reports', 'Staff Mgmt & Approvals', 'Zomato/Swiggy Sync (Upcoming)', 'WhatsApp CRM (Upcoming)'].map(f => (
+                {selectedUpgradePlan === 'max' && ['Everything in Pro Plan', 'Advanced Summary Suite', 'Staff Mgmt & Approvals', 'Zomato/Swiggy Sync (Upcoming)', 'WhatsApp CRM (Upcoming)'].map(f => (
                   <div key={f} className="flex items-center gap-2 text-[12px] text-slate-700 font-medium">
                     <span className="text-purple-500 font-bold text-[14px]">✓</span> {f}
                   </div>

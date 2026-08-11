@@ -55,6 +55,9 @@ class OrderCreate(BaseModel):
     items: List[OrderItemCreate]
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    guests_count: Optional[int] = None
+    counter_name: str = "Main Register"
     source: str = "CUSTOMER"
     is_accepted: bool = False
     tip_amount: float = 0.0
@@ -75,6 +78,9 @@ class OrderRead(BaseModel):
     waiter_id: Optional[UUID] = None
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    guests_count: Optional[int] = None
+    counter_name: str
     status: OrderStatus
     source: str
     is_accepted: bool

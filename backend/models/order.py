@@ -26,6 +26,9 @@ class Order(Base):
     waiter_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     customer_phone = Column(String, nullable=True) # Used for WhatsApp
     customer_name = Column(String, nullable=True) # Gathered for UI
+    customer_address = Column(String, nullable=True) # Used for Locality Summary
+    guests_count = Column(Integer, nullable=True) # Used for Cover Size Summary
+    counter_name = Column(String, default="Main Register", nullable=False) # POS terminal tracking
     
     status = Column(SAEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     

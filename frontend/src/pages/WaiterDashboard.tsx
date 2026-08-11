@@ -63,6 +63,11 @@ export default function WaiterDashboard() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [guestsCount, setGuestsCount] = useState<string>('');
+  const [tipAmount, setTipAmount] = useState<string>('');
+  
+  const [showAddModal, setShowAddModal] = useState<string | null>(null);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
@@ -205,11 +210,18 @@ export default function WaiterDashboard() {
             menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
           })),
           customer_name: customerName || undefined,
-          customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined
+          customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
+          customer_address: orderType === 'TAKEAWAY' ? (customerAddress || undefined) : undefined,
+          guests_count: (orderType === 'DINE_IN' && guestsCount) ? parseInt(guestsCount) : undefined,
+          tip_amount: tipAmount ? parseFloat(tipAmount) : 0,
+          counter_name: "Waiter POS"
         });
         toast.success('🚀 Ticket sent to kitchen!');
         setCustomerName('');
         setCustomerPhone('');
+        setCustomerAddress('');
+        setGuestsCount('');
+        setTipAmount('');
       }
       setView('status');
       fetchInitialData();
@@ -264,6 +276,21 @@ export default function WaiterDashboard() {
   };
   const handleDirectPaymentConfirm = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
   const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutStep(1); setDiscountAmount(0); setDiscountType('percent'); setDeliveryCharge(0); setContainerCharge(0); setCustomerPaidAmount(''); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
+  
+  const handleNextToPayment = async () => {
+    if (!checkoutOrder || !billDetails) return;
+    setIsProcessingPayment(true);
+    try {
+      const discAmt = discountType === 'percent'
+        ? Math.round(billDetails.total_amount * discountAmount / 100 * 100) / 100
+        : discountAmount;
+      const updatedBill = await waiterApi.generateBill(checkoutOrder.id, 'CASH', discAmt);
+      setBillDetails(updatedBill);
+      setCheckoutStep(2);
+    } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); }
+    finally { setIsProcessingPayment(false); }
+  };
+
   const handleConfirmPayment = async () => {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
@@ -775,21 +802,52 @@ export default function WaiterDashboard() {
 
             {/* ── Sprint 1: Customer Details moved to TOP of ticket for fast entry ── */}
             {!editingOrderId && (
-              <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  placeholder="👤 Customer Name (opt.)"
-                  className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
-                  value={customerName}
-                  onChange={e => setCustomerName(e.target.value)}
-                />
-                <input
-                  type="tel"
-                  placeholder="💬 WhatsApp Phone (opt.)"
-                  className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
-                  value={customerPhone}
-                  onChange={e => setCustomerPhone(e.target.value)}
-                />
+              <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex flex-col gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="👤 Customer Name (opt.)"
+                    className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="💬 WhatsApp Phone (opt.)"
+                    className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {orderType === 'DINE_IN' && (
+                    <input
+                      type="number"
+                      placeholder="👥 Guests / Cover Size"
+                      min="1"
+                      className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                      value={guestsCount}
+                      onChange={e => setGuestsCount(e.target.value)}
+                    />
+                  )}
+                  {orderType === 'TAKEAWAY' && (
+                    <input
+                      type="text"
+                      placeholder="📍 Delivery Address / Locality"
+                      className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                      value={customerAddress}
+                      onChange={e => setCustomerAddress(e.target.value)}
+                    />
+                  )}
+                  <input
+                    type="number"
+                    placeholder="💰 Tip Amount (₹)"
+                    min="0"
+                    className="flex-1 bg-white border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-slate-800 focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 shadow-2xs"
+                    value={tipAmount}
+                    onChange={e => setTipAmount(e.target.value)}
+                  />
+                </div>
               </div>
             )}
 
@@ -1124,7 +1182,7 @@ export default function WaiterDashboard() {
                       Step {checkoutStep}/2 — {checkoutStep === 1 ? 'Bill Review' : 'Payment'}
                     </p>
                     <h2 className="text-[20px] font-extrabold text-white mt-0.5">
-                      {orderType === 'TAKEAWAY' ? '📦 Parcel' : `Table ${selectedTable?.table_number}`}
+                      {checkoutOrder.order_type === 'TAKEAWAY' ? '📦 Parcel' : `Table ${tables.find(t => t.id === checkoutOrder.table_id)?.table_number || '?'}`}
                     </h2>
                   </div>
                   <button onClick={() => !isProcessingPayment && setCheckoutModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
@@ -1243,7 +1301,8 @@ export default function WaiterDashboard() {
               {checkoutStep === 1 && (
                 <div className="p-4 shrink-0 border-t border-slate-100">
                   <button
-                    onClick={() => setCheckoutStep(2)}
+                    onClick={handleNextToPayment}
+                    disabled={isProcessingPayment}
                     className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all"
                     style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 4px 16px rgb(79 70 229 / .4)' }}
                   >

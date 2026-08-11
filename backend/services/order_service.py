@@ -57,6 +57,9 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
         if order_in.source == "CUSTOMER" and not new_order.customer_phone and order_in.customer_phone:
             new_order.customer_phone = order_in.customer_phone
             new_order.customer_name = order_in.customer_name
+        # Update guests count if missing
+        if getattr(order_in, 'guests_count', None) and not new_order.guests_count:
+            new_order.guests_count = order_in.guests_count
     else:
         # Initialize new Order record safely
         new_order = Order(
@@ -66,6 +69,9 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
             waiter_id=waiter_id,
             customer_phone=order_in.customer_phone,
             customer_name=order_in.customer_name,
+            customer_address=getattr(order_in, 'customer_address', None),
+            guests_count=getattr(order_in, 'guests_count', None),
+            counter_name=getattr(order_in, 'counter_name', 'Main Register'),
             source=order_in.source,
             status=initial_status,
             is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,

@@ -10,15 +10,15 @@ export default function ReportsTab({ setActiveTab }: { setActiveTab: (tab: strin
   const [reportEndDate, setReportEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   return (
-    <div className="surface p-8 max-w-4xl mx-auto">
+    <div className="surface p-8 max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-200">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
         <div>
-          <h3 className="text-[20px] font-bold text-slate-800">Advanced Reports</h3>
+          <h3 className="text-[20px] font-bold text-slate-800">CA Reports & GST</h3>
           <p className="text-[13px] text-slate-500 mt-1">Export detailed CSV reports for your CA and accounting software.</p>
         </div>
         
         <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
             <Calendar size={14} className="text-slate-400" />
             <input 
               type="date" 
@@ -28,7 +28,7 @@ export default function ReportsTab({ setActiveTab }: { setActiveTab: (tab: strin
             />
           </div>
           <span className="text-slate-400 text-[12px] font-medium">to</span>
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
             <Calendar size={14} className="text-slate-400" />
             <input 
               type="date" 
