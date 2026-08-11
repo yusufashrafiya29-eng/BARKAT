@@ -1,4 +1,4 @@
-import { Trophy, Users, IndianRupee, Search, TrendingUp, Sparkles, Send, Tag, Gift, Calendar, Award, Phone, CheckCircle2, UserCheck } from 'lucide-react';
+import { Trophy, Users, IndianRupee, Search, TrendingUp, Sparkles, Send, Tag, Gift, Calendar, Award, Phone, CheckCircle2, UserCheck, Download } from 'lucide-react';
 import { useOwnerStore } from '../../store/ownerStore';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -147,6 +147,14 @@ export default function CustomersTab() {
                 className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full transition-all"
               />
             </div>
+            
+            {/* Export Button */}
+            <button
+              onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/crm/csv?token_str=${localStorage.getItem('auth_token')}`)}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white px-4 py-2 rounded-xl text-[13px] font-bold transition-colors whitespace-nowrap shadow-sm"
+            >
+              <Download size={16} /> Export CSV
+            </button>
           </div>
         </div>
 
