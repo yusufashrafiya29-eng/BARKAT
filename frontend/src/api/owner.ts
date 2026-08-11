@@ -33,6 +33,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  updateStaffAccess: async (userId: string, allowed_categories: string[]) => {
+    const response = await axios.put(`${BASE_URL}/users/staff/${userId}/access`, { allowed_categories }, getHeaders());
+    return response.data;
+  },
+
   // Menu Modifications
   addCategory: async (payload: any) => {
     const response = await axios.post(`${BASE_URL}/menu/categories`, payload, getHeaders());

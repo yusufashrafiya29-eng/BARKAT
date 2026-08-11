@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column, String, Enum as SAEnum, Boolean, DateTime, func, ForeignKey
+from sqlalchemy import Column, String, Enum as SAEnum, Boolean, DateTime, func, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from db.session import Base
 from sqlalchemy.orm import relationship
@@ -11,6 +11,7 @@ class UserRole(str, enum.Enum):
     KITCHEN = "KITCHEN"
     MANAGER = "MANAGER"
     SUPERADMIN = "SUPERADMIN"
+    RUNNER = "RUNNER"
 
 
 class User(Base):
@@ -41,6 +42,9 @@ class User(Base):
     # Local password hash — only used in dev mode (when Supabase is not configured).
     # In production, Supabase Auth handles passwords; this column stays NULL.
     password_hash = Column(String, nullable=True)
+
+    # RBAC Menu restrictions for specialized waiters
+    allowed_categories = Column(JSON, default=list, nullable=False)
 
     # Audit timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

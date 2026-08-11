@@ -187,10 +187,10 @@ def signup_staff(payload: StaffSignupRequest, db: Session = Depends(get_db)):
 
     try:
         role = UserRole(payload.role.upper())
-        if role not in [UserRole.WAITER, UserRole.KITCHEN]:
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.RUNNER]:
             raise ValueError()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER or KITCHEN.")
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, or RUNNER.")
 
     # Find owner to link restaurant
     owner = db.query(User).filter(

@@ -16,20 +16,24 @@ def get_categories(
     db: Session = Depends(get_db)
 ):
     """Fetch all active categories along with their menu items. Customers must pass restaurant_id. Waiters use token."""
-    if not restaurant_id:
-        # Fallback to token if no query param
-        from fastapi import HTTPException
-        if token and "email" in token:
-            from models.user import User
-            user = db.query(User).filter(User.email == token["email"]).first()
-            if user and user.restaurant_id:
-                restaurant_id = user.restaurant_id
+    user = None
+    if token and "email" in token:
+        from models.user import User
+        user = db.query(User).filter(User.email == token["email"]).first()
+        if not restaurant_id and user and user.restaurant_id:
+            restaurant_id = user.restaurant_id
             
     if not restaurant_id:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="restaurant_id is required")
         
-    return menu_service.get_all_active_categories(db, str(restaurant_id))
+    all_categories = menu_service.get_all_active_categories(db, str(restaurant_id))
+    
+    # Apply category-level RBAC restrictions for specialized waiters
+    if user and getattr(user, 'allowed_categories', None):
+        return [c for c in all_categories if str(c.id) in user.allowed_categories]
+        
+    return all_categories
 
 @router.post("/categories", response_model=CategoryRead)
 def create_category(

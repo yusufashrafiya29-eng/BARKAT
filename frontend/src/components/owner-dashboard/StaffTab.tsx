@@ -1,10 +1,16 @@
-import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Settings2, X, Loader2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
 
 export default function StaffTab() {
-  const { staff, fetchData } = useOwnerStore();
+  const { staff, menuCategories, fetchData } = useOwnerStore();
+
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isSavingAccess, setIsSavingAccess] = useState(false);
 
   const handleVerifyStaff = async (id: string, name: string | null) => {
     try {
@@ -29,6 +35,35 @@ export default function StaffTab() {
       toast.success("Staff role updated");
       fetchData();
     } catch { toast.error("Update failed"); }
+  };
+
+  const openAccessModal = (user: any) => {
+    setSelectedStaff(user);
+    setSelectedCategories(user.allowed_categories || []);
+    setAccessModalOpen(true);
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId) 
+        : [...prev, categoryId]
+    );
+  };
+
+  const handleSaveAccess = async () => {
+    if (!selectedStaff) return;
+    setIsSavingAccess(true);
+    try {
+      await ownerApi.updateStaffAccess(selectedStaff.id, selectedCategories);
+      toast.success("Menu access updated successfully!");
+      setAccessModalOpen(false);
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to update menu access");
+    } finally {
+      setIsSavingAccess(false);
+    }
   };
 
   const pendingStaff = staff.filter((u: any) => !u.is_approved);
@@ -114,7 +149,7 @@ export default function StaffTab() {
               <tr className="border-b border-subtle bg-subtle/50">
                 <th className="px-5 py-3 text-[12px] font-medium text-muted">Team Member</th>
                 <th className="px-5 py-3 text-[12px] font-medium text-muted">Role</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-muted">Status</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-muted">Menu Access</th>
                 <th className="px-5 py-3 text-[12px] font-medium text-muted text-right">Actions</th>
               </tr>
             </thead>
@@ -122,7 +157,10 @@ export default function StaffTab() {
               {activeStaff.map((user: any) => (
                 <tr key={user.id} className="hover:bg-subtle/30 transition-colors">
                   <td className="px-5 py-3">
-                    <div className="text-[14px] font-medium text-main">{user.full_name || 'System User'}</div>
+                    <div className="text-[14px] font-medium text-main flex items-center gap-2">
+                      {user.full_name || 'System User'}
+                      {user.role === 'OWNER' && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">OWNER</span>}
+                    </div>
                     <div className="text-[12px] text-muted">{user.email}</div>
                   </td>
                   <td className="px-5 py-3">
@@ -130,22 +168,44 @@ export default function StaffTab() {
                       className="bg-subtle border border-subtle text-[11px] font-medium px-2 py-1 rounded text-main focus:ring-1 focus:ring-indigo-500 outline-none"
                       value={user.role}
                       onChange={(e) => handleUpdateStaffRole(user.id, e.target.value)}
+                      disabled={user.role === 'OWNER'}
                     >
                       <option value="WAITER">WAITER</option>
+                      <option value="RUNNER">RUNNER</option>
                       <option value="KITCHEN">KITCHEN</option>
                       <option value="MANAGER">MANAGER</option>
+                      {user.role === 'OWNER' && <option value="OWNER">OWNER</option>}
                     </select>
                   </td>
                   <td className="px-5 py-3">
-                    <span className="text-[12px] text-emerald-600 font-medium">✅ Active</span>
+                    {user.role === 'RUNNER' ? (
+                      <div className="flex items-center gap-2">
+                        {(!user.allowed_categories || user.allowed_categories.length === 0) ? (
+                          <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">Setup Required</span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">{user.allowed_categories.length} Categories Only</span>
+                        )}
+                        <button 
+                          onClick={() => openAccessModal(user)}
+                          className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 transition-colors"
+                          title="Edit Menu Access"
+                        >
+                          <Settings2 size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      onClick={() => handleDeleteStaff(user.id)}
-                      className="text-muted hover:text-rose-500 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {user.role !== 'OWNER' && (
+                      <button
+                        onClick={() => handleDeleteStaff(user.id)}
+                        className="text-muted hover:text-rose-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -156,6 +216,61 @@ export default function StaffTab() {
           </table>
         </div>
       </div>
+
+      {/* Menu Access Modal */}
+      {accessModalOpen && selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-[16px]">Menu Access Configuration</h3>
+                <p className="text-[12px] text-slate-500 mt-0.5">Restrict what {selectedStaff.full_name || 'this waiter'} can see.</p>
+              </div>
+              <button onClick={() => setAccessModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors"><X size={20} /></button>
+            </div>
+            
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-[12px] text-indigo-800 leading-relaxed">
+                <strong>Tip:</strong> Leave all categories unchecked to grant <strong>full access</strong>. Check specific categories to restrict the waiter to only those categories (e.g. for a Beverage Waiter or Runner).
+              </div>
+
+              <div className="space-y-2">
+                {menuCategories.map((cat: any) => {
+                  const isSelected = selectedCategories.includes(cat.id);
+                  return (
+                    <div 
+                      key={cat.id} 
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-slate-50'}`}>
+                        {isSelected && <Check size={14} strokeWidth={3} />}
+                      </div>
+                      <span className={`text-[14px] font-semibold ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{cat.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setAccessModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveAccess}
+                disabled={isSavingAccess}
+                className="px-4 py-2 rounded-xl text-[13px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm"
+              >
+                {isSavingAccess ? <Loader2 size={16} className="animate-spin" /> : 'Save Access'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

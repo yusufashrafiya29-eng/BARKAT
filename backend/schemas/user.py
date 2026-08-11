@@ -24,6 +24,7 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: UUID
+    allowed_categories: Optional[list[str]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
@@ -38,6 +39,7 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    allowed_categories: Optional[list[str]] = None
 
 class PasswordChange(BaseModel):
     current_password: str

@@ -120,8 +120,8 @@ const Dashboard: React.FC = () => {
   }
 
   const canSeeOwner = role === 'OWNER';
-  const canSeeWaiter = role === 'OWNER' || role === 'WAITER';
-  const canSeeKitchen = (role === 'OWNER' || role === 'WAITER' || role === 'KITCHEN') && subscriptionPlan !== 'basic';
+  const canSeeWaiter = role === 'OWNER' || role === 'WAITER' || role === 'RUNNER';
+  const canSeeKitchen = (role === 'OWNER' || role === 'WAITER' || role === 'RUNNER' || role === 'KITCHEN') && subscriptionPlan !== 'basic';
   const canSeeSuperAdmin = role === 'SUPERADMIN';
 
   const restaurantName = localStorage.getItem('restaurantName') || 'MyRestro';
