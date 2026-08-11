@@ -5,9 +5,9 @@ import { ownerApi } from '../../api/owner';
 import { useNavigate } from 'react-router-dom';
 
 const PLANS = [
-  { id: 'basic', name: 'Basic', monthly: 800, yearly: 8000, icon: Zap, color: 'text-slate-600', bg: 'bg-slate-100' },
-  { id: 'pro', name: 'Pro', monthly: 1400, yearly: 14000, icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-100' },
-  { id: 'max', name: 'Max', monthly: 1999, yearly: 19990, icon: Crown, color: 'text-amber-600', bg: 'bg-amber-100' },
+  { id: 'basic', name: 'Basic', monthly: 499, yearly: 4990, icon: Zap, color: 'text-slate-600', bg: 'bg-slate-100' },
+  { id: 'pro', name: 'Pro', monthly: 999, yearly: 9990, icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+  { id: 'max', name: 'Max', monthly: 1399, yearly: 13990, icon: Crown, color: 'text-amber-600', bg: 'bg-amber-100' },
 ];
 
 export default function BillingTab() {

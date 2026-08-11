@@ -709,7 +709,7 @@ export default function SuperAdminDashboard() {
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
                       <div>
                         <p className="text-sm font-bold text-slate-900 uppercase tracking-wide">Basic Plan</p>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">₹499/mo</p>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">₹{platformSettings?.find(s => s.key === 'basic_plan_price')?.value || '499'}/mo</p>
                       </div>
                       <span className="text-2xl font-black text-indigo-600">{financials.active_subscriptions_by_plan.basic || 0}</span>
                     </div>
@@ -719,14 +719,14 @@ export default function SuperAdminDashboard() {
                           <p className="text-sm font-bold text-emerald-900 uppercase tracking-wide">Pro Plan</p>
                           <span className="px-1.5 py-0.5 bg-emerald-200 text-emerald-800 text-[9px] font-black uppercase rounded-md">Popular</span>
                         </div>
-                        <p className="text-xs text-emerald-600 font-medium mt-0.5">₹999/mo</p>
+                        <p className="text-xs text-emerald-600 font-medium mt-0.5">₹{platformSettings?.find(s => s.key === 'pro_plan_price')?.value || '999'}/mo</p>
                       </div>
                       <span className="text-2xl font-black text-emerald-700">{financials.active_subscriptions_by_plan.pro || 0}</span>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-purple-50 rounded-xl border border-purple-100">
                       <div>
                         <p className="text-sm font-bold text-purple-900 uppercase tracking-wide">Max Plan</p>
-                        <p className="text-xs text-purple-600 font-medium mt-0.5">₹1399/mo</p>
+                        <p className="text-xs text-purple-600 font-medium mt-0.5">₹{platformSettings?.find(s => s.key === 'max_plan_price')?.value || '1399'}/mo</p>
                       </div>
                       <span className="text-2xl font-black text-purple-700">{financials.active_subscriptions_by_plan.max || 0}</span>
                     </div>

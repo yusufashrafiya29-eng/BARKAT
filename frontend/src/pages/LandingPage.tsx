@@ -314,7 +314,7 @@ export default function LandingPage() {
             Pricing
           </div>
           <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-4">
-            From ₹800/month.<br/>
+            From ₹499/month.<br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Everything you need, nothing you don't.</span>
           </h2>
           <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto">Start free for 14 days. No credit card required. Upgrade when your restaurant is ready to scale.</p>
@@ -329,9 +329,9 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
             {[
-              { name: 'Basic', price: '₹800/mo', tag: null, color: 'slate', desc: 'QR Menu, KDS, Waiter POS, Basic Analytics, 10 Tables' },
-              { name: 'Pro', price: '₹1,400/mo', tag: '⭐ Most Popular', color: 'indigo', desc: 'Everything in Basic + CRM, Reports, Discounts, Aggregators, Unlimited Staff' },
-              { name: 'Max', price: '₹1,999/mo', tag: '🏆 For Chains', color: 'amber', desc: 'Everything in Pro + 3D AR, Franchise Management, Priority Support' },
+              { name: 'Basic', price: '₹499/mo', tag: null, color: 'slate', desc: 'QR Menu, KDS, Waiter POS, Basic Analytics, 10 Tables' },
+              { name: 'Pro', price: '₹999/mo', tag: '⭐ Most Popular', color: 'indigo', desc: 'Everything in Basic + CRM, Reports, Discounts, Aggregators, Unlimited Staff' },
+              { name: 'Max', price: '₹1,399/mo', tag: '🏆 For Chains', color: 'amber', desc: 'Everything in Pro + 3D AR, Franchise Management, Priority Support' },
             ].map((p) => (
               <div key={p.name} className={`relative rounded-2xl p-6 border ${
                 p.color === 'indigo' ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-slate-800/50 border-slate-700'

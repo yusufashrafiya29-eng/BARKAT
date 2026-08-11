@@ -13,6 +13,7 @@ from api.deps import get_db, get_current_user
 from models.saas_payment import SaaSPayment
 from models.restaurant import Restaurant
 from models.user import User, UserRole
+from models.settings import PlatformConfig
 from core.config import settings
 
 router = APIRouter()
@@ -44,17 +45,19 @@ def create_subscription_order(
     if current_user.role != UserRole.OWNER:
         raise HTTPException(status_code=403, detail="Only owners can manage subscriptions")
     
-    # FIX BUG-014: align prices with platform config (basic=499, pro=999, max=1399)
-    # Monthly amounts in INR; yearly = ~10x monthly (2 months free)
-    amount = 0
-    if req.plan_name == "basic":
-        amount = 4990 if req.is_yearly else 499
-    elif req.plan_name == "pro":
-        amount = 9990 if req.is_yearly else 999
-    elif req.plan_name == "max":
-        amount = 13990 if req.is_yearly else 1399
-    else:
-        raise HTTPException(status_code=400, detail="Invalid plan name")
+    # Fetch prices from platform config
+    plan_key = f"{req.plan_name}_plan_price"
+    config_entry = db.query(PlatformConfig).filter(PlatformConfig.key == plan_key).first()
+    
+    if not config_entry:
+        raise HTTPException(status_code=400, detail="Invalid plan name or plan price not configured")
+        
+    try:
+        monthly_price = int(config_entry.value)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Invalid plan price configuration")
+        
+    amount = monthly_price * 10 if req.is_yearly else monthly_price
         
     client = get_saas_razorpay_client()
     

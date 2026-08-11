@@ -63,6 +63,15 @@ def get_financials(
     total_restaurants = len(restaurants)
     active_count = 0
     
+    # Fetch dynamic prices
+    basic_price = db.query(PlatformConfig).filter(PlatformConfig.key == "basic_plan_price").first()
+    pro_price = db.query(PlatformConfig).filter(PlatformConfig.key == "pro_plan_price").first()
+    max_price = db.query(PlatformConfig).filter(PlatformConfig.key == "max_plan_price").first()
+    
+    p_basic = float(basic_price.value) if basic_price else 499.0
+    p_pro = float(pro_price.value) if pro_price else 999.0
+    p_max = float(max_price.value) if max_price else 1399.0
+
     for r in restaurants:
         r_gmv = gmv_by_restaurant.get(r.id, 0.0)
         r_mrr = 0.0
@@ -70,13 +79,13 @@ def get_financials(
         if r.subscription_status == "active":
             active_count += 1
             if r.subscription_plan == "basic":
-                r_mrr = 499.0
+                r_mrr = p_basic
                 active_subscriptions_by_plan["basic"] += 1
             elif r.subscription_plan == "pro":
-                r_mrr = 999.0
+                r_mrr = p_pro
                 active_subscriptions_by_plan["pro"] += 1
             elif r.subscription_plan == "max":
-                r_mrr = 1399.0
+                r_mrr = p_max
                 active_subscriptions_by_plan["max"] += 1
                 
         total_mrr += r_mrr
