@@ -94,7 +94,8 @@ def get_daily_analytics(
     ).all()
     
     cancelled_amount = sum([o.total_amount or 0.0 for o in cancelled_orders])
-    complimentary_amount = sum([b.discount_amount or 0.0 for b in today_bills])
+    complimentary_bills = [b for b in today_bills if b.discount_amount and b.discount_amount > 0]
+    complimentary_amount = sum([b.discount_amount for b in complimentary_bills])
     total_leakage = cancelled_amount + complimentary_amount
     
     leakage_percent = 0
@@ -141,7 +142,9 @@ def get_daily_analytics(
             "percent": leakage_percent,
             "total": total_leakage,
             "cancelled": cancelled_amount,
-            "complimentary": complimentary_amount
+            "cancelled_count": len(cancelled_orders),
+            "complimentary": complimentary_amount,
+            "complimentary_count": len(complimentary_bills)
         }
     }
 

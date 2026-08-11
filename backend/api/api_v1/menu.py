@@ -374,12 +374,14 @@ def delete_3d_model(
 
 from fastapi.responses import StreamingResponse
 
+from starlette.background import BackgroundTask
+
 @router.get("/models/serve/{item_id}")
 async def serve_3d_model(
     item_id: str,
     db: Session = Depends(get_db)
 ):
-    """Proxy endpoint to serve 3D models with proper CORS headers. Uses async streaming for large files."""
+    """Proxy endpoint to serve 3D models with proper CORS headers. Uses async streaming and passes Content-Length."""
     from models.menu import MenuItem
     item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
     if not item or not item.model_3d_url:
@@ -387,24 +389,31 @@ async def serve_3d_model(
         
     import httpx
     
-    # We use a larger timeout for 40MB+ files
-    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0), follow_redirects=True)
+    req = client.build_request("GET", item.model_3d_url)
+    try:
+        r = await client.send(req, stream=True)
+        r.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {str(e)}")
     
-    async def iterfile():
-        try:
-            async with client.stream("GET", item.model_3d_url) as r:
-                r.raise_for_status()
-                async for chunk in r.aiter_bytes(chunk_size=1024 * 1024): # 1MB chunks
-                    yield chunk
-        finally:
-            await client.aclose()
+    # Extract Content-Length if present
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*"
+    }
+    
+    content_length = r.headers.get("Content-Length")
+    if content_length:
+        headers["Content-Length"] = content_length
+        
+    # Also pass Content-Type just in case
+    content_type = r.headers.get("Content-Type", "model/gltf-binary")
                     
     return StreamingResponse(
-        iterfile(),
-        media_type="model/gltf-binary",
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "*"
-        }
+        r.aiter_bytes(chunk_size=1024 * 1024),
+        media_type=content_type,
+        headers=headers,
+        background=BackgroundTask(r.aclose)
     )

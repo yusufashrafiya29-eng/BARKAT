@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sparkles, RotateCw, ZoomIn, Smartphone, Share2, ShieldCheck, Flame, Utensils, Award, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,26 @@ export default function DishARViewerModal({ item, onClose, onAddToCart }: DishAR
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activeTab, setActiveTab] = useState<'3d' | 'nutrition' | 'ar'>('3d');
   const [modelError, setModelError] = useState(false);
+  
+  const modelRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handleModelError = (event: any) => {
+      console.error("ModelViewer Custom Error Event:", event.detail);
+      setModelError(true);
+    };
+
+    const currentModel = modelRef.current;
+    if (currentModel) {
+      currentModel.addEventListener('error', handleModelError);
+    }
+
+    return () => {
+      if (currentModel) {
+        currentModel.removeEventListener('error', handleModelError);
+      }
+    };
+  }, [modelRef.current, item?.model_3d_url]);
 
   if (!item) return null;
 
@@ -102,6 +122,7 @@ export default function DishARViewerModal({ item, onClose, onAddToCart }: DishAR
                   </div>
                 ) : (
                   <ModelViewer
+                    ref={modelRef}
                     src={
                       item.model_3d_url
                         ? `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1'}/menu/models/serve/${item.id}`
@@ -120,8 +141,14 @@ export default function DishARViewerModal({ item, onClose, onAddToCart }: DishAR
                     exposure="1.2"
                     style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
                     field-of-view={`${45 / zoomLevel}deg`}
-                    onError={() => setModelError(true)}
                   >
+                    <div slot="poster" className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-transparent">
+                       <svg className="w-10 h-10 animate-spin text-orange-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                       </svg>
+                       <span className="text-xs font-semibold animate-pulse text-orange-300">Downloading 3D Mesh...</span>
+                    </div>
                   </ModelViewer>
                 )}
 
