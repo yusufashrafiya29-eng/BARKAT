@@ -31,7 +31,10 @@ export default function CustomersTab() {
   const handleSendWhatsApp = (phone: string, name: string, points: number, e: React.MouseEvent) => {
     e.stopPropagation();
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const msg = `🎉 Dear ${name}, Greetings from MyRestro! 🥂 You currently have an impressive *${points} Loyalty Points* in your rewards wallet. Visit us today and show this message to redeem a special VIP discount on your meal! 🍽️✨`;
+    const restaurantName = localStorage.getItem('restaurantName') || 'our restaurant';
+    
+    const msg = `🌟 Dear ${name},\nWarm greetings from ${restaurantName}! ✨\n\nWe truly value your patronage. You currently have *${points} Loyalty Points* available in your rewards wallet. 🎁\n\nWe'd love to host you again! Show this message on your next visit to redeem your points for an exclusive VIP discount on your meal. 🍽️\n\nLooking forward to serving you soon!\nBest Regards,\n${restaurantName} Team`;
+    
     window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
     toast.success(`Opened WhatsApp greeting for ${name}`);
   };
