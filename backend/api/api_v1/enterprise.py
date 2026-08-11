@@ -176,9 +176,14 @@ def get_branches(db: Session = Depends(get_db), restaurant_id: UUID = Depends(ge
 
 @router.post("/branches")
 def create_branch(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    b_code = data.get("id", data.get("branch_code", ""))
+    if not b_code or b_code == "BR-NEW":
+        b_code = f"BR-{random.randint(100, 999)}"
+        
     item = BranchOutlet(
         restaurant_id=restaurant_id,
-        branch_code=data.get("id", data.get("branch_code", "BR-NEW")),
+        branch_code=b_code,
         name=data.get("name", ""),
         location=data.get("location", ""),
         manager=data.get("manager", ""),
@@ -213,9 +218,14 @@ def get_central_stock(db: Session = Depends(get_db), restaurant_id: UUID = Depen
 
 @router.post("/stock")
 def create_central_stock(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    s_code = data.get("id", data.get("item_code", ""))
+    if not s_code or s_code == "STK-NEW":
+        s_code = f"STK-{random.randint(1000, 9999)}"
+
     item = CentralStockItem(
         restaurant_id=restaurant_id,
-        item_code=data.get("id", data.get("item_code", "STK-NEW")),
+        item_code=s_code,
         name=data.get("name", ""),
         total_batch=float(data.get("total_batch", 100)),
         unit=data.get("unit", "Kg"),
@@ -253,15 +263,45 @@ def get_transfers(db: Session = Depends(get_db), restaurant_id: UUID = Depends(g
 
 @router.post("/transfers")
 def create_transfer(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    from datetime import datetime
+    
+    qty_requested = float(data.get("quantity", 0))
+    item_name = data.get("item_name", "")
+    
+    # 1. Check Central Stock First
+    central_item = db.query(CentralStockItem).filter(
+        CentralStockItem.restaurant_id == restaurant_id,
+        CentralStockItem.name == item_name
+    ).first()
+    
+    if not central_item:
+        raise HTTPException(status_code=400, detail=f"Item '{item_name}' not found in Central HQ Stock.")
+    
+    if central_item.total_batch < qty_requested:
+        raise HTTPException(status_code=400, detail=f"Insufficient Central Stock. Only {central_item.total_batch} {central_item.unit} available.")
+        
+    # 2. Deduct the stock
+    central_item.total_batch -= qty_requested
+    
+    # 3. Generate Codes
+    t_code = data.get("id", data.get("transfer_code", ""))
+    if not t_code or t_code == "TR-NEW":
+        t_code = f"TR-{random.randint(1000, 9999)}"
+        
+    v_number = data.get("voucher_number", "")
+    if not v_number or v_number == "WTV-NEW":
+        v_number = f"WTV-{datetime.now().year}-{random.randint(1000, 9999)}"
+
     item = StockTransfer(
         restaurant_id=restaurant_id,
-        transfer_code=data.get("id", data.get("transfer_code", "TR-NEW")),
-        voucher_number=data.get("voucher_number", "WTV-NEW"),
+        transfer_code=t_code,
+        voucher_number=v_number,
         source_kitchen=data.get("source_kitchen", "Central Commissary (Base Kitchen HQ)"),
         destination_branch=data.get("destination_branch", ""),
-        item_name=data.get("item_name", ""),
-        quantity=float(data.get("quantity", 0)),
-        unit=data.get("unit", ""),
+        item_name=item_name,
+        quantity=qty_requested,
+        unit=data.get("unit", central_item.unit),
         dispatched_at=data.get("dispatched_at", ""),
         status=data.get("status", "IN_TRANSIT"),
         driver_name=data.get("driver_name", "")
