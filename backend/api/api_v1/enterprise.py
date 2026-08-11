@@ -42,6 +42,23 @@ def create_expense(data: dict, db: Session = Depends(get_db), restaurant_id: UUI
     db.add(item)
     db.commit()
     db.refresh(item)
+    
+    # Auto-sync with Cash Register if payment is CASH
+    if item.payment_mode.upper() == "CASH":
+        from services.cash_service import get_current_shift, add_transaction
+        from models.cash_register import TransactionType
+        shift = get_current_shift(db, str(restaurant_id))
+        if shift:
+            add_transaction(
+                db=db,
+                shift_id=str(shift.id),
+                restaurant_id=str(restaurant_id),
+                user_id=item.verified_by or "Owner Portal",
+                type=TransactionType.CASH_OUT,
+                amount=item.amount,
+                description=f"Expense Voucher {item.voucher_id}: {item.payee} - {item.remarks}"
+            )
+            
     return {"status": "success", "id": str(item.id)}
 
 @router.delete("/expenses/{id}")
