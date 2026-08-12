@@ -409,23 +409,6 @@ export default function OwnerDashboard() {
           </div>
         </nav>
 
-        {/* Captain App Install Button */}
-        <div className="px-3 mb-2">
-          <button
-            onClick={() => navigate('/owner/download-app')}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all"
-            style={{
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-              border: '1px solid #818cf850',
-              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-[16px]">📱</span>
-              <span className="text-[13px] font-bold text-white">Get Captain App</span>
-            </div>
-          </button>
-        </div>
 
         {/* Subscription Widget */}
         <div className="mx-3 mb-3 p-3 rounded-xl"
