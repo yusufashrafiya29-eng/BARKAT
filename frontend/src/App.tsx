@@ -25,6 +25,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SuperAdminRoute from './components/SuperAdminRoute';
 import Pricing from './pages/Pricing';
 import AdvancedReportsPage from './pages/AdvancedReportsPage';
+import AppDownload from './pages/AppDownload';
 
 const ImpersonationBanner = () => {
   const isImpersonating = !!localStorage.getItem('superadmin_token');
@@ -83,6 +84,7 @@ const App: React.FC = () => {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/owner" element={<PrivateRoute><OwnerDashboard /></PrivateRoute>} />
         <Route path="/owner/reports" element={<PrivateRoute><AdvancedReportsPage /></PrivateRoute>} />
+        <Route path="/owner/download-app" element={<PrivateRoute><AppDownload /></PrivateRoute>} />
         <Route path="/waiter" element={<PrivateRoute><WaiterDashboard /></PrivateRoute>} />
         <Route path="/kitchen" element={<PrivateRoute><KitchenKDS /></PrivateRoute>} />
         

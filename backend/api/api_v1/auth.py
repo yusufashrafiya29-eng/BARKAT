@@ -265,13 +265,16 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     access_token = _make_local_token(str(local_user.id), local_user.email, local_user.role.value)
     
+    # Build auth data before commit to avoid DetachedInstanceError or expired attributes
+    auth_data = _build_auth_data(local_user, access_token)
+    
     # Update last_login_at
     local_user.last_login_at = datetime.utcnow()
     db.commit()
 
     return GenericResponse(
         message="Login successful",
-        data=_build_auth_data(local_user, access_token)
+        data=auth_data
     )
 
 
