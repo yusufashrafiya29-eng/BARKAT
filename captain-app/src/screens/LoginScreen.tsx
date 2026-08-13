@@ -39,7 +39,7 @@ export default function LoginScreen() {
       end={{ x: 1, y: 1 }}
     >
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <View style={styles.contentWrapper}>
