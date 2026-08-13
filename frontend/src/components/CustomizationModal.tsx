@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -14,6 +14,13 @@ export default function CustomizationModal({ item, onClose, onAddToCart }: Custo
   
   // Track selected modifiers. Key: group_id, Value: array of modifier objects
   const [selectedMods, setSelectedMods] = useState<Record<string, any[]>>({});
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   const handleToggleModifier = (group: any, mod: any) => {
     const currentSelected = selectedMods[group.id] || [];

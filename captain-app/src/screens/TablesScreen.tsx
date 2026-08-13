@@ -5,6 +5,7 @@ import {
   Modal, TextInput, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { waiterApi } from '../api/waiterApi';
 import api from '../api/axios';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -49,10 +50,10 @@ export default function TablesScreen({ navigation }: any) {
     try {
       if (!silent) setLoading(true);
       const [tablesRes, ordersRes] = await Promise.all([
-        api.get('/tables/'),
-        api.get('/orders/waiter/active')
+        waiterApi.getTables(),
+        waiterApi.getAllOrders()
       ]);
-      const activeOrders: any[] = ordersRes.data || [];
+      const activeOrders: any[] = ordersRes || [];
 
       // Build tableId → order map (pick the most recent non-SERVED or SERVED-unpaid order)
       const orderMap: Record<string, any> = {};
@@ -62,12 +63,25 @@ export default function TablesScreen({ navigation }: any) {
         if (!existing) { orderMap[o.table_id] = o; }
       });
 
-      const mapped = (tablesRes.data || []).map((t: any) => {
+      const mapped = (tablesRes || []).map((t: any) => {
         const order = orderMap[t.id];
+        
+        let tableStatus = 'free';
+        if (order) {
+           if (order.status === 'SERVED' && order.payment_status !== 'PAID') {
+             tableStatus = 'printed';
+           } else if (order.source === 'CUSTOMER' && order.status === 'PENDING') {
+             tableStatus = 'customer';
+           } else {
+             tableStatus = 'running';
+           }
+        }
+
         return {
           ...t,
           active_order: order || null,
           is_occupied: !!order,
+          tableStatus,
           active_order_amount: order?.total_amount || 0,
           active_order_time: order?.created_at || null,
           order_status: order?.status || null,
@@ -138,7 +152,7 @@ export default function TablesScreen({ navigation }: any) {
     if (!table.active_order) return;
     const doDelete = async () => {
       try {
-        await api.delete(`/orders/${table.active_order.id}`);
+        await waiterApi.deleteOrder(table.active_order.id);
         fetchTablesAndOrders(true);
       } catch (e: any) {
         const msg = e.response?.data?.detail || 'Failed to delete';
@@ -184,50 +198,57 @@ export default function TablesScreen({ navigation }: any) {
     const isOccupied = table.is_occupied;
     const isServedUnpaid = table.order_status === 'SERVED' && table.payment_status !== 'PAID';
 
+    const STATUS_COLORS: any = {
+      free: { bg: '#ffffff', text: '#334155', border: 'rgba(0,0,0,0.07)' },
+      customer: { bg: '#eef2ff', text: '#4338ca', border: '#a5b4fc' }, 
+      running: { bg: '#fffbeb', text: '#b45309', border: '#fcd34d' },  
+      printed: { bg: '#ecfdf5', text: '#065f46', border: '#6ee7b7' },  
+      reserved: { bg: '#fffbeb', text: '#d97706', border: '#fde68a' }
+    };
+    const style = STATUS_COLORS[table.tableStatus || 'free'];
+
     return (
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => handleTablePress(table)}
         style={[
           styles.card,
-          { backgroundColor: isOccupied ? YELLOW : '#ffffff' }
+          { backgroundColor: style.bg, borderColor: style.border, borderWidth: 1.5 }
         ]}
       >
         {/* Time badge */}
         {isOccupied && table.active_order_time && (
-          <View style={styles.timeBadge}>
-            <Feather name="clock" size={10} color="#5c4000" />
-            <Text style={styles.timeText}>{getElapsedTime(table.active_order_time)}</Text>
+          <View style={[styles.timeBadge, { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
+            <Feather name="clock" size={10} color={style.text} />
+            <Text style={[styles.timeText, { color: style.text }]}>{getElapsedTime(table.active_order_time)}</Text>
           </View>
         )}
 
         {/* Table number */}
-        <Text style={[styles.tableNum, { color: isOccupied ? '#1a1a1a' : '#334155' }]}>
+        <Text style={[styles.tableNum, { color: style.text }]}>
           {table.table_number}
         </Text>
 
         {/* Settle & Save button OR amount + 3-dot */}
         {isOccupied ? (
           isServedUnpaid ? (
-            // SERVED order — show Settle & Save button
             <TouchableOpacity
-              style={styles.settleBtn}
+              style={[styles.settleBtn, { backgroundColor: '#10b981', shadowColor: '#10b981' }]}
               onPress={() => handleSettleAndSave(table)}
               activeOpacity={0.85}
             >
               <Text style={styles.settleBtnText}>Settle & Save</Text>
             </TouchableOpacity>
           ) : (
-            // Active order — show amount + 3-dot
             <View style={styles.cardFooter}>
-              <Text style={styles.amountText}>
+              <Text style={[styles.amountText, { color: style.text }]}>
                 {table.active_order_amount ? `₹${Math.round(table.active_order_amount)}` : ''}
               </Text>
               <TouchableOpacity
                 onPress={() => { setThreeDotTable(table); setShowThreeDot(true); }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="more-vertical" size={16} color="#5c4000" />
+                <Feather name="more-vertical" size={16} color={style.text} />
               </TouchableOpacity>
             </View>
           )

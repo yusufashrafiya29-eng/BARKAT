@@ -7,7 +7,7 @@ import {
   RefreshCcw, AlertCircle, Edit2,
   ShoppingCart, CheckCircle2, X,
   Wallet, CreditCard, Smartphone,
-  Send, Zap, ChefHat, Shield, Banknote, Printer, ShoppingBag
+  Send, Zap, ChefHat, Shield, Banknote, Printer, ShoppingBag, MessageCircle
 } from 'lucide-react';
 import { waiterApi } from '../api/waiter';
 import { cashApi } from '../api/cashRegister';
@@ -16,6 +16,7 @@ import ReceiptPrinter from '../components/ReceiptPrinter';
 import CustomizationModal from '../components/CustomizationModal';
 import LiveTelemetryBanner from '../components/LiveTelemetryBanner';
 import DishARViewerModal from '../components/DishARViewerModal';
+import { printerService } from '../utils/PrinterService';
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface MenuItem { id: string; name: string; price: number; description?: string; category_id: string; is_veg: boolean; is_available: boolean; image_url?: string; modifier_groups?: any[]; }
@@ -67,8 +68,6 @@ export default function WaiterDashboard() {
   const [guestsCount, setGuestsCount] = useState<string>('');
   const [tipAmount, setTipAmount] = useState<string>('');
   
-  const [showAddModal, setShowAddModal] = useState<string | null>(null);
-  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkoutOrder, setCheckoutOrder] = useState<Order | null>(null);
@@ -98,11 +97,38 @@ export default function WaiterDashboard() {
   const [customReason, setCustomReason] = useState<string>('');
   const [isProcessingReason, setIsProcessingReason] = useState(false);
 
-  const handlePrintReceipt = (order: Order) => {
+  const handlePrintReceipt = async (order: Order) => {
+    try {
+      const pType = localStorage.getItem('printer_type') || 'bluetooth';
+      const tableNum = tables.find(t => t.id === order.table_id)?.table_number || '?';
+      
+      let billText = `*BARKAT KOT / BILL*\n`;
+      billText += `Table: ${tableNum} | Order: ${order.id?.slice(-4)}\n`;
+      billText += `------------------------\n`;
+      order.items?.forEach(item => {
+        billText += `${item.quantity}x ${item.menu_item?.name}\n`;
+      });
+      billText += `------------------------\n`;
+      billText += `Total: Rs ${order.total_amount}\n\n`;
+
+      if (pType === 'bluetooth') {
+        if (!printerService.device) await printerService.connectBluetooth();
+      } else {
+        if (!printerService.device) await printerService.connectUSB();
+      }
+      await printerService.printReceipt(billText, pType as any);
+      toast.success('Hardware Printing successful!');
+      return;
+    } catch (err: any) {
+      console.error('Hardware print failed:', err);
+      toast.error('Hardware Print failed, falling back to browser print.');
+    }
+    
+    // Fallback to standard browser print
     setPrintingOrder(order);
     setTimeout(() => {
       window.print();
-    }, 100); // Wait for React to render the invisible component
+    }, 100);
   };
 
   /* ── Data fetching ─────────────────────────────────────────── */
@@ -192,37 +218,90 @@ export default function WaiterDashboard() {
   }, 0);
 
   /* ── Order actions ──────────────────────────────────────────── */
-  const placeOrder = async () => {
+  const placeOrder = async (action: 'save' | 'save_print' | 'save_print_direct' | 'ebill' = 'save') => {
     if ((!selectedTable && orderType !== 'TAKEAWAY') || cart.length === 0 || isPlacingOrder) return;
     setIsPlacingOrder(true);
+    let createdOrder: any = null;
     try {
       if (editingOrderId) {
-        await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ 
+        createdOrder = await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ 
           menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
         })));
         toast.success('Order updated!');
         setEditingOrderId(null);
       } else {
-        await waiterApi.placeOrder({
+        createdOrder = await waiterApi.placeOrder({
           table_id: selectedTable?.id || null,
           order_type: orderType,
           items: cart.map(i => ({ 
             menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
           })),
           customer_name: customerName || undefined,
-          customer_phone: customerPhone ? `+${customerPhone.replace(/\D/g, '')}` : undefined,
+          customer_phone: customerPhone ? (() => {
+            const digits = customerPhone.replace(/\D/g, '');
+            return digits.length === 10 ? `+91${digits}` : `+${digits}`;
+          })() : undefined,
           customer_address: orderType === 'TAKEAWAY' ? (customerAddress || undefined) : undefined,
           guests_count: (orderType === 'DINE_IN' && guestsCount) ? parseInt(guestsCount) : undefined,
           tip_amount: tipAmount ? parseFloat(tipAmount) : 0,
-          counter_name: "Waiter POS"
+          counter_name: "Waiter POS",
+          status: action === 'save_print_direct' ? 'READY' : undefined
         });
-        toast.success('🚀 Ticket sent to kitchen!');
+        toast.success('🚀 Ticket sent!');
         setCustomerName('');
         setCustomerPhone('');
         setCustomerAddress('');
         setGuestsCount('');
         setTipAmount('');
       }
+
+      // Action specific logic
+      if (action === 'ebill') {
+        const tableNum = selectedTable?.table_number || '?';
+        let msg = `*Barkat Restaurant*\n\n`;
+        msg += `Table: ${tableNum} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
+        msg += `------------------------\n`;
+        cart.forEach(item => {
+          msg += `${item.quantity}x ${item.name} - Rs ${item.price * item.quantity}\n`;
+          if (item.modifiers?.length) {
+            msg += `   + ${item.modifiers.map(m => m.name).join(', ')}\n`;
+          }
+        });
+        msg += `------------------------\n`;
+        msg += `*Grand Total: Rs ${totalAmount}*\n\n`;
+        msg += `Thank you for dining with us!`;
+
+        const phone = customerPhone || '';
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+      }
+
+      if (action === 'save_print' || action === 'save_print_direct') {
+          const pType = localStorage.getItem('printer_type') || 'bluetooth';
+          const tableNum = selectedTable?.table_number || '?';
+          try {
+            let billText = `*BARKAT KOT*\n`;
+            billText += `Table: ${tableNum} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
+            billText += `------------------------\n`;
+            cart.forEach(item => {
+              billText += `${item.quantity}x ${item.name}\n`;
+            });
+            billText += `------------------------\n`;
+            billText += `Total: Rs ${totalAmount}\n\n`;
+
+            if (pType === 'bluetooth') {
+              if (!printerService.device) await printerService.connectBluetooth();
+            } else {
+              if (!printerService.device) await printerService.connectUSB();
+            }
+            await printerService.printReceipt(billText, pType as any);
+            toast.success('KOT Printed successful!');
+          } catch (err: any) {
+            console.error('Print failed:', err);
+            toast.error('Print failed: ' + err.message);
+          }
+      }
+
       setView('status');
       fetchInitialData();
     } catch (e: any) {
@@ -291,7 +370,7 @@ export default function WaiterDashboard() {
     finally { setIsProcessingPayment(false); }
   };
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async (sendEbill: boolean = false) => {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
     try {
@@ -303,6 +382,29 @@ export default function WaiterDashboard() {
         paymentMethod === 'CASH' ? undefined : `TRX-${Date.now()}`
       );
       toast.success('✅ Payment confirmed! Table cleared.');
+
+      if (sendEbill) {
+        if (!checkoutOrder.customer_phone) {
+          toast.error("Cannot send E-Bill: No customer phone number provided.");
+        } else {
+          const tableNum = tables.find(t => t.id === checkoutOrder.table_id)?.table_number || '?';
+          let billText = `*BARKAT TAX INVOICE*\n`;
+          billText += `Table: ${tableNum} | Order: ${checkoutOrder.id.slice(-4)}\n`;
+          billText += `------------------------\n`;
+          checkoutOrder.items?.forEach(item => {
+            billText += `${item.quantity}x ${item.menu_item?.name}\n`;
+          });
+          billText += `------------------------\n`;
+          billText += `Total Paid: Rs ${billDetails.total_amount}\n\n`;
+          billText += `Thank you for dining with us!`;
+
+          const phone = checkoutOrder.customer_phone.replace(/\D/g, '');
+          const finalPhone = phone.length === 10 ? '91' + phone : phone;
+          const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(billText)}`;
+          window.open(url, '_blank');
+        }
+      }
+
       setCheckoutModalOpen(false); setCheckoutOrder(null); setBillDetails(null);
       fetchInitialData();
     } catch (e: any) { toast.error(e.response?.data?.detail || 'Payment failed'); }
@@ -974,15 +1076,26 @@ export default function WaiterDashboard() {
                 <span className="text-[22px] font-extrabold text-slate-900 tracking-tight">₹{totalAmount}</span>
               </div>
 
-              <button
-                onClick={placeOrder}
-                disabled={cart.length === 0 || isPlacingOrder}
-                className="w-full py-3.5 rounded-2xl font-extrabold text-[15px] flex items-center justify-center gap-2 transition-all duration-200 transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
-                style={cart.length > 0 ? { background: 'linear-gradient(135deg, #e85d04, #fb8c00)', color: '#fff', boxShadow: '0 4px 20px rgba(232, 93, 4, 0.45)', border: '1px solid rgba(251, 140, 0, 0.3)' } : { background: '#f1f5f9', color: '#94a3b8' }}
-              >
-                {isPlacingOrder ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.5} />}
-                {isPlacingOrder ? 'Processing...' : (editingOrderId ? 'Update Order' : '🔥 Send to Kitchen (FIRE KOT)')}
-              </button>
+              <div className="flex gap-2 relative">
+                <button
+                  onClick={() => placeOrder('save_print_direct')}
+                  disabled={cart.length === 0 || isPlacingOrder}
+                  className="w-1/3 py-3.5 rounded-2xl font-extrabold text-[13px] flex flex-col items-center justify-center gap-1 transition-all duration-200 transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200"
+                >
+                  <Printer size={16} strokeWidth={2.5} />
+                  Print KOT
+                </button>
+
+                <button
+                  onClick={() => placeOrder('save')}
+                  disabled={cart.length === 0 || isPlacingOrder}
+                  className="flex-1 py-3.5 rounded-2xl font-extrabold text-[15px] flex items-center justify-center gap-2 transition-all duration-200 transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+                  style={cart.length > 0 ? { background: 'linear-gradient(135deg, #e85d04, #fb8c00)', color: '#fff', boxShadow: '0 4px 20px rgba(232, 93, 4, 0.45)', border: '1px solid rgba(251, 140, 0, 0.3)' } : { background: '#f1f5f9', color: '#94a3b8' }}
+                >
+                  {isPlacingOrder ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.5} />}
+                  {isPlacingOrder ? 'Processing...' : (editingOrderId ? 'Update Order' : '🔥 Send to Kitchen')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1118,9 +1231,14 @@ export default function WaiterDashboard() {
                                   ✓ Mark Served
                                 </button>
                               )}
-                              {order.status === 'SERVED' && (
+                              {['ACCEPTED', 'PREPARING'].includes(order.status) && (
+                                <button onClick={() => handleServeOrder(order.id)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-600 bg-slate-100 border border-slate-200 transition-all hover:bg-slate-200">
+                                  ✓ Mark Served
+                                </button>
+                              )}
+                              {['ACCEPTED', 'PREPARING', 'READY', 'SERVED'].includes(order.status) && (
                                 <>
-                                  {subscriptionPlan !== 'basic' && (
+                                  {order.status === 'SERVED' && subscriptionPlan !== 'basic' && (
                                     <button onClick={() => handlePrintReceipt(order)} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-700 bg-slate-100 border border-slate-200 transition-all hover:bg-slate-200 flex items-center gap-1.5">
                                       <Printer size={14} /> Print Bill
                                     </button>
@@ -1299,11 +1417,40 @@ export default function WaiterDashboard() {
                 </div>
               )}
               {checkoutStep === 1 && (
-                <div className="p-4 shrink-0 border-t border-slate-100">
+                <div className="p-4 shrink-0 border-t border-slate-100 flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!checkoutOrder.customer_phone) {
+                        toast.error("Cannot send E-Bill: No customer phone number provided.");
+                        return;
+                      }
+                      const tableNum = tables.find(t => t.id === checkoutOrder.table_id)?.table_number || '?';
+                      let billText = `*BARKAT TAX INVOICE*\n`;
+                      billText += `Table: ${tableNum} | Order: ${checkoutOrder.id.slice(-4)}\n`;
+                      billText += `------------------------\n`;
+                      checkoutOrder.items?.forEach(item => {
+                        billText += `${item.quantity}x ${item.menu_item?.name}\n`;
+                      });
+                      billText += `------------------------\n`;
+                      billText += `Total: Rs ${billDetails.total_amount}\n\n`;
+                      billText += `Thank you for dining with us!`;
+
+                      const phone = checkoutOrder.customer_phone.replace(/\D/g, '');
+                      const finalPhone = phone.length === 10 ? '91' + phone : phone;
+                      const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(billText)}`;
+                      window.open(url, '_blank');
+                    }}
+                    disabled={isProcessingPayment}
+                    className="py-3.5 px-4 rounded-2xl font-bold flex items-center justify-center text-white transition-all"
+                    style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}
+                    title="Send WhatsApp E-Bill"
+                  >
+                    <MessageCircle size={20} />
+                  </button>
                   <button
                     onClick={handleNextToPayment}
                     disabled={isProcessingPayment}
-                    className="w-full py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all"
+                    className="flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all"
                     style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', boxShadow: '0 4px 16px rgb(79 70 229 / .4)' }}
                   >
                     Next: Choose Payment →
@@ -1404,7 +1551,7 @@ export default function WaiterDashboard() {
                     ← Back
                   </button>
                   <button
-                    onClick={handleConfirmPayment}
+                    onClick={() => handleConfirmPayment(false)}
                     disabled={isProcessingPayment}
                     className="flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 text-white transition-all disabled:opacity-50"
                     style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 16px rgb(16 185 129 / .4)' }}

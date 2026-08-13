@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  ActivityIndicator, Alert, Platform, ScrollView, TextInput
+  ActivityIndicator, Alert, Platform, ScrollView, TextInput, Image
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { waiterApi } from '../api/waiterApi';
 import api from '../api/axios';
 
 const PRIMARY = '#6366f1';      // Indigo
@@ -23,23 +24,28 @@ export default function CheckoutScreen({ route, navigation }: any) {
 
   const [payMethod, setPayMethod] = useState<PayMethod>('CASH');
   const [discount, setDiscount] = useState('');
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('fixed');
   const [customerPaid, setCustomerPaid] = useState('');
+  const [upiId, setUpiId] = useState<string | null>(null);
 
   useEffect(() => { fetchBill(); }, []);
 
   const fetchBill = async () => {
     try {
       // First get order details
-      const ordersRes = await api.get('/orders/waiter/active');
-      const found = (ordersRes.data || []).find((o: any) => o.id === orderId);
+      const [ordersData, upiData] = await Promise.all([
+        waiterApi.getAllOrders(),
+        waiterApi.getUpiId()
+      ]);
+      
+      const found = (ordersData || []).find((o: any) => o.id === orderId);
       if (found) setOrder(found);
 
+      if (upiData?.upi_id) setUpiId(upiData.upi_id);
+
       // Generate bill
-      const billRes = await api.post(`/billing/${orderId}/generate`, {
-        payment_method: 'CASH',
-        discount_amount: 0
-      });
-      setBill(billRes.data);
+      const billData = await waiterApi.generateBill(orderId, 'CASH', 0);
+      setBill(billData);
     } catch (e) {
       console.log('Checkout fetch error:', e);
     } finally {
@@ -49,12 +55,12 @@ export default function CheckoutScreen({ route, navigation }: any) {
 
   const applyDiscount = async () => {
     try {
-      const discAmt = parseFloat(discount) || 0;
-      const res = await api.post(`/billing/${orderId}/generate`, {
-        payment_method: payMethod,
-        discount_amount: discAmt
-      });
-      setBill(res.data);
+      let discVal = parseFloat(discount) || 0;
+      if (discountType === 'percent' && bill?.subtotal) {
+        discVal = (bill.subtotal * discVal) / 100;
+      }
+      const billData = await waiterApi.generateBill(orderId, payMethod, discVal);
+      setBill(billData);
       setStep(2);
     } catch (e: any) {
       const msg = e.response?.data?.detail || 'Failed to generate bill';
@@ -62,14 +68,42 @@ export default function CheckoutScreen({ route, navigation }: any) {
     }
   };
 
+  const sendEbill = async () => {
+    try {
+      const phoneRaw = (order?.customer_phone || '').replace(/\D/g, '');
+      if (phoneRaw.length >= 10) {
+        const phone = phoneRaw.length === 10 ? '91' + phoneRaw : phoneRaw;
+        let billText = `*BARKAT RESTAURANT*\n`;
+        billText += `Table: ${tableNumber}\n`;
+        billText += `------------------------\n`;
+        order.items?.forEach((item: any) => {
+          const modTotal = (item.modifiers || []).reduce((ms: number, m: any) => ms + (m.price_at_order_time || 0), 0);
+          billText += `${item.quantity}x ${item.menu_item?.name || 'Item'} - ₹${((item.price_at_order_time + modTotal) * item.quantity).toFixed(2)}\n`;
+        });
+        billText += `------------------------\n`;
+        billText += `*Grand Total: ₹${grandTotal.toFixed(2)}*\n\n`;
+        billText += `Thank you for dining with us! 🙏`;
+        
+        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(billText)}`;
+        if (Platform.OS === 'web') {
+          window.open(waUrl, '_blank');
+        } else {
+          const { Share } = require('react-native');
+          await Share.share({ message: billText });
+        }
+      } else {
+        const msg = 'No customer phone found for this order.';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('E-Bill', msg);
+      }
+    } catch (err) {
+      console.log('Ebill error', err);
+    }
+  };
+
   const confirmPayment = async () => {
     setProcessing(true);
     try {
-      await api.put(`/billing/${orderId}/confirm`, {
-        amount: bill.total_amount,
-        payment_method: payMethod,
-        transaction_reference: payMethod !== 'CASH' ? `TRX-${Date.now()}` : null
-      });
+      await waiterApi.confirmPayment(orderId, bill.total_amount, payMethod, payMethod !== 'CASH' ? `TRX-${Date.now()}` : undefined);
       const msg = '✅ Payment confirmed! Table is now free.';
       Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Payment Confirmed', msg);
       navigation.reset({ index: 0, routes: [{ name: 'Drawer' }] });
@@ -151,15 +185,31 @@ export default function CheckoutScreen({ route, navigation }: any) {
                   </View>
                   <View style={styles.divider} />
                   <View style={styles.billRow}>
-                    <Text style={styles.billLabel}>Discount (₹)</Text>
-                    <TextInput
-                      style={[styles.discountInput, { outlineStyle: 'none' } as any]}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor="#94a3b8"
-                      value={discount}
-                      onChangeText={setDiscount}
-                    />
+                    <Text style={styles.billLabel}>Discount</Text>
+                    <View style={styles.discountControls}>
+                      <View style={styles.discountToggle}>
+                        <TouchableOpacity 
+                          style={[styles.toggleOption, discountType === 'percent' && styles.toggleActive]} 
+                          onPress={() => setDiscountType('percent')}
+                        >
+                          <Text style={[styles.toggleText, discountType === 'percent' && {color: '#fff'}]}>%</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.toggleOption, discountType === 'fixed' && styles.toggleActive]} 
+                          onPress={() => setDiscountType('fixed')}
+                        >
+                          <Text style={[styles.toggleText, discountType === 'fixed' && {color: '#fff'}]}>₹</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TextInput
+                        style={[styles.discountInput, { outlineStyle: 'none' } as any]}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#94a3b8"
+                        value={discount}
+                        onChangeText={setDiscount}
+                      />
+                    </View>
                   </View>
                   <View style={styles.divider} />
                   <View style={styles.totalRow}>
@@ -200,6 +250,18 @@ export default function CheckoutScreen({ route, navigation }: any) {
                   ))}
                 </View>
               </View>
+
+              {/* UPI QR Code */}
+              {payMethod === 'UPI' && upiId && (
+                <View style={[styles.card, { alignItems: 'center', paddingVertical: 20 }]}>
+                  <Text style={styles.sectionLabel}>SCAN TO PAY</Text>
+                  <Image 
+                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Restaurant&am=${grandTotal.toFixed(2)}&cu=INR`)}` }}
+                    style={{ width: 200, height: 200, marginTop: 10, borderRadius: 10 }}
+                  />
+                  <Text style={{ marginTop: 15, fontSize: 13, color: '#64748b', fontWeight: '600' }}>UPI ID: {upiId}</Text>
+                </View>
+              )}
 
               {/* Cash change calculator */}
               {payMethod === 'CASH' && (
@@ -245,9 +307,14 @@ export default function CheckoutScreen({ route, navigation }: any) {
             <Text style={styles.cancelText}>CANCEL</Text>
           </TouchableOpacity>
           {step === 1 ? (
-            <TouchableOpacity style={styles.settleBtn} onPress={applyDiscount}>
-              <Text style={styles.settleBtnText}>Next: Payment →</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 2, flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[styles.settleBtn, { flex: 1, backgroundColor: '#10b981', shadowColor: '#10b981' }]} onPress={sendEbill}>
+                <Feather name="message-circle" size={16} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.settleBtn, { flex: 3 }]} onPress={applyDiscount}>
+                <Text style={styles.settleBtnText}>Next: Payment →</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <TouchableOpacity
               style={[styles.settleBtn, processing && { opacity: 0.7 }]}
@@ -294,10 +361,15 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
   totalAmt: { fontSize: 22, fontWeight: '800', color: PRIMARY },
+  discountControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  discountToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 2 },
+  toggleOption: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  toggleActive: { backgroundColor: PRIMARY },
+  toggleText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
   discountInput: {
     borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 6, fontSize: 14,
-    color: '#0f172a', width: 100, textAlign: 'right',
+    paddingHorizontal: 10, paddingVertical: 6, fontSize: 14,
+    color: '#0f172a', width: 70, textAlign: 'right', backgroundColor: '#f8fafc'
   },
   bigAmount: { fontSize: 36, fontWeight: '900', color: '#0f172a', marginTop: 4 },
   payRow: { flexDirection: 'row', gap: 10 },

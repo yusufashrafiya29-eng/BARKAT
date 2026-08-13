@@ -175,7 +175,12 @@ def update_order_items(
     db: Session = Depends(get_db),
     restaurant_id: UUID = Depends(get_current_restaurant)
 ):
-    order = order_service.update_order_items(db, order_id, items_update.items, str(restaurant_id))
+    order = order_service.update_order_items(
+        db, order_id, items_update.items, str(restaurant_id), 
+        items_update.status, items_update.customer_name, 
+        items_update.customer_phone, items_update.guests_count, 
+        items_update.tip_amount
+    )
     notify_kds(background_tasks, str(restaurant_id), order.id, db)
     return order
 

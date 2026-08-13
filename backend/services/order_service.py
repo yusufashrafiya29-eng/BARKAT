@@ -47,13 +47,22 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
             Order.status != OrderStatus.CANCELLED
         ).first()
 
-    initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
+    if order_in.status:
+        initial_status = OrderStatus[order_in.status]
+    else:
+        initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
 
     if existing_order:
         # Append to existing order
         new_order = existing_order
         if new_order.status == OrderStatus.SERVED:
             new_order.status = initial_status
+        # If it's Print KOT, we DON'T force an ACCEPTED order to READY, 
+        # but if it was just PENDING, or if it's already SERVED, we can update it.
+        # But for safety, we won't overwrite ACCEPTED/PREPARING to READY.
+        elif order_in.status and new_order.status not in [OrderStatus.ACCEPTED, OrderStatus.PREPARING]:
+            new_order.status = OrderStatus[order_in.status]
+            
         if order_in.source == "CUSTOMER" and not new_order.customer_phone and order_in.customer_phone:
             new_order.customer_phone = order_in.customer_phone
             new_order.customer_name = order_in.customer_name
@@ -330,13 +339,20 @@ def clear_order_history(db: Session, restaurant_id: str, password: str, user_id:
     db.commit()
     return {"message": f"Successfully cleared {count} historical orders", "count": count}
 
-def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str) -> Order:
+def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str, status: str = None, customer_name: str = None, customer_phone: str = None, guests_count: int = None, tip_amount: float = None) -> Order:
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status == OrderStatus.SERVED:
+    if status and order.status not in [OrderStatus.ACCEPTED, OrderStatus.PREPARING]:
+        order.status = OrderStatus[status]
+    elif order.status == OrderStatus.SERVED:
         raise HTTPException(status_code=400, detail="Cannot edit a served order")
     
+    if customer_name is not None: order.customer_name = customer_name
+    if customer_phone is not None: order.customer_phone = customer_phone
+    if guests_count is not None: order.guests_count = guests_count
+    if tip_amount is not None: order.tip_amount = tip_amount
+
     # 1. Wipe existing items
     db.query(OrderItem).filter(OrderItem.order_id == order_id).delete()
     

@@ -4,6 +4,12 @@ import App from './App.tsx'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import '@google/model-viewer'
+import { reticle, install } from '@reticlehq/react'
+
+if (import.meta.env.DEV) {
+  reticle.connect({ session: 'my-app' });
+  install();
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

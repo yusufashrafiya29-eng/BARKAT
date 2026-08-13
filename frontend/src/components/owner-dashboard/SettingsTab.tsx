@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { Loader2, Store } from 'lucide-react';
+import { Loader2, Store, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
@@ -7,6 +7,10 @@ import { useOwnerStore } from '../../store/ownerStore';
 export default function SettingsTab() {
   const { upiId, razorpayKeys, fetchData, setFormLoading, formLoading } = useOwnerStore();
   const [integrations, setIntegrations] = useState({ zomato_store_id: '', swiggy_store_id: '' });
+  const [printerConfig, setPrinterConfig] = useState({
+    enable_printing: localStorage.getItem('enable_printing') === 'true',
+    printer_type: localStorage.getItem('printer_type') || 'bluetooth'
+  });
 
   useEffect(() => {
     ownerApi.getIntegrations().then(res => {
@@ -106,6 +110,21 @@ export default function SettingsTab() {
     } finally {
       setFormLoading(false);
     }
+  };
+
+  const handleSavePrinter = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const enablePrinting = formData.get('enable_printing') === 'on';
+    const printerType = formData.get('printer_type') as string;
+    
+    localStorage.setItem('enable_printing', enablePrinting.toString());
+    localStorage.setItem('printer_type', printerType);
+    
+    setPrinterConfig({ enable_printing: enablePrinting, printer_type: printerType });
+    toast.success("Hardware Printer Configuration Saved");
+    setFormLoading(false);
   };
 
   return (
@@ -265,6 +284,49 @@ export default function SettingsTab() {
           <div className="pt-2 border-t border-subtle">
             <button disabled={formLoading} className="btn w-full justify-center">
               {formLoading ? <Loader2 size={16} className="animate-spin" /> : "Save Razorpay Keys"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* HARDWARE PRINTER CONFIGURATION */}
+      <div className="surface p-6 mb-6">
+        <h3 className="text-[15px] font-medium mb-1 flex items-center gap-2">
+          <Printer size={18} className="text-indigo-600" />
+          Hardware Printer Configuration
+        </h3>
+        <p className="text-[13px] text-muted mb-6">Configure receipt and KOT printing for Waiter and Captain apps.</p>
+
+        <form onSubmit={handleSavePrinter} className="space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <input 
+              type="checkbox" 
+              id="enable_printing"
+              name="enable_printing"
+              defaultChecked={printerConfig.enable_printing}
+              className="w-4 h-4 text-indigo-600 rounded border-gray-300"
+            />
+            <label htmlFor="enable_printing" className="text-[13px] font-medium text-main">
+              Enable Hardware Printing
+            </label>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-main">Connection Type</label>
+            <select 
+              name="printer_type" 
+              defaultValue={printerConfig.printer_type}
+              className="form-input bg-white"
+            >
+              <option value="bluetooth">Bluetooth (Wireless Thermal Printer)</option>
+              <option value="usb">USB (Wired Thermal Printer)</option>
+            </select>
+            <p className="text-[10px] text-muted">Web Bluetooth requires Chrome/Edge on Desktop or Android. Web USB requires Chrome/Edge on Desktop.</p>
+          </div>
+
+          <div className="pt-2 border-t border-subtle">
+            <button disabled={formLoading} className="btn w-full justify-center">
+              {formLoading ? <Loader2 size={16} className="animate-spin" /> : "Save Printer Settings"}
             </button>
           </div>
         </form>

@@ -59,15 +59,15 @@ class OrderCreate(BaseModel):
     guests_count: Optional[int] = None
     counter_name: str = "Main Register"
     source: str = "CUSTOMER"
-    is_accepted: bool = False
     tip_amount: float = 0.0
+    status: Optional[str] = None
+    is_accepted: bool = False
     
-    @field_validator('customer_phone')
+    @field_validator("customer_phone")
     @classmethod
     def validate_phone(cls, v):
-        if v is not None:
-            if not re.match(r'^\+[1-9]\d{1,14}$', v):
-                raise ValueError('Phone number must be in E.164 format (e.g. +919876543210)')
+        if v:
+            return re.sub(r"[^\+0-9]", "", v)
         return v
 
 class OrderRead(BaseModel):
@@ -106,6 +106,11 @@ class PaymentStatusUpdate(BaseModel):
 
 class OrderUpdateItems(BaseModel):
     items: List[OrderItemCreate]
+    status: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    guests_count: Optional[int] = None
+    tip_amount: Optional[float] = None
 
 class OrderItemStatusUpdate(BaseModel):
     status: str

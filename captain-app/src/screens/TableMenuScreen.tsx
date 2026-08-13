@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import api from '../api/axios';
+import CustomizationModal from '../components/CustomizationModal';
 
 const PRIMARY = '#6366f1';
 
@@ -21,10 +22,11 @@ export default function TableMenuScreen({ route, navigation }: any) {
 
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState<{ [key: string]: number }>({});
+  const [cart, setCart] = useState<any[]>([]);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState(false);
+  const [selectedModItem, setSelectedModItem] = useState<any>(null);
 
   useEffect(() => { fetchMenu(); }, []);
 
@@ -44,26 +46,72 @@ export default function TableMenuScreen({ route, navigation }: any) {
     setExpandedCat(prev => prev === catId ? null : catId);
   };
 
-  const updateCart = (item: any, delta: number) => {
+  const updateSimpleCartItem = (item: any, delta: number) => {
     setCart(prev => {
-      const qty = Math.max(0, (prev[item.id] || 0) + delta);
-      const next = { ...prev };
-      if (qty === 0) delete next[item.id];
-      else next[item.id] = qty;
-      return next;
+      const existingIndex = prev.findIndex(c => c.id === item.id && (!c.selected_modifiers || c.selected_modifiers.length === 0));
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        const newQty = next[existingIndex].quantity + delta;
+        if (newQty <= 0) {
+          next.splice(existingIndex, 1);
+        } else {
+          next[existingIndex].quantity = newQty;
+        }
+        return next;
+      } else if (delta > 0) {
+        return [...prev, { ...item, cartItemId: `${item.id}-${Date.now()}`, quantity: delta, selected_modifiers: [], notes: '' }];
+      }
+      return prev;
     });
   };
 
-  const totalItems = Object.values(cart).reduce((s, q) => s + q, 0);
+  const handlePlus = (item: any) => {
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setSelectedModItem(item);
+    } else {
+      updateSimpleCartItem(item, 1);
+    }
+  };
+
+  const handleMinus = (item: any) => {
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setCart(prev => {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].id === item.id) {
+            if (next[i].quantity > 1) {
+              next[i].quantity -= 1;
+            } else {
+              next.splice(i, 1);
+            }
+            break;
+          }
+        }
+        return next;
+      });
+    } else {
+      updateSimpleCartItem(item, -1);
+    }
+  };
+
+  const addToCartWithModifiers = (item: any, selectedModifiers: any[], quantity: number, notes: string) => {
+    setCart(prev => [
+      ...prev,
+      {
+        ...item,
+        cartItemId: `${item.id}-${Date.now()}`,
+        quantity,
+        selected_modifiers: selectedModifiers,
+        notes
+      }
+    ]);
+  };
+
+  const totalItems = cart.reduce((s, item) => s + item.quantity, 0);
 
   const handleGoToCart = () => {
     if (totalItems === 0) return;
-    const allItems = categories.flatMap(c => c.menu_items || []);
-    const cartArray = Object.keys(cart).map(id => ({
-      ...allItems.find((i: any) => i.id === id),
-      quantity: cart[id]
-    }));
-    navigation.navigate('Cart', { cartItems: cartArray, tableId, tableNumber, orderType });
+    navigation.navigate('Cart', { cartItems: cart, tableId, tableNumber, orderType });
   };
 
   const handleBack = () => {
@@ -92,7 +140,7 @@ export default function TableMenuScreen({ route, navigation }: any) {
     : [];
 
   const renderItem = (item: any) => {
-    const qty = cart[item.id] || 0;
+    const qty = cart.filter(c => c.id === item.id).reduce((s, c) => s + c.quantity, 0);
     return (
       <View key={item.id} style={styles.itemRow}>
         {/* Veg / Non-Veg indicator */}
@@ -110,16 +158,16 @@ export default function TableMenuScreen({ route, navigation }: any) {
         {item.is_available !== false ? (
           qty > 0 ? (
             <View style={styles.qtyControls}>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateCart(item, -1)}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => handleMinus(item)}>
                 <Feather name="minus" size={14} color={PRIMARY} />
               </TouchableOpacity>
-              <Text style={styles.qtyNum}>{qty}.0</Text>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateCart(item, 1)}>
+              <Text style={styles.qtyNum}>{qty}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => handlePlus(item)}>
                 <Feather name="plus" size={14} color={PRIMARY} />
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.addBtn} onPress={() => updateCart(item, 1)}>
+            <TouchableOpacity style={styles.addBtn} onPress={() => handlePlus(item)}>
               <Feather name="plus" size={16} color={PRIMARY} />
             </TouchableOpacity>
           )
@@ -131,7 +179,6 @@ export default function TableMenuScreen({ route, navigation }: any) {
   };
 
   const renderSearchItem = (item: any) => {
-    const qty = cart[item.id] || 0;
     return (
       <View key={item.id}>
         <Text style={styles.searchCatLabel}>{item.categoryName}</Text>
@@ -210,7 +257,10 @@ export default function TableMenuScreen({ route, navigation }: any) {
             categories.map(cat => {
               const items: any[] = cat.menu_items || [];
               const isOpen = expandedCat === cat.id;
-              const catCartCount = items.reduce((s, i) => s + (cart[i.id] || 0), 0);
+              const catCartCount = items.reduce((s, i) => {
+                const itemQty = cart.filter(c => c.id === i.id).reduce((sum, c) => sum + c.quantity, 0);
+                return s + itemQty;
+              }, 0);
 
               return (
                 <View key={cat.id} style={styles.categoryBlock}>
@@ -288,6 +338,14 @@ export default function TableMenuScreen({ route, navigation }: any) {
             <Text style={styles.cartLabel}>Cart</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── CUSTOMIZATION MODAL ── */}
+        <CustomizationModal
+          visible={!!selectedModItem}
+          item={selectedModItem}
+          onClose={() => setSelectedModItem(null)}
+          onAddToCart={addToCartWithModifiers}
+        />
 
       </View>
     </SafeAreaView>

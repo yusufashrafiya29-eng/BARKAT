@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { printerService } from '../utils/PrinterService';
 
 const PRIMARY = '#6366f1';      // Indigo — matches web app
 const PRIMARY_DARK = '#4f46e5'; // Indigo dark
@@ -35,6 +36,22 @@ export default function CartScreen({ route, navigation }: any) {
 
   useEffect(() => { fetchActiveOrder(); }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (showMore) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = 'unset';
+      }
+    }
+
+    return () => {
+      if (Platform.OS === 'web') {
+        document.body.style.overflow = 'unset';
+      }
+    };
+  }, [showMore]);
+
   const fetchActiveOrder = async () => {
     try {
       const res = await api.get('/orders/waiter/active');
@@ -44,21 +61,24 @@ export default function CartScreen({ route, navigation }: any) {
     finally { setFetchingActive(false); }
   };
 
-  const updateQty = (id: string, delta: number) =>
+  const updateQty = (cartItemId: string, delta: number) =>
     setCartItems(prev =>
-      prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)
+      prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)
         .filter(i => i.quantity > 0)
     );
 
-  const deleteItem = (id: string) => setCartItems(prev => prev.filter(i => i.id !== id));
+  const deleteItem = (cartItemId: string) => setCartItems(prev => prev.filter(i => (i.cartItemId || i.id) !== cartItemId));
 
-  const updateNotes = (id: string, text: string) =>
-    setCartItems(prev => prev.map(i => i.id === id ? { ...i, notes: text } : i));
+  const updateNotes = (cartItemId: string, text: string) =>
+    setCartItems(prev => prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, notes: text } : i));
 
-  const toggleParcel = (id: string) =>
-    setCartItems(prev => prev.map(i => i.id === id ? { ...i, is_parcel: !i.is_parcel } : i));
+  const toggleParcel = (cartItemId: string) =>
+    setCartItems(prev => prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, is_parcel: !i.is_parcel } : i));
 
-  const grandTotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const grandTotal = cartItems.reduce((s, i) => {
+    const modTotal = (i.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);
+    return s + (i.price + modTotal) * i.quantity;
+  }, 0);
 
   const buildCombinedItems = (newItems: any[]) => {
     if (!activeOrder) return newItems;
@@ -67,14 +87,19 @@ export default function CartScreen({ route, navigation }: any) {
       combined.push({ menu_item_id: ex.menu_item_id, quantity: ex.quantity, notes: ex.notes || '', is_parcel: ex.is_parcel || false });
     });
     newItems.forEach(ni => {
-      const m = combined.find(c => c.menu_item_id === ni.menu_item_id && c.is_parcel === ni.is_parcel);
-      if (m) { m.quantity += ni.quantity; }
-      else combined.push(ni);
+      const hasMods = ni.selected_modifiers && ni.selected_modifiers.length > 0;
+      if (!hasMods) {
+        const m = combined.find(c => c.menu_item_id === ni.menu_item_id && c.is_parcel === ni.is_parcel && (!c.selected_modifiers || c.selected_modifiers.length === 0));
+        if (m) { m.quantity += ni.quantity; }
+        else combined.push(ni);
+      } else {
+        combined.push(ni);
+      }
     });
     return combined;
   };
 
-  const placeOrder = async (action: 'kot' | 'save_bill' | 'save_print' | 'ebill') => {
+  const placeOrder = async (action: 'kot' | 'save_bill' | 'save_print' | 'save_print_direct' | 'ebill') => {
     if (cartItems.length === 0) {
       const msg = 'Add items to cart first';
       Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Empty Cart', msg);
@@ -88,12 +113,25 @@ export default function CartScreen({ route, navigation }: any) {
         quantity: i.quantity,
         notes: i.notes,
         is_parcel: i.is_parcel,
+        selected_modifiers: i.selected_modifiers || []
       }));
 
       let createdOrder: any;
 
       if (activeOrder) {
-        const res = await api.put(`/orders/${activeOrder.id}/items`, { items: buildCombinedItems(formattedItems) });
+        let ph = customerPhone.trim();
+        if (ph) {
+          ph = ph.replace(/\D/g, '');
+          ph = ph.length === 10 ? '+91' + ph : '+' + ph;
+        }
+        const res = await api.put(`/orders/${activeOrder.id}/items`, { 
+            items: buildCombinedItems(formattedItems),
+            status: action === 'save_print_direct' ? 'READY' : undefined,
+            customer_name: customerName.trim() || undefined,
+            customer_phone: ph || undefined,
+            guests_count: guests.trim() ? parseInt(guests) : undefined,
+            tip_amount: tipAmount.trim() ? parseFloat(tipAmount) : undefined
+        });
         createdOrder = res.data || activeOrder;
       } else {
         const payload: any = {
@@ -101,6 +139,7 @@ export default function CartScreen({ route, navigation }: any) {
           order_type: orderType,
           items: formattedItems,
           source: 'WAITER',
+          status: action === 'save_print_direct' ? 'READY' : undefined
         };
         if (customerName.trim()) payload.customer_name = customerName.trim();
         if (customerPhone.trim()) {
@@ -113,27 +152,35 @@ export default function CartScreen({ route, navigation }: any) {
         createdOrder = res.data;
       }
 
-      // Handle eBill — send WhatsApp message
-      if (action === 'ebill' && createdOrder?.id) {
-        const phoneRaw = (customerPhone || '').replace(/\D/g, '');
-        if (phoneRaw.length >= 10) {
-          const phone = phoneRaw.length === 10 ? '91' + phoneRaw : phoneRaw;
-          const msg = `Hi! Your bill for Table ${tableNumber} is ₹${grandTotal.toFixed(2)}. Thank you! 🙏`;
-          const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-          if (Platform.OS === 'web') {
-            window.open(waUrl, '_blank');
-          } else {
-            await Share.share({ message: msg });
-          }
-        } else {
-          const msg = 'No customer phone found. Please enter customer phone first.';
-          Platform.OS === 'web' ? window.alert(msg) : Alert.alert('E-Bill', msg);
-        }
-      }
-
       if (action !== 'ebill') {
         const msg = activeOrder ? 'Items added to kitchen!' : '🔥 Order sent to kitchen!';
         Platform.OS === 'web' ? window.alert(msg) : Alert.alert('✅ Success', msg);
+      }
+
+      // Hardware Printing Logic
+      if (action === 'save_print' || action === 'save_print_direct') {
+        if (Platform.OS === 'web') {
+          const pType = localStorage.getItem('printer_type') || 'bluetooth';
+          try {
+            let billText = `*BARKAT KOT*\n`;
+            billText += `Table: ${tableNumber} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
+            billText += `------------------------\n`;
+            cartItems.forEach(item => {
+              billText += `${item.quantity}x ${item.name}\n`;
+            });
+            billText += `------------------------\n`;
+            
+            if (pType === 'bluetooth') {
+              if (!printerService.device) await printerService.connectBluetooth();
+            } else {
+              if (!printerService.device) await printerService.connectUSB();
+            }
+            await printerService.printReceipt(billText, pType as any);
+          } catch (err: any) {
+            console.error('Print failed:', err);
+            window.alert('Print failed: ' + err.message);
+          }
+        }
       }
 
       navigation.reset({ index: 0, routes: [{ name: 'Drawer' }] });
@@ -146,57 +193,61 @@ export default function CartScreen({ route, navigation }: any) {
     }
   };
 
-  const handleCash = () => {
-    if (activeOrder) {
-      navigation.navigate('Checkout', { orderId: activeOrder.id, tableNumber });
-    } else {
-      const msg = 'Place the order first (KOT), then proceed to checkout.';
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
-    }
-  };
-
   const orderTypeLabel = orderType === 'DINE_IN' ? 'Dine In' : orderType === 'DELIVERY' ? 'Delivery' : 'Pick Up';
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={styles.cartItem}>
-      <View style={styles.itemTop}>
-        <View style={styles.itemLeft}>
-          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.itemPrice}>₹{(item.price * item.quantity).toFixed(2)}</Text>
-        </View>
-        <View style={styles.itemRight}>
-          <View style={styles.qtyRow}>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, -1)}>
-              <Feather name="minus" size={14} color={PRIMARY} />
-            </TouchableOpacity>
-            <Text style={styles.qtyNum}>{item.quantity.toFixed(1)}</Text>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, 1)}>
-              <Feather name="plus" size={14} color={PRIMARY} />
+  const renderItem = ({ item }: { item: any }) => {
+    const modTotal = (item.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);
+    const itemKey = item.cartItemId || item.id;
+    return (
+      <View style={styles.cartItem}>
+        <View style={styles.itemTop}>
+          <View style={styles.itemLeft}>
+            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+              <View style={{ marginTop: 2 }}>
+                {item.selected_modifiers.map((mod: any, idx: number) => (
+                  <Text key={idx} style={{ fontSize: 11, color: '#64748b' }}>
+                    • {mod.name} {mod.price ? `(+₹${mod.price})` : ''}
+                  </Text>
+                ))}
+              </View>
+            )}
+            <Text style={styles.itemPrice}>₹{((item.price + modTotal) * item.quantity).toFixed(2)}</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <View style={styles.qtyRow}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(itemKey, -1)}>
+                <Feather name="minus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+              <Text style={styles.qtyNum}>{item.quantity}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(itemKey, 1)}>
+                <Feather name="plus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => deleteItem(itemKey)} style={styles.trashBtn}>
+              <Feather name="trash-2" size={15} color="#ef4444" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => deleteItem(item.id)} style={styles.trashBtn}>
-            <Feather name="trash-2" size={15} color="#ef4444" />
+        </View>
+        <View style={styles.itemBottom}>
+          <TextInput
+            style={[styles.notesInput, { outlineStyle: 'none' } as any]}
+            placeholder="Chef notes..."
+            placeholderTextColor="#94a3b8"
+            value={item.notes}
+            onChangeText={t => updateNotes(itemKey, t)}
+          />
+          <TouchableOpacity
+            style={[styles.parcelBtn, item.is_parcel && styles.parcelBtnActive]}
+            onPress={() => toggleParcel(itemKey)}
+          >
+            <MaterialCommunityIcons name="bag-personal" size={13} color={item.is_parcel ? '#f97316' : '#94a3b8'} />
+            <Text style={[styles.parcelTxt, item.is_parcel && { color: '#f97316' }]}>PARCEL</Text>
           </TouchableOpacity>
         </View>
       </View>
-      <View style={styles.itemBottom}>
-        <TextInput
-          style={[styles.notesInput, { outlineStyle: 'none' } as any]}
-          placeholder="Chef notes..."
-          placeholderTextColor="#94a3b8"
-          value={item.notes}
-          onChangeText={t => updateNotes(item.id, t)}
-        />
-        <TouchableOpacity
-          style={[styles.parcelBtn, item.is_parcel && styles.parcelBtnActive]}
-          onPress={() => toggleParcel(item.id)}
-        >
-          <MaterialCommunityIcons name="bag-personal" size={13} color={item.is_parcel ? '#f97316' : '#94a3b8'} />
-          <Text style={[styles.parcelTxt, item.is_parcel && { color: '#f97316' }]}>PARCEL</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -210,9 +261,6 @@ export default function CartScreen({ route, navigation }: any) {
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.headerTitle}>Table {tableNumber}</Text>
             <Text style={styles.headerSub}>{orderTypeLabel}</Text>
-          </View>
-          <View style={styles.onlineBadge}>
-            <Text style={styles.onlineBadgeText}>Online Orders</Text>
           </View>
         </View>
 
@@ -272,7 +320,7 @@ export default function CartScreen({ route, navigation }: any) {
         ) : (
           <FlatList
             data={cartItems}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.cartItemId || item.id}
             renderItem={renderItem}
             contentContainerStyle={{ paddingBottom: 220 }}
             ListEmptyComponent={
@@ -290,57 +338,30 @@ export default function CartScreen({ route, navigation }: any) {
           <Text style={styles.totalAmt}>₹{grandTotal.toFixed(0)}</Text>
         </View>
 
-        {/* Bottom 4 buttons */}
+        {/* Bottom Action Bar */}
         <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.bottomBtn} onPress={() => setShowMore(true)}>
-            <Feather name="more-horizontal" size={18} color="#334155" />
-            <Text style={styles.bottomBtnTxt}>More</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomBtn} onPress={handleCash}>
-            <Feather name="credit-card" size={18} color="#334155" />
-            <Text style={styles.bottomBtnTxt}>Cash</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomBtn} onPress={() => {}}>
-            <Feather name="user" size={18} color="#334155" />
-            <Text style={styles.bottomBtnTxt}>Customer</Text>
+          <TouchableOpacity 
+            style={[styles.bottomBtn, { backgroundColor: '#f1f5f9', flex: 1, borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center', borderRadius: 10, gap: 3 }]} 
+            onPress={() => placeOrder('save_print_direct')} 
+            disabled={loading || cartItems.length === 0}
+          >
+            <Feather name="printer" size={16} color="#334155" />
+            <Text style={[styles.bottomBtnTxt, { color: '#334155', fontWeight: '800' }]}>Print KOT</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.kotBtn, (loading || cartItems.length === 0) && { opacity: 0.6 }]}
-            onPress={() => placeOrder('save_print')}
+            style={[styles.kotBtn, { flex: 1.5 }, (loading || cartItems.length === 0) && { opacity: 0.6 }]}
+            onPress={() => placeOrder('kot')}
             disabled={loading || cartItems.length === 0}
           >
             {loading
               ? <ActivityIndicator color="#fff" size="small" />
               : <>
                   <Feather name="send" size={14} color="#fff" />
-                  <Text style={styles.kotBtnTxt}>Save & Print</Text>
+                  <Text style={styles.kotBtnTxt}>Send to Kitchen</Text>
                 </>
             }
           </TouchableOpacity>
         </View>
-
-        {/* ── MORE OPTIONS POPUP (appears above "More" button like PetPooja) ── */}
-        <Modal visible={showMore} transparent animationType="fade" onRequestClose={() => setShowMore(false)}>
-          <TouchableOpacity style={styles.moreOverlay} activeOpacity={1} onPress={() => setShowMore(false)}>
-            <View style={styles.morePopup}>
-              {[
-                { label: 'Save & Print', icon: 'printer', action: () => placeOrder('save_print') },
-                { label: 'Save & Ebill', icon: 'message-circle', action: () => placeOrder('ebill') },
-                { label: 'KOT', icon: 'send', action: () => placeOrder('kot') },
-                { label: 'KOT & Print', icon: 'printer', action: () => placeOrder('save_print') },
-              ].map((opt, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[styles.moreItem, idx < 3 && { borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }]}
-                  onPress={opt.action}
-                >
-                  <Text style={styles.moreItemTxt}>{opt.label}</Text>
-                  <Feather name={opt.icon as any} size={18} color="#94a3b8" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </Modal>
 
       </View>
     </SafeAreaView>
