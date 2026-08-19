@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Plus, Minus,
@@ -38,10 +38,10 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; border: string; d
 
 /* ── Table Status Config (5 states) ─────────────────────────── */
 const TABLE_STATUS_CONFIG = {
-  free:     { color: '#94a3b8', borderColor: '#e2e8f0', bgGrad: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', dotColor: '#cbd5e1', label: 'Free' },
+  free: { color: '#94a3b8', borderColor: '#e2e8f0', bgGrad: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', dotColor: '#cbd5e1', label: 'Free' },
   customer: { color: '#4338ca', borderColor: '#a5b4fc', bgGrad: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', dotColor: '#6366f1', label: '⚡ New Order' },
-  running:  { color: '#b45309', borderColor: '#fcd34d', bgGrad: 'linear-gradient(135deg,#fffbeb,#fef3c7)', dotColor: '#f59e0b', label: '🔥 KOT Running' },
-  printed:  { color: '#065f46', borderColor: '#6ee7b7', bgGrad: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', dotColor: '#10b981', label: '🖨️ Bill Printed' },
+  running: { color: '#b45309', borderColor: '#fcd34d', bgGrad: 'linear-gradient(135deg,#fffbeb,#fef3c7)', dotColor: '#f59e0b', label: '🔥 KOT Running' },
+  printed: { color: '#065f46', borderColor: '#6ee7b7', bgGrad: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', dotColor: '#10b981', label: '🖨️ Bill Printed' },
   reserved: { color: '#d97706', borderColor: '#fde68a', bgGrad: 'linear-gradient(135deg,#fffbeb,#fef9c3)', dotColor: '#fbbf24', label: 'Reserved' },
 } as const;
 type TStatusKey = keyof typeof TABLE_STATUS_CONFIG;
@@ -67,9 +67,13 @@ export default function WaiterDashboard() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [guestsCount, setGuestsCount] = useState<string>('');
   const [tipAmount, setTipAmount] = useState<string>('');
-  
+
 
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [showDueCustomerModal, setShowDueCustomerModal] = useState(false);
+  const [dueCustomerName, setDueCustomerName] = useState('');
+  const [dueCustomerPhone, setDueCustomerPhone] = useState('');
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
   const [checkoutOrder, setCheckoutOrder] = useState<Order | null>(null);
   const [billDetails, setBillDetails] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'UPI'>('CASH');
@@ -89,6 +93,7 @@ export default function WaiterDashboard() {
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [containerCharge, setContainerCharge] = useState(0);
   const [customerPaidAmount, setCustomerPaidAmount] = useState('');
+  const [payingAmountInput, setPayingAmountInput] = useState<string>('');
 
   /* ── Sprint 1: Reason Modal states ────────────────────────── */
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
@@ -101,7 +106,7 @@ export default function WaiterDashboard() {
     try {
       const pType = localStorage.getItem('printer_type') || 'bluetooth';
       const tableNum = tables.find(t => t.id === order.table_id)?.table_number || '?';
-      
+
       let billText = `*BARKAT KOT / BILL*\n`;
       billText += `Table: ${tableNum} | Order: ${order.id?.slice(-4)}\n`;
       billText += `------------------------\n`;
@@ -123,7 +128,7 @@ export default function WaiterDashboard() {
       console.error('Hardware print failed:', err);
       toast.error('Hardware Print failed, falling back to browser print.');
     }
-    
+
     // Fallback to standard browser print
     setPrintingOrder(order);
     setTimeout(() => {
@@ -139,7 +144,7 @@ export default function WaiterDashboard() {
       setReservations(resData || []);
       setTables(prev => prev.map((t: any) => ({
         ...t,
-        status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Free',
+        status: ordersData.some((o: any) => o.table_id === t.id) ? 'Occupied' : 'Free',
         hasPendingCustomerOrder: ordersData.some((o: any) => o.table_id === t.id && o.source === 'CUSTOMER' && o.status === 'PENDING')
       })));
     } catch { }
@@ -147,8 +152,46 @@ export default function WaiterDashboard() {
 
   useEffect(() => {
     fetchInitialData();
-    const interval = setInterval(fetchOrdersOnly, 3000);
-    return () => clearInterval(interval);
+    let ws: WebSocket | null = null;
+    let isComponentMounted = true;
+    let reconnectTimeout: any = null;
+    const token = localStorage.getItem('auth_token');
+    const restaurantId = localStorage.getItem('restaurantId');
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+    if (token && restaurantId) {
+      const wsBase = apiUrl.replace(/^http/, 'ws');
+      const wsUrl = `${wsBase}/orders/ws/kitchen/${restaurantId}?token=${token}`;
+
+      const connectWS = () => {
+        if (!isComponentMounted) return;
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => { if (isComponentMounted) fetchOrdersOnly(); };
+        ws.onmessage = (event) => {
+          if (!isComponentMounted) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'ORDER_UPDATE') fetchOrdersOnly();
+          } catch (e) { }
+        };
+        ws.onclose = () => {
+          if (isComponentMounted) reconnectTimeout = setTimeout(connectWS, 5000);
+        };
+      };
+      connectWS();
+    }
+
+    // Fallback polling for browsers with suspended WS
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) fetchOrdersOnly();
+    }, 15000);
+
+    return () => {
+      isComponentMounted = false;
+      if (ws) ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const fetchInitialData = async () => {
@@ -159,7 +202,7 @@ export default function WaiterDashboard() {
       ]);
       setTables(tablesData.map((t: any) => ({
         ...t,
-        status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Free',
+        status: ordersData.some((o: any) => o.table_id === t.id) ? 'Occupied' : 'Free',
         hasPendingCustomerOrder: ordersData.some((o: any) => o.table_id === t.id && o.source === 'CUSTOMER' && o.status === 'PENDING')
       })));
       setCategories(menuData);
@@ -190,7 +233,7 @@ export default function WaiterDashboard() {
   const addToCart = (item: MenuItem, modifiers: any[] = [], quantity: number = 1, notes: string = '') => {
     const modifierSignature = modifiers.map(m => m.id).sort().join('|');
     const cartItemId = `${item.id}-${modifierSignature}`;
-    
+
     setCart(prev => {
       const ex = prev.find(i => i.cartItemId === cartItemId);
       if (ex) return prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: i.quantity + quantity } : i);
@@ -203,19 +246,21 @@ export default function WaiterDashboard() {
     setCart(prev => prev.map(i => i.cartItemId === cartItemId ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
   const updateNotes = (cartItemId: string, notes: string) =>
     setCart(prev => prev.map(i => i.cartItemId === cartItemId ? { ...i, notes } : i));
-  const totalAmount = cart.reduce((s, i) => {
-    let basePrice = i.price;
-    let modsTotal = 0;
-    i.modifiers?.forEach(m => {
-      const group = i.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));
-      if (group?.price_replaces_base) {
-        basePrice = m.price;
-      } else {
-        modsTotal += m.price;
-      }
-    });
-    return s + (basePrice + modsTotal) * i.quantity;
-  }, 0);
+  const totalAmount = useMemo(() => {
+    return cart.reduce((s, i) => {
+      let basePrice = i.price;
+      let modsTotal = 0;
+      i.modifiers?.forEach(m => {
+        const group = i.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));
+        if (group?.price_replaces_base) {
+          basePrice = m.price;
+        } else {
+          modsTotal += m.price;
+        }
+      });
+      return s + (basePrice + modsTotal) * i.quantity;
+    }, 0);
+  }, [cart]);
 
   /* ── Order actions ──────────────────────────────────────────── */
   const placeOrder = async (action: 'save' | 'save_print' | 'save_print_direct' | 'ebill' = 'save') => {
@@ -224,8 +269,8 @@ export default function WaiterDashboard() {
     let createdOrder: any = null;
     try {
       if (editingOrderId) {
-        createdOrder = await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({ 
-          menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+        createdOrder = await waiterApi.updateOrderItems(editingOrderId, cart.map(i => ({
+          menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || []
         })));
         toast.success('Order updated!');
         setEditingOrderId(null);
@@ -233,8 +278,8 @@ export default function WaiterDashboard() {
         createdOrder = await waiterApi.placeOrder({
           table_id: selectedTable?.id || null,
           order_type: orderType,
-          items: cart.map(i => ({ 
-            menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || [] 
+          items: cart.map(i => ({
+            menu_item_id: i.id, quantity: i.quantity, notes: i.notes, is_parcel: i.is_parcel, modifiers: i.modifiers?.map(m => ({ modifier_id: m.id })) || []
           })),
           customer_name: customerName || undefined,
           customer_phone: customerPhone ? (() => {
@@ -248,6 +293,11 @@ export default function WaiterDashboard() {
           status: action === 'save_print_direct' ? 'READY' : undefined
         });
         toast.success('🚀 Ticket sent!');
+        
+        // Fix: Update UI immediately so table occupancy and queue reflect the new order
+        // regardless of whether the subsequent printing step succeeds or fails.
+        await fetchOrdersOnly();
+
         setCustomerName('');
         setCustomerPhone('');
         setCustomerAddress('');
@@ -277,33 +327,36 @@ export default function WaiterDashboard() {
       }
 
       if (action === 'save_print' || action === 'save_print_direct') {
-          const pType = localStorage.getItem('printer_type') || 'bluetooth';
-          const tableNum = selectedTable?.table_number || '?';
-          try {
-            let billText = `*BARKAT KOT*\n`;
-            billText += `Table: ${tableNum} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
-            billText += `------------------------\n`;
-            cart.forEach(item => {
-              billText += `${item.quantity}x ${item.name}\n`;
-            });
-            billText += `------------------------\n`;
-            billText += `Total: Rs ${totalAmount}\n\n`;
+        const pType = localStorage.getItem('printer_type') || 'bluetooth';
+        const tableNum = selectedTable?.table_number || '?';
+        try {
+          let billText = `*BARKAT KOT*\n`;
+          billText += `Table: ${tableNum} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
+          billText += `------------------------\n`;
+          cart.forEach(item => {
+            billText += `${item.quantity}x ${item.name}\n`;
+          });
+          billText += `------------------------\n`;
+          billText += `Total: Rs ${totalAmount}\n\n`;
 
-            if (pType === 'bluetooth') {
-              if (!printerService.device) await printerService.connectBluetooth();
-            } else {
-              if (!printerService.device) await printerService.connectUSB();
-            }
-            await printerService.printReceipt(billText, pType as any);
-            toast.success('KOT Printed successful!');
-          } catch (err: any) {
-            console.error('Print failed:', err);
-            toast.error('Print failed: ' + err.message);
+          if (pType === 'bluetooth') {
+            if (!printerService.device) await printerService.connectBluetooth();
+          } else {
+            if (!printerService.device) await printerService.connectUSB();
           }
+          await printerService.printReceipt(billText, pType as any);
+          toast.success('KOT Printed successful!');
+        } catch (err: any) {
+          console.error('Print failed:', err);
+          toast('Order sent to kitchen — printing unavailable', {
+            icon: 'ℹ️',
+            style: { background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0' }
+          });
+        }
       }
 
       setView('status');
-      fetchInitialData();
+      // fetchInitialData() handled by WS or polling
     } catch (e: any) {
       const d = e.response?.data?.detail;
       toast.error(Array.isArray(d) ? d[0]?.msg : d || 'Failed to process order');
@@ -312,18 +365,18 @@ export default function WaiterDashboard() {
     }
   };
 
-  const handleDeleteOrder = (id: string) => { 
+  const handleDeleteOrder = (id: string) => {
     setReasonAction({ type: 'delete', id });
     setSelectedReason('Customer Changed Mind');
     setCustomReason('');
-    setReasonModalOpen(true); 
+    setReasonModalOpen(true);
   };
   const handleEditOrder = (order: Order) => { setEditingOrderId(order.id); setCart(order.items?.map(i => ({ id: i.menu_item_id, name: i.menu_item?.name || 'Item', price: i.price_at_order_time, quantity: i.quantity, notes: i.notes || '', is_parcel: !i.is_parcel, category_id: '', is_veg: false, is_available: true, cartItemId: i.id, modifiers: i.modifiers || [] })) || []); toast('✏️ Editing order'); };
-  
+
   const handleServeOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updateOrderStatus(id, 'SERVED'); toast.success('Marked served!'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
-  const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchInitialData(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
-  const handleRejectOrder = (id: string) => { 
-    if (processingOrders.has(id)) return; 
+  const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.acceptOrder(id); toast.success('Accepted — sent to kitchen'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
+  const handleRejectOrder = (id: string) => {
+    if (processingOrders.has(id)) return;
     setReasonAction({ type: 'reject', id });
     setSelectedReason('Out of Stock');
     setCustomReason('');
@@ -346,7 +399,7 @@ export default function WaiterDashboard() {
       }
       setReasonModalOpen(false);
       setReasonAction(null);
-      fetchInitialData();
+      fetchOrdersOnly();
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Action failed');
     } finally {
@@ -354,8 +407,49 @@ export default function WaiterDashboard() {
     }
   };
   const handleDirectPaymentConfirm = async (id: string) => { if (processingOrders.has(id)) return; setProcessingOrders(prev => new Set(prev).add(id)); try { await waiterApi.updatePaymentStatus(id, 'PAID'); toast.success('Payment settled directly'); fetchOrdersOnly(); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(id); return n; }); } };
-  const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutStep(1); setDiscountAmount(0); setDiscountType('percent'); setDeliveryCharge(0); setContainerCharge(0); setCustomerPaidAmount(''); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
-  
+  const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; setProcessingOrders(prev => new Set(prev).add(order.id)); try { const bill = await waiterApi.generateBill(order.id, 'CASH', 0); setCheckoutOrder(order); setBillDetails(bill); setPaymentMethod('CASH'); setCheckoutStep(1); setDiscountAmount(0); setDiscountType('percent'); setDeliveryCharge(0); setContainerCharge(0); setCustomerPaidAmount(''); setPayingAmountInput(''); setCheckoutModalOpen(true); } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setProcessingOrders(prev => { const n = new Set(prev); n.delete(order.id); return n; }); } };
+
+  const handleCloseCheckout = () => {
+    if (!checkoutOrder || !billDetails) {
+      setCheckoutModalOpen(false);
+      return;
+    }
+    const dueAmount = billDetails.total_amount - (billDetails.amount_paid || 0);
+    if (dueAmount > 0) {
+      setDueCustomerName(checkoutOrder.customer_name || '');
+      setDueCustomerPhone(checkoutOrder.customer_phone || '');
+      setShowDueCustomerModal(true);
+    } else {
+      setCheckoutModalOpen(false);
+      setCheckoutOrder(null);
+      setBillDetails(null);
+    }
+  };
+
+  const handleDueCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dueCustomerName.trim()) return toast.error('Name is required');
+    const phone = dueCustomerPhone.replace(/\D/g, '');
+    if (phone.length !== 10) return toast.error('Enter a valid 10-digit phone number');
+    
+    setIsSubmittingCustomer(true);
+    try {
+      if (checkoutOrder) {
+        await waiterApi.updateCustomerInfo(checkoutOrder.id, dueCustomerName.trim(), phone);
+      }
+      setShowDueCustomerModal(false);
+      setCheckoutModalOpen(false);
+      setCheckoutOrder(null);
+      setBillDetails(null);
+      toast.success('Saved due payment correctly');
+      fetchOrdersOnly(); // Refresh state
+    } catch (err) {
+      toast.error('Failed to save customer details');
+    } finally {
+      setIsSubmittingCustomer(false);
+    }
+  };
+
   const handleNextToPayment = async () => {
     if (!checkoutOrder || !billDetails) return;
     setIsProcessingPayment(true);
@@ -374,14 +468,28 @@ export default function WaiterDashboard() {
     if (!checkoutOrder) return;
     setIsProcessingPayment(true);
     try {
-      const amountToPay = billDetails.total_amount - (billDetails.amount_paid || 0);
-      await waiterApi.confirmPayment(
-        checkoutOrder.id, 
-        amountToPay, 
-        paymentMethod, 
+      const maxAmountToPay = billDetails.total_amount - (billDetails.amount_paid || 0);
+      const amountToPay = payingAmountInput !== '' ? parseFloat(payingAmountInput) : maxAmountToPay;
+
+      if (amountToPay <= 0 || amountToPay > maxAmountToPay) {
+        toast.error("Invalid payment amount");
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      const updatedBill = await waiterApi.confirmPayment(
+        checkoutOrder.id,
+        amountToPay,
+        paymentMethod,
         paymentMethod === 'CASH' ? undefined : `TRX-${Date.now()}`
       );
-      toast.success('✅ Payment confirmed! Table cleared.');
+
+      const newPaidAmt = (billDetails.amount_paid || 0) + amountToPay;
+      if (newPaidAmt >= billDetails.total_amount) {
+        toast.success('✅ Payment confirmed! Table cleared.');
+      } else {
+        toast.success(`✅ Partial payment of ₹${amountToPay} applied!`);
+      }
 
       if (sendEbill) {
         if (!checkoutOrder.customer_phone) {
@@ -405,8 +513,13 @@ export default function WaiterDashboard() {
         }
       }
 
-      setCheckoutModalOpen(false); setCheckoutOrder(null); setBillDetails(null);
-      fetchInitialData();
+      if (newPaidAmt >= billDetails.total_amount) {
+        setCheckoutModalOpen(false); setCheckoutOrder(null); setBillDetails(null);
+      } else {
+        setBillDetails(updatedBill);
+        setPayingAmountInput('');
+      }
+      fetchOrdersOnly();
     } catch (e: any) { toast.error(e.response?.data?.detail || 'Payment failed'); }
     finally { setIsProcessingPayment(false); }
   };
@@ -499,6 +612,9 @@ export default function WaiterDashboard() {
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-bold text-emerald-700 hidden sm:block">Online</span>
           </div>
+          <button onClick={() => navigate('/waiter/aggregators')} className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center border border-slate-200 transition-colors tooltip-trigger" title="Aggregator Orders">
+            <ShoppingBag size={14} className="text-slate-500" />
+          </button>
           <button onClick={() => navigate('/dashboard')} className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center border border-slate-200 transition-colors">
             <LayoutGrid size={14} className="text-slate-500" />
           </button>
@@ -555,7 +671,7 @@ export default function WaiterDashboard() {
                 <p className="text-[13px] text-slate-500 mt-0.5 font-medium">{tables.length} tables · tap to manage orders</p>
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => { setSelectedTable(null); setOrderType('TAKEAWAY'); setView('order'); setCart([]); setEditingOrderId(null); }}
                   className="px-4 py-2 rounded-xl text-[12px] font-extrabold tracking-wide flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors uppercase"
                 >
@@ -567,57 +683,57 @@ export default function WaiterDashboard() {
             {/* Sections grid */}
             {!tables.every((t: any) => !t.category && !t.section) && (
               ['AC', 'Non-AC'].map(section => {
-              const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);
-              if (sectionTables.length === 0) return null;
-              return (
-                <div key={section}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full"
-                      style={section === 'AC'
-                        ? { background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }
-                        : { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }
-                      }
-                    >
-                      {section === 'AC' ? '❄️ AC Section' : '🌿 Non-AC Section'}
-                    </span>
-                    <div className="flex-1 h-px bg-slate-200" />
-                    <span className="text-[11px] text-slate-400 font-medium">{sectionTables.length} tables</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {sectionTables.map(table => {
-                      const isPending = (table as any).hasPendingCustomerOrder;
-                      const isOccupied = table.status === 'Occupied';
-                      
-                      const today = new Date().toISOString().split('T')[0];
-                      const tableReservations = reservations.filter(r => 
-                        r.table_id === table.id && 
-                        (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
-                        r.reservation_date.startsWith(today)
-                      );
-                      const isReserved = tableReservations.length > 0;
+                const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);
+                if (sectionTables.length === 0) return null;
+                return (
+                  <div key={section}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full"
+                        style={section === 'AC'
+                          ? { background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }
+                          : { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }
+                        }
+                      >
+                        {section === 'AC' ? '❄️ AC Section' : '🌿 Non-AC Section'}
+                      </span>
+                      <div className="flex-1 h-px bg-slate-200" />
+                      <span className="text-[11px] text-slate-400 font-medium">{sectionTables.length} tables</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {sectionTables.map(table => {
+                        const isPending = (table as any).hasPendingCustomerOrder;
 
-                      // Sprint 1: compute live data
-                      const tableOrders = activeOrders.filter(o => o.table_id === table.id && o.status !== 'SERVED');
-                      const tableAmount = tableOrders.reduce((sum, o) => sum + o.total_amount, 0);
-                      const earliestMs = tableOrders.length > 0 ? Math.min(...tableOrders.map(o => new Date(o.created_at).getTime())) : 0;
-                      const elapsedMins = earliestMs > 0 ? Math.floor((Date.now() - earliestMs) / 60000) : 0;
-                      const hasBillPrinted = tableOrders.some(o => o.payment_status === 'VERIFYING');
-                      const tStatusKey: TStatusKey = isPending ? 'customer' : hasBillPrinted ? 'printed' : isOccupied ? 'running' : isReserved ? 'reserved' : 'free';
-                      const tCfg = TABLE_STATUS_CONFIG[tStatusKey];
-                      
-                      return (
-                        <button
-                          key={table.id}
-                          onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
-                          className="relative group bg-white rounded-2xl transition-all duration-200 hover:-translate-y-1 overflow-hidden"
-                          style={{
-                            border: `1.5px solid ${tCfg.borderColor}`,
-                            boxShadow: tStatusKey !== 'free'
-                              ? `0 4px 24px ${tCfg.dotColor}30, 0 1px 4px rgb(0 0 0/.04)`
-                              : '0 1px 4px rgb(0 0 0/.04)',
-                          }}
-                        >
-                          {/* Top accent bar */}
+                        const today = new Date().toISOString().split('T')[0];
+                        const tableReservations = reservations.filter(r =>
+                          r.table_id === table.id &&
+                          (r.status === 'CONFIRMED' || r.payment_status === 'PAID') &&
+                          r.reservation_date.startsWith(today)
+                        );
+                        const isReserved = !!tableReservations.length;
+
+                        // Sprint 1: compute live data
+                        const tableOrders = activeOrders.filter(o => o.table_id === table.id);
+                        const isOccupied = tableOrders.length > 0;
+                        const tableAmount = tableOrders.reduce((sum, o) => sum + o.total_amount, 0);
+                        const earliestMs = tableOrders.length > 0 ? Math.min(...tableOrders.map(o => new Date(o.created_at).getTime())) : 0;
+                        const elapsedMins = earliestMs > 0 ? Math.floor((Date.now() - earliestMs) / 60000) : 0;
+                        const hasBillPrinted = tableOrders.some(o => o.payment_status === 'VERIFYING');
+                        const tStatusKey: TStatusKey = isPending ? 'customer' : hasBillPrinted ? 'printed' : isOccupied ? 'running' : isReserved ? 'reserved' : 'free';
+                        const tCfg = TABLE_STATUS_CONFIG[tStatusKey];
+
+                        return (
+                          <button
+                            key={table.id}
+                            onClick={() => { setSelectedTable(table); setOrderType('DINE_IN'); setView('order'); setCart([]); setEditingOrderId(null); }}
+                            className="relative group bg-white rounded-2xl transition-all duration-200 hover:-translate-y-1 overflow-hidden"
+                            style={{
+                              border: `1.5px solid ${tCfg.borderColor}`,
+                              boxShadow: tStatusKey !== 'free'
+                                ? `0 4px 24px ${tCfg.dotColor}30, 0 1px 4px rgb(0 0 0/.04)`
+                                : '0 1px 4px rgb(0 0 0/.04)',
+                            }}
+                          >
+                            {/* Top accent bar */}
                             <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${tCfg.dotColor}, ${tCfg.dotColor}80)` }} />
                             <div className="p-3.5">
                               {/* Timer + Amount row */}
@@ -649,17 +765,17 @@ export default function WaiterDashboard() {
                                 style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1px solid ${tCfg.borderColor}` }}
                               >
                                 {tStatusKey === 'reserved' && tableReservations.length > 0
-                                  ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}`
+                                  ? `Rsrv ${tableReservations[0].reservation_time.substring(0, 5)}`
                                   : tCfg.label}
                               </div>
                             </div>
                           </button>
                         );
-                    })}
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })
             )}
 
             {/* Fallback (if no section data) */}
@@ -667,12 +783,11 @@ export default function WaiterDashboard() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {tables.map(table => {
                   const isPending = (table as any).hasPendingCustomerOrder;
-                  const isOccupied = table.status === 'Occupied';
-                  
+
                   const today = new Date().toISOString().split('T')[0];
-                  const tableReservations = reservations.filter(r => 
-                    r.table_id === table.id && 
-                    (r.status === 'CONFIRMED' || r.payment_status === 'PAID') && 
+                  const tableReservations = reservations.filter(r =>
+                    r.table_id === table.id &&
+                    (r.status === 'CONFIRMED' || r.payment_status === 'PAID') &&
                     r.reservation_date.startsWith(today)
                   );
                   const isReserved = tableReservations.length > 0;
@@ -683,9 +798,10 @@ export default function WaiterDashboard() {
                   const earliestMs = tableOrders.length > 0 ? Math.min(...tableOrders.map(o => new Date(o.created_at).getTime())) : 0;
                   const elapsedMins = earliestMs > 0 ? Math.floor((Date.now() - earliestMs) / 60000) : 0;
                   const hasBillPrinted = tableOrders.some(o => o.payment_status === 'VERIFYING');
+                  const isOccupied = tableOrders.length > 0;
                   const tStatusKey: TStatusKey = isPending ? 'customer' : hasBillPrinted ? 'printed' : isOccupied ? 'running' : isReserved ? 'reserved' : 'free';
                   const tCfg = TABLE_STATUS_CONFIG[tStatusKey];
-                  
+
                   return (
                     <button
                       key={table.id}
@@ -730,7 +846,7 @@ export default function WaiterDashboard() {
                           style={{ background: tCfg.bgGrad, color: tCfg.color, border: `1px solid ${tCfg.borderColor}` }}
                         >
                           {tStatusKey === 'reserved' && tableReservations.length > 0
-                            ? `Rsrv ${tableReservations[0].reservation_time.substring(0,5)}`
+                            ? `Rsrv ${tableReservations[0].reservation_time.substring(0, 5)}`
                             : tCfg.label}
                         </div>
                       </div>
@@ -849,7 +965,7 @@ export default function WaiterDashboard() {
                               <div className={`w-1.5 h-1.5 rounded-xs ${item.is_veg ? 'bg-emerald-600' : 'bg-rose-600'}`} />
                             </div>
                           </div>
-                          
+
                           <div className="flex flex-col items-end gap-1.5">
                             <span className="text-[13px] font-extrabold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 tracking-tight">₹{item.price}</span>
                             {inCart && (
@@ -957,7 +1073,7 @@ export default function WaiterDashboard() {
 
               {/* Live orders for this table */}
               {(() => {
-                const liveOrders = activeOrders.filter(o => o.table_id === selectedTable?.id && o.status !== 'SERVED');
+                const liveOrders = activeOrders.filter(o => o.table_id === selectedTable?.id);
                 if (!liveOrders.length) return null;
                 return (
                   <div>
@@ -1303,7 +1419,7 @@ export default function WaiterDashboard() {
                       {checkoutOrder.order_type === 'TAKEAWAY' ? '📦 Parcel' : `Table ${tables.find(t => t.id === checkoutOrder.table_id)?.table_number || '?'}`}
                     </h2>
                   </div>
-                  <button onClick={() => !isProcessingPayment && setCheckoutModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                  <button onClick={() => !isProcessingPayment && handleCloseCheckout()} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
                     <X size={15} />
                   </button>
                 </div>
@@ -1464,8 +1580,22 @@ export default function WaiterDashboard() {
 
                   {/* Amount reminder */}
                   <div className="rounded-xl p-3.5 border flex justify-between items-center" style={{ background: '#eef2ff', borderColor: '#c7d2fe' }}>
-                    <span className="text-[13px] font-semibold text-indigo-800">Amount to Pay</span>
-                    <span className="text-[20px] font-extrabold text-indigo-700">₹{grandTotal.toFixed(2)}</span>
+                    <span className="text-[13px] font-semibold text-indigo-800">Remaining Amount to Pay</span>
+                    <span className="text-[20px] font-extrabold text-indigo-700">₹{(billDetails?.total_amount - (billDetails?.amount_paid || 0)).toFixed(2)}</span>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-3.5 border border-slate-200">
+                    <span className="text-[12px] font-bold text-slate-600 block mb-2">Paying Now (Edit for split/partial payment)</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[14px] font-bold text-slate-400">₹</span>
+                      <input
+                        type="number"
+                        className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-[14px] font-bold text-slate-800 focus:outline-none focus:border-indigo-400"
+                        placeholder={(billDetails?.total_amount - (billDetails?.amount_paid || 0)).toFixed(2)}
+                        value={payingAmountInput}
+                        onChange={e => setPayingAmountInput(e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   {/* Payment methods */}
@@ -1587,7 +1717,7 @@ export default function WaiterDashboard() {
       </div>
       {/* ── RECEIPTS OVERLAY ── */}
       {printingOrder && (
-        <ReceiptPrinter 
+        <ReceiptPrinter
           order={printingOrder}
           tableNumber={tables.find(t => t.id === printingOrder.table_id)?.table_number}
           restaurantName={localStorage.getItem('restaurantName') || 'MyRestro'}
@@ -1626,8 +1756,8 @@ export default function WaiterDashboard() {
                   key={reason}
                   onClick={() => setSelectedReason(reason)}
                   className="w-full px-3.5 py-2.5 rounded-xl text-left text-[13px] font-semibold flex items-center justify-between transition-all"
-                  style={selectedReason === reason 
-                    ? { background: '#fff1f2', color: '#be123c', border: '1.5px solid #f43f5e', fontWeight: 700 } 
+                  style={selectedReason === reason
+                    ? { background: '#fff1f2', color: '#be123c', border: '1.5px solid #f43f5e', fontWeight: 700 }
                     : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
                 >
                   <span>{reason}</span>
@@ -1667,11 +1797,75 @@ export default function WaiterDashboard() {
       )}
 
       {/* 3D AR DISH PREVIEW MODAL */}
-      <DishARViewerModal
-        item={selectedItemForAR}
-        onClose={() => setSelectedItemForAR(null)}
-        onAddToCart={() => selectedItemForAR && handleAddToCartClick(selectedItemForAR)}
-      />
+      {selectedItemForAR && (
+        <DishARViewerModal
+          item={selectedItemForAR}
+          onClose={() => setSelectedItemForAR(null)}
+          onAddToCart={() => handleAddToCartClick(selectedItemForAR)}
+        />
+      )}
+
+      {/* DUE CUSTOMER MODAL */}
+      {showDueCustomerModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl shadow-indigo-900/20 border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="px-5 pt-5 pb-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-[16px] font-extrabold text-indigo-900">Customer Details Required</h3>
+                <p className="text-[12px] text-indigo-700/80 font-medium mt-0.5 leading-snug">
+                  Please capture details for the due balance of ₹{(billDetails?.total_amount - (billDetails?.amount_paid || 0)).toFixed(2)}.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowDueCustomerModal(false)}
+                className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 hover:bg-indigo-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleDueCustomerSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Customer Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dueCustomerName}
+                  onChange={e => setDueCustomerName(e.target.value)}
+                  className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  placeholder="E.g. Rahul Sharma"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  pattern="[0-9]{10}"
+                  maxLength={10}
+                  value={dueCustomerPhone}
+                  onChange={e => setDueCustomerPhone(e.target.value.replace(/\D/g, ''))}
+                  className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  placeholder="10-digit number"
+                />
+              </div>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmittingCustomer || dueCustomerName.trim().length === 0 || dueCustomerPhone.length !== 10}
+                  className="w-full h-12 rounded-xl text-[14px] font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}
+                >
+                  {isSubmittingCustomer ? <Loader2 size={18} className="animate-spin" /> : 'Save & Close'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

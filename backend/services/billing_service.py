@@ -77,6 +77,11 @@ def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, r
             # Trigger CRM & cash register via the service but AFTER our single commit
             # We pass db without committing inside — the commit below covers everything
             _handle_order_paid_side_effects(db, order, restaurant_id, payload.payment_method)
+    else:
+        bill.status = PaymentStatus.PARTIAL
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if order:
+            order.payment_status = 'PARTIAL'
             
     db.commit()  # Single commit covers bill, txn, and order status
     db.refresh(bill)

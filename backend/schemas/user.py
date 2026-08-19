@@ -25,6 +25,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: UUID
     allowed_categories: Optional[list[str]] = None
+    can_settle_orders: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None

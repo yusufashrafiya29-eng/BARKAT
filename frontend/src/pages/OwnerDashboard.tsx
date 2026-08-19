@@ -28,6 +28,7 @@ import DiscountsTab from '../components/owner-dashboard/DiscountsTab';
 import ExpensesTab from '../components/owner-dashboard/ExpensesTab';
 import FranchiseCommissaryTab from '../components/owner-dashboard/FranchiseCommissaryTab';
 import AggregatorOrdersTab from '../components/owner-dashboard/AggregatorOrdersTab';
+import { AggregatorMappingTab } from '../components/owner-dashboard/AggregatorMappingTab';
 import LiveTelemetryBanner from '../components/LiveTelemetryBanner';
 
 // Interfaces
@@ -45,7 +46,7 @@ interface MenuItem {
 
 
 
-type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'billing' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support' | 'day_end' | 'discounts' | 'expenses' | 'commissary' | 'aggregators';
+type TabType = 'analytics' | 'orders' | 'staff' | 'menu' | 'tables' | 'inventory' | 'settings' | 'billing' | 'reports' | 'reservations' | 'cash_register' | 'crm' | 'support' | 'day_end' | 'discounts' | 'expenses' | 'commissary' | 'aggregators' | 'aggregator_mapping';
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
@@ -390,6 +391,7 @@ export default function OwnerDashboard() {
             {[
               { id: 'commissary', label: 'Central Kitchen HQ', icon: Building2 },
               { id: 'aggregators', label: 'Aggregator Net Hub', icon: Truck },
+              { id: 'aggregator_mapping', label: 'Item Mapping', icon: ShoppingBag },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -542,6 +544,7 @@ export default function OwnerDashboard() {
               {activeTab === 'expenses' && <ExpensesTab />}
               {activeTab === 'commissary' && <FranchiseCommissaryTab />}
               {activeTab === 'aggregators' && <AggregatorOrdersTab />}
+              {activeTab === 'aggregator_mapping' && <AggregatorMappingTab />}
             </div>
           )}
         </div>

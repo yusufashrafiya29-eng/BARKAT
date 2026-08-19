@@ -8,7 +8,7 @@ interface LiveTelemetryBannerProps {
 }
 
 export default function LiveTelemetryBanner({ activeOrdersCount }: LiveTelemetryBannerProps = {}) {
-  const { analytics } = useOwnerStore();
+  const analytics = useOwnerStore(state => state.analytics);
   const [broadcastMessage, setBroadcastMessage] = useState<string | null>(null);
   const [tickerIndex, setTickerIndex] = useState(0);
   const [isOfflineLAN, setIsOfflineLAN] = useState(false);

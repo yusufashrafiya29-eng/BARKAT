@@ -37,6 +37,14 @@ export default function StaffTab() {
     } catch { toast.error("Update failed"); }
   };
 
+  const handleToggleSettlePermission = async (id: string, currentVal: boolean) => {
+    try {
+      await ownerApi.updateStaffPermissions(id, !currentVal);
+      toast.success("Permissions updated");
+      fetchData();
+    } catch { toast.error("Failed to update permissions"); }
+  };
+
   const openAccessModal = (user: any) => {
     setSelectedStaff(user);
     setSelectedCategories(user.allowed_categories || []);
@@ -149,7 +157,7 @@ export default function StaffTab() {
               <tr className="border-b border-subtle bg-subtle/50">
                 <th className="px-5 py-3 text-[12px] font-medium text-muted">Team Member</th>
                 <th className="px-5 py-3 text-[12px] font-medium text-muted">Role</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-muted">Menu Access</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-muted">Permissions</th>
                 <th className="px-5 py-3 text-[12px] font-medium text-muted text-right">Actions</th>
               </tr>
             </thead>
@@ -178,34 +186,41 @@ export default function StaffTab() {
                     </select>
                   </td>
                   <td className="px-5 py-3">
-                    {user.role === 'RUNNER' ? (
-                      <div className="flex items-center gap-2">
-                        {(!user.allowed_categories || user.allowed_categories.length === 0) ? (
-                          <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">Setup Required</span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">{user.allowed_categories.length} Categories Only</span>
-                        )}
-                        <button 
-                          onClick={() => openAccessModal(user)}
-                          className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="Edit Menu Access"
-                        >
-                          <Settings2 size={14} />
-                        </button>
-                      </div>
+                    {['WAITER', 'RUNNER'].includes(user.role) ? (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={user.can_settle_orders !== false}
+                          onChange={() => handleToggleSettlePermission(user.id, user.can_settle_orders !== false)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-500"
+                        />
+                        <span className="text-[11px] font-medium text-slate-600">Can Settle Orders</span>
+                      </label>
                     ) : (
                       <span className="text-[11px] text-slate-400">—</span>
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    {user.role !== 'OWNER' && (
-                      <button
-                        onClick={() => handleDeleteStaff(user.id)}
-                        className="text-muted hover:text-rose-500 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {['WAITER', 'RUNNER'].includes(user.role) && (
+                        <button
+                          onClick={() => openAccessModal(user)}
+                          className="text-indigo-500 hover:text-indigo-600 transition-colors p-1"
+                          title="Menu Access"
+                        >
+                          <Settings2 size={15} />
+                        </button>
+                      )}
+                      {user.role !== 'OWNER' && (
+                        <button
+                          onClick={() => handleDeleteStaff(user.id)}
+                          className="text-muted hover:text-rose-500 transition-colors p-1"
+                          title="Remove Staff"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

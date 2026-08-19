@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
-import '@google/model-viewer'
 import { reticle, install } from '@reticlehq/react'
 
 if (import.meta.env.DEV) {

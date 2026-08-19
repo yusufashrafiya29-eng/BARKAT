@@ -300,12 +300,17 @@ def get_advanced_report(
     from sqlalchemy import func
 
     # 1. Fetch Orders
-    orders = db.query(Order).filter(
+    query = db.query(Order).filter(
         Order.restaurant_id == restaurant_id,
-        Order.status == OrderStatus.SERVED,
         func.date(Order.created_at) >= start_date,
         func.date(Order.created_at) <= end_date
-    ).all()
+    )
+    if report_type == "due_payments":
+        query = query.filter(Order.payment_status == 'PARTIAL')
+    else:
+        query = query.filter(Order.status == OrderStatus.SERVED)
+        
+    orders = query.all()
 
     # 2. Extract IDs and batch fetch related data for fast lookup
     order_ids = [o.id for o in orders]
@@ -351,6 +356,9 @@ def get_advanced_report(
     total_net = 0.0
     total_tax = 0.0
     total_sales = 0.0
+    total_amount_overall = 0.0
+    total_amount_paid = 0.0
+    total_due_amount = 0.0
 
     # Execute Grouping Strategy
     if report_type in ["category", "item"]:
@@ -452,7 +460,7 @@ def get_advanced_report(
             total_tax += getattr(o, 'tax_amount', 0.0)
             total_sales += order_sales
 
-    elif report_type in ["captain", "employee", "assignee"]:
+    elif report_type in ["employee", "assignee"]:
         for o in orders:
             key = waiter_map.get(o.waiter_id, "Self Service / Online")
             
@@ -581,6 +589,29 @@ def get_advanced_report(
             total_net += (oim.price_at_order_time * oim.order_item.quantity)
             total_sales += (oim.price_at_order_time * oim.order_item.quantity)
 
+    elif report_type == "due_payments":
+        for o in orders:
+            local_dt = o.created_at.astimezone() if o.created_at.tzinfo else o.created_at
+            
+            b = next((b for b in bills if b.order_id == o.id), None)
+            amount_paid = b.amount_paid if b else 0.0
+            total_amt = getattr(o, 'total_amount', 0.0)
+            
+            key = str(o.id)
+            grouped_data[key] = {
+                "label": f"{o.customer_name or 'Walk-in'} / #{str(o.id)[-4:]}",
+                "customer_phone": o.customer_phone,
+                "total_amount": total_amt,
+                "amount_paid": amount_paid,
+                "due_amount": total_amt - amount_paid,
+                "date": local_dt.strftime("%d %b %Y %I:%M %p"),
+                "order_id": str(o.id),
+                "sales": 0.0 # for sorting
+            }
+            total_amount_overall += total_amt
+            total_amount_paid += amount_paid
+            total_due_amount += (total_amt - amount_paid)
+
     else:
         # Fallback for Group
         grouped_data["Not Applicable"] = {
@@ -617,6 +648,9 @@ def get_advanced_report(
             "tax": round(total_tax, 2),
             "sales": round(total_sales, 2),
             "orders": len(orders),
-            "items": sum([oi.quantity for oi in order_items]) if order_items else 0
+            "items": sum([oi.quantity for oi in order_items]) if order_items else 0,
+            "total_amount": round(total_amount_overall, 2),
+            "amount_paid": round(total_amount_paid, 2),
+            "due_amount": round(total_due_amount, 2)
         }
     }

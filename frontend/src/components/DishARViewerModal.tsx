@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Sparkles, RotateCw, ZoomIn, Smartphone, Share2, ShieldCheck, Flame, Utensils, Award, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
+import '@google/model-viewer';
 
 const ModelViewer = 'model-viewer' as any;
 

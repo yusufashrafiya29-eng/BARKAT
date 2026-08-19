@@ -40,13 +40,11 @@ class User(Base):
 
 
     # Local password hash — only used in dev mode (when Supabase is not configured).
-    # In production, Supabase Auth handles passwords; this column stays NULL.
     password_hash = Column(String, nullable=True)
-
-    # RBAC Menu restrictions for specialized waiters
-    allowed_categories = Column(JSON, default=list, nullable=False)
-
-    # Audit timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    
+    allowed_categories = Column(JSON, nullable=True) # For Runner
+    can_settle_orders = Column(Boolean, default=False)

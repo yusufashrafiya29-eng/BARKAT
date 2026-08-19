@@ -5,6 +5,18 @@ from uuid import UUID
 from datetime import datetime
 from models.order import OrderStatus
 
+class TableSimpleRead(BaseModel):
+    id: UUID
+    table_number: int
+    class Config:
+        from_attributes = True
+
+class MenuItemSimpleRead(BaseModel):
+    id: UUID
+    name: str
+    class Config:
+        from_attributes = True
+
 class OrderItemModifierBase(BaseModel):
     modifier_id: UUID
 
@@ -44,6 +56,7 @@ class OrderItemRead(BaseModel):
     status: str = "PENDING"
     is_parcel: bool = False
     modifiers: List[OrderItemModifierRead] = []
+    menu_item: Optional[MenuItemSimpleRead] = None
 
     class Config:
         from_attributes = True
@@ -74,6 +87,7 @@ class OrderRead(BaseModel):
     id: UUID
     restaurant_id: UUID
     table_id: Optional[UUID] = None
+    table: Optional[TableSimpleRead] = None
     order_type: str
     waiter_id: Optional[UUID] = None
     customer_phone: Optional[str] = None
@@ -114,6 +128,10 @@ class OrderUpdateItems(BaseModel):
 
 class OrderItemStatusUpdate(BaseModel):
     status: str
+
+class OrderUpdateCustomer(BaseModel):
+    customer_name: str
+    customer_phone: str
 
 class ClearHistoryRequest(BaseModel):
     password: str

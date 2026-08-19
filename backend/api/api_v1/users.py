@@ -167,6 +167,27 @@ def update_staff_access(
     db.refresh(user)
     return user
 
+class PermissionsUpdateRequest(BaseModel):
+    can_settle_orders: bool
+
+@router.put("/staff/{user_id}/permissions", response_model=UserRead)
+def update_staff_permissions(
+    user_id: UUID,
+    payload: PermissionsUpdateRequest,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Update general permissions of a staff member (waiter)."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.can_settle_orders = payload.can_settle_orders
+    db.commit()
+    db.refresh(user)
+    return user
+
 @router.get("/announcements/active", response_model=List[AnnouncementResponse])
 def get_active_announcements(
     db: Session = Depends(get_db),

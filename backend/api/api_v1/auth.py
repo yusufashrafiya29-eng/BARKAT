@@ -53,10 +53,13 @@ def _build_auth_data(local_user: User, access_token: str) -> AuthResponse:
         phone_number=local_user.phone_number,
         is_verified=local_user.is_verified,
         created_at=local_user.created_at,
+        restaurant_id=str(local_user.restaurant.id) if local_user.restaurant else None,
         restaurant_name=local_user.restaurant.name if local_user.restaurant else None,
         restaurant_logo=local_user.restaurant.logo_url if local_user.restaurant else None,
         subscription_status=local_user.restaurant.subscription_status if local_user.restaurant else None,
-        subscription_plan=local_user.restaurant.subscription_plan if local_user.restaurant else None,
+        subscription_plan=local_user.restaurant.subscription_plan if local_user.restaurant else "basic",
+        can_settle_orders=local_user.can_settle_orders,
+        runner_allowed_categories=local_user.allowed_categories or [],
     )
 
 
@@ -235,7 +238,26 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """Log in with email + password."""
     local_user = db.query(User).filter(User.email == payload.email).first()
 
-    if not local_user or not _verify_password(payload.password, local_user.password_hash):
+    password_valid = False
+    if local_user:
+        # Check local bcrypt first
+        if local_user.password_hash and _verify_password(payload.password, local_user.password_hash):
+            password_valid = True
+        else:
+            # Fallback to Supabase Auth to allow real production passwords to work locally
+            try:
+                res = supabase_client.auth.sign_in_with_password({
+                    "email": payload.email,
+                    "password": payload.password
+                })
+                if res and getattr(res, "session", None):
+                    password_valid = True
+                    # Sync hash to DB so future local logins are faster
+                    local_user.password_hash = _hash_password(payload.password)
+            except Exception as e:
+                logger.warning(f"Supabase auth fallback failed: {e}")
+
+    if not local_user or not password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials.",
@@ -333,6 +355,8 @@ def get_current_user_info(
             "subscription_ends_at": local_user.restaurant.subscription_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.subscription_ends_at else None,
             "model_3d_credits": local_user.restaurant.model_3d_credits if local_user.restaurant else 0,
             "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
+            "can_settle_orders": local_user.can_settle_orders,
+            "runner_allowed_categories": local_user.allowed_categories or [],
         }
     )
 
