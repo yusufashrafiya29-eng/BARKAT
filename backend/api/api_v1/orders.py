@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from api.deps import get_db, get_current_user_token, get_current_restaurant
-from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate, ClearHistoryRequest
+from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate, ClearHistoryRequest, OrderUpdateCustomer
 from services import order_service
 from models.order import OrderStatus
 from models.notification import MessageType
@@ -66,6 +66,29 @@ def pull_kds_orders(
     """Strictly fetches PENDING and PREPARING orders for Kitchen displays that are accepted."""
     return order_service.get_active_kitchen_orders(db, str(restaurant_id))
 
+@router.get("/waiter/stats")
+def get_waiter_stats(
+    db: Session = Depends(get_db),
+    user_token: dict = Depends(get_current_user_token),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Fetches simple daily stats for the waiter dashboard."""
+    from models.order import Order, OrderStatus
+    from datetime import datetime, timezone, time
+    
+    today_start = datetime.combine(datetime.now(timezone.utc).date(), time.min).replace(tzinfo=timezone.utc)
+    
+    # In a full implementation, we'd filter by user_token['sub'] if waiter_id was strictly tracked
+    daily_orders = db.query(Order).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.created_at >= today_start
+    ).all()
+    
+    return {
+        "orders_today": len(daily_orders),
+        "tips_collected": sum([o.tip_amount for o in daily_orders if o.tip_amount])
+    }
+
 @router.get("/waiter/active", response_model=List[OrderRead])
 def pull_waiter_orders(
     db: Session = Depends(get_db),
@@ -78,8 +101,8 @@ def pull_waiter_orders(
     return db.query(Order).options(joinedload(Order.items)).outerjoin(Bill, Order.id == Bill.order_id).filter(
         Order.restaurant_id == restaurant_id,
         Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
-        (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED),
-        Order.payment_status != 'PAID'
+        (Bill.id == None) | (~Bill.status.in_([PaymentStatus.COMPLETED, PaymentStatus.PARTIAL])),
+        Order.payment_status.notin_(['PAID', 'PARTIAL'])
     ).order_by(Order.created_at.desc()).all()
 
 @router.get("/table/{table_id}", response_model=List[OrderRead])
@@ -134,6 +157,20 @@ def update_order_status(
                 "Your food is ready!"
             )
             
+    # Aggregator Sync Hook
+    from models.aggregator import AggregatorOrder
+    agg_order = db.query(AggregatorOrder).filter(AggregatorOrder.order_id == order_id).first()
+    if agg_order:
+        if order.status == OrderStatus.PREPARING:
+            agg_order.status = "KITCHEN_PREPARING"
+        elif order.status == OrderStatus.READY:
+            agg_order.status = "READY_FOR_RIDER"
+        elif order.status == OrderStatus.DELIVERED:
+            agg_order.status = "DELIVERED"
+        db.commit()
+        # TODO: Integrate Dyno APIs status sync here once the API Key is available
+        # sync_status_to_dams(agg_order.platform_order_id, agg_order.status)
+            
     notify_kds(background_tasks, str(restaurant_id), order.id, db)
     return order
 
@@ -183,6 +220,18 @@ def update_order_items(
     )
     notify_kds(background_tasks, str(restaurant_id), order.id, db)
     return order
+
+@router.patch("/{order_id}/customer", response_model=OrderRead)
+def update_order_customer_details(
+    order_id: UUID,
+    customer_update: OrderUpdateCustomer,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return order_service.update_order_customer(
+        db, order_id, customer_update.customer_name, 
+        customer_update.customer_phone, str(restaurant_id)
+    )
 
 @router.get("/history/owner")
 def get_owner_order_history(

@@ -17,5 +17,6 @@ from .enterprise import (
     BranchOutlet, CentralStockItem, StockTransfer
 )
 from .aggregator import AggregatorOrder
+from .aggregator_item_map import AggregatorItemMapping
 from .customer import Customer
 from .reservation import Reservation

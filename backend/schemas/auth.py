@@ -55,10 +55,14 @@ class AuthResponse(BaseModel):
     phone_number: Optional[str] = None
     is_verified: bool = False
     created_at: Optional[datetime] = None
+    restaurant_id: Optional[str] = None
     restaurant_name: Optional[str] = None
     restaurant_logo: Optional[str] = None
     subscription_status: Optional[str] = None
     subscription_plan: Optional[str] = None
+    
+    can_settle_orders: bool = True
+    runner_allowed_categories: list[str] = []
 
 
 class GenericResponse(BaseModel):

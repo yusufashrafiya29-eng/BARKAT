@@ -98,7 +98,10 @@ def update_upi_id(
         raise HTTPException(status_code=403, detail="Owner access required")
     
     settings_service.set_config_value(db, "upi_id", config_in.upi_id, str(restaurant_id))
-    return {"upi_id": config_in.upi_id}
+    return config_in
+
+from pydantic import BaseModel
+
 
 @router.get("/razorpay", response_model=RazorpayConfig)
 def get_razorpay_keys(

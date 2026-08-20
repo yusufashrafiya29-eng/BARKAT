@@ -1,0 +1,6 @@
+2026-08-18 21:33:20,841 - cover_agent.UnitTestValidator - ERROR - Error during initial test suite analysis: RetryError[<Future at 0x1b6b27c0290 state=finished raised BadRequestError>]
+aming: litellm.BadRequestError: VertexAIException BadRequestError - b'{\n  "error": {\n    "code": 400,\n    "message": "This model only supports Interactions API.",\n    "status": "INVALID_ARGUMENT"\n  }\n}\n'
+2026-08-18 21:33:18,750 - cover_agent.AICaller - INFO - Streaming results from LLM model...
+2026-08-18 21:33:19,179 - cover_agent.AICaller - ERROR - Error calling LLM model during streaming: litellm.BadRequestError: VertexAIException BadRequestError - b'{\n  "error": {\n    "code": 400,\n    "message": "This model only supports Interactions API.",\n    "status": "INVALID_ARGUMENT"\n  }\n}\n'
+2026-08-18 21:33:20,374 - cover_agent.AICaller - INFO - Streaming results from LLM model...
+2026-08-18 21:33:20,841 - cover_agent.AICaller - ERROR - Error calling LLM model during streaming: litellm.BadRequestError: VertexAIException BadRequestError - b'{\n  "error": {\n    "code": 400,\n    "message": "This model only supports Interactions API.",\n    "status": "INVALID_ARGUMENT"\n  }\n}\n'

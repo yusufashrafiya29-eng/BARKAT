@@ -33,7 +33,12 @@ class AggregatorOrder(Base):
     net_payout = Column(Float, default=0.0, nullable=False)
     
     # Status tracking
-    status = Column(String, default="NEW", nullable=False) # NEW, KITCHEN_PREPARING, READY_FOR_RIDER
+    status = Column(String, default="NEW", nullable=False) # NEW, KITCHEN_PREPARING, READY_FOR_RIDER, REJECTED
+    is_accepted = Column(Boolean, default=False, nullable=False)
+    rejection_reason = Column(String, nullable=True)
+    
+    # Internal Link (Populated when accepted)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
     
     # Rider Info
     rider_name = Column(String, nullable=True)
@@ -48,3 +53,4 @@ class AggregatorOrder(Base):
 
     # Relationships
     restaurant = relationship("Restaurant")
+    order = relationship("Order")

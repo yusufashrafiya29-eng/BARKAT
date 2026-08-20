@@ -5,7 +5,7 @@ import { ownerApi } from '../../api/owner';
 import { useOwnerStore } from '../../store/ownerStore';
 
 export default function SettingsTab() {
-  const { upiId, razorpayKeys, fetchData, setFormLoading, formLoading } = useOwnerStore();
+  const { upiId, razorpayKeys, fetchData, setFormLoading, formLoading, menuCategories } = useOwnerStore();
   const [integrations, setIntegrations] = useState({ zomato_store_id: '', swiggy_store_id: '' });
   const [printerConfig, setPrinterConfig] = useState({
     enable_printing: localStorage.getItem('enable_printing') === 'true',
@@ -127,9 +127,11 @@ export default function SettingsTab() {
     setFormLoading(false);
   };
 
+
+
   return (
     <div className="max-w-xl">
-    
+
       {/* PROFILE SETTINGS */}
       <div className="surface p-6 mb-6">
         <h3 className="text-[15px] font-medium mb-1">Restaurant Profile</h3>
@@ -295,7 +297,7 @@ export default function SettingsTab() {
           <Printer size={18} className="text-indigo-600" />
           Hardware Printer Configuration
         </h3>
-        <p className="text-[13px] text-muted mb-6">Configure receipt and KOT printing for Waiter and Captain apps.</p>
+        <p className="text-[13px] text-muted mb-6">Configure receipt and KOT printing for thermal and network printers.</p>
 
         <form onSubmit={handleSavePrinter} className="space-y-4">
           <div className="flex items-center gap-3 mb-2">

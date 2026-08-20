@@ -74,6 +74,11 @@ export const waiterApi = {
     return response.data;
   },
 
+  updateCustomerInfo: async (orderId: string, name: string, phone: string) => {
+    const response = await axios.patch(`${BASE_URL}/orders/${orderId}/customer`, { customer_name: name, customer_phone: phone }, getHeaders());
+    return response.data;
+  },
+
   updatePaymentStatus: async (orderId: string, payment_status: string) => {
     const response = await axios.put(`${BASE_URL}/orders/${orderId}/payment-status`, { payment_status }, getHeaders());
     return response.data;

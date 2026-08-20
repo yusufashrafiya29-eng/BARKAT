@@ -38,6 +38,11 @@ export const ownerApi = {
     return response.data;
   },
 
+  updateStaffPermissions: async (userId: string, can_settle_orders: boolean) => {
+    const response = await axios.put(`${BASE_URL}/users/staff/${userId}/permissions`, { can_settle_orders }, getHeaders());
+    return response.data;
+  },
+
   // Menu Modifications
   addCategory: async (payload: any) => {
     const response = await axios.post(`${BASE_URL}/menu/categories`, payload, getHeaders());

@@ -48,7 +48,7 @@ def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> 
     if order_in.table_id:
         existing_order = db.query(Order).filter(
             Order.table_id == order_in.table_id,
-            Order.payment_status != 'PAID',
+            Order.payment_status.notin_(['PAID', 'PARTIAL']),
             Order.status != OrderStatus.CANCELLED
         ).first()
 
@@ -343,6 +343,17 @@ def clear_order_history(db: Session, restaurant_id: str, password: str, user_id:
         
     db.commit()
     return {"message": f"Successfully cleared {count} historical orders", "count": count}
+
+def update_order_customer(db: Session, order_id: UUID, customer_name: str, customer_phone: str, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order.customer_name = customer_name
+    order.customer_phone = customer_phone
+    db.commit()
+    db.refresh(order)
+    return order
 
 def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str, status: str = None, customer_name: str = None, customer_phone: str = None, guests_count: int = None, tip_amount: float = None) -> Order:
     order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()

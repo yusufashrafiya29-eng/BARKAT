@@ -186,11 +186,12 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
           set({ customers: crmRes });
           break;
         case 'settings':
-          const [payResData, rzpResData] = await Promise.all([
+          const [payResData, rzpResData, menuResData] = await Promise.all([
             ownerApi.getUpiId(),
-            ownerApi.getRazorpayKeys()
+            ownerApi.getRazorpayKeys(),
+            waiterApi.getMenu()
           ]);
-          set({ upiId: payResData.upi_id || '', razorpayKeys: rzpResData });
+          set({ upiId: payResData.upi_id || '', razorpayKeys: rzpResData, menuCategories: menuResData });
           break;
       }
     } catch (err: any) {
@@ -251,11 +252,12 @@ export const useOwnerStore = create<OwnerState>((set, get) => ({
           set({ customers: crmResSil });
           break;
         case 'settings':
-          const [payRes, rzpRes] = await Promise.all([
+          const [payRes, rzpRes, menuResSil] = await Promise.all([
             ownerApi.getUpiId(),
-            ownerApi.getRazorpayKeys()
+            ownerApi.getRazorpayKeys(),
+            waiterApi.getMenu()
           ]);
-          set({ upiId: payRes.upi_id || '', razorpayKeys: rzpRes });
+          set({ upiId: payRes.upi_id || '', razorpayKeys: rzpRes, menuCategories: menuResSil });
           break;
       }
     } catch (err) {
