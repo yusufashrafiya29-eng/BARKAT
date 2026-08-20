@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -19,7 +19,7 @@ class PaymentTransactionRead(BaseModel):
 
 class BillBase(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.CASH
-    discount_amount: float = 0.0
+    discount_amount: float = Field(default=0.0, ge=0.0)
 
 class BillCreate(BillBase):
     pass

@@ -147,8 +147,11 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
     # --- Process Payload ---
     try:
         payload = json.loads(body.decode('utf-8'))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    except Exception as e:
+        logger.exception("Unexpected error parsing Razorpay webhook payload")
+        raise HTTPException(status_code=400, detail="Invalid request payload")
 
     event = payload.get('event')
     logger.info(f"Razorpay webhook received event: {event}")

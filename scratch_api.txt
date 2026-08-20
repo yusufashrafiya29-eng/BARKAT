@@ -1,0 +1,4422 @@
+\n--- backend/api\deps.py ---\nfrom fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from db.session import SessionLocal
+from core.config import settings
+import jwt
+from jwt.exceptions import InvalidTokenError
+from typing import Generator
+
+security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
+
+def get_db() -> Generator[Session, None, None]:
+    """Dependency to generate a database session per HTTP request."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verifies the JWT token from the Authorization header using our secret."""
+    try:
+        # Supabase signs JWTs with HS256 algorithm and the project's JWT Secret.
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} 
+            # Note: audience verification can be enabled if required (usually 'authenticated')
+        )
+        return payload
+    except InvalidTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials - Token invalid or expired.",
+        )
+
+def get_optional_user_token(credentials: HTTPAuthorizationCredentials = Depends(optional_security)) -> dict:
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} 
+        )
+        return payload
+    except InvalidTokenError:
+        return None
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    token_payload: dict = Depends(get_current_user_token)
+):
+    from models.user import User
+    user_email = token_payload.get("email")
+    if not user_email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+    
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
+    return user
+
+def get_current_restaurant(user = Depends(get_current_user)):
+    if not user.restaurant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="User is not linked to any restaurant."
+        )
+    return user.restaurant_id
+
+#     """
+#     Mocked security dependency. 
+#     Returns a fake token payload to bypass Supabase JWT authentication for local Postman testing.
+#     """
+#     return {
+#         "sub": "mock-admin-id-1234",
+#         "email": "admin@MyRestro.local",
+#         "role": "admin"
+#     }
+\n--- backend/api\router.py ---\nfrom fastapi import APIRouter
+from api.api_v1.router import api_router as api_v1_router
+
+main_router = APIRouter()
+
+# All business routes are versioned under /api/v1
+main_router.include_router(api_v1_router, prefix="/api/v1")
+\n--- backend/api\__init__.py ---\n\n--- backend/api\api_v1\aggregators.py ---\nimport math
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from api.deps import get_db, get_current_user
+from models.user import User
+from models.aggregator import AggregatorOrder
+from schemas.order import AggregatorOrderResponse # I will create this schema
+from services.ws_manager import manager
+import uuid
+
+router = APIRouter()
+
+@router.get("/orders")
+def get_aggregator_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get all live aggregator orders for KDS"""
+    if not current_user.restaurant_id:
+        raise HTTPException(status_code=400, detail="Not assigned to a restaurant")
+        
+    orders = db.query(AggregatorOrder).filter(
+        AggregatorOrder.restaurant_id == current_user.restaurant_id,
+        AggregatorOrder.status.in_(['NEW', 'KITCHEN_PREPARING', 'READY_FOR_RIDER'])
+    ).order_by(AggregatorOrder.created_at.desc()).all()
+    
+    return orders
+
+@router.post("/webhooks/simulate")
+async def simulate_webhook_drop(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Simulate a webhook drop from the frontend.
+    This replaces the frontend mock array with a real DB insertion.
+    """
+    if not current_user.restaurant_id:
+        raise HTTPException(status_code=400, detail="Not assigned to a restaurant")
+        
+    gross = payload.get("gross_amount", 800)
+    comm_rate = payload.get("platform_commission_rate", 22)
+    net = round(gross * (1 - comm_rate / 100))
+    gst_on_comm = round(comm_rate * gross * 0.0018)
+    
+    order = AggregatorOrder(
+        restaurant_id=current_user.restaurant_id,
+        platform=payload.get("platform", "Zomato"),
+        platform_order_id=payload.get("platform_order_id", f"SIM-{uuid.uuid4().hex[:6].upper()}"),
+        customer_name=payload.get("customer_name", "Mock Customer"),
+        items_summary=payload.get("items_summary", "1x Item"),
+        gross_amount=gross,
+        platform_commission_rate=comm_rate,
+        ad_deduction=0.0,
+        gst_on_commission=gst_on_comm,
+        net_payout=net,
+        status="NEW",
+        rider_name=payload.get("rider_name", "Valet Partner"),
+        rider_status="ASSIGNED_WAITING",
+        eta="Arriving in 10 mins",
+        raw_payload=payload
+    )
+    
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    
+    # Broadcast to all connected WebSockets for this restaurant
+    await manager.broadcast(str(current_user.restaurant_id), {
+        "type": "NEW_AGGREGATOR_ORDER",
+        "order_id": str(order.id),
+        "platform": order.platform
+    })
+    
+    return {"message": "Webhook simulated and saved to DB", "order_id": order.id}
+
+@router.put("/orders/{order_id}/status")
+def update_aggregator_order_status(
+    order_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update status of an aggregator order (e.g. Mark Ready)"""
+    order = db.query(AggregatorOrder).filter(AggregatorOrder.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if order.restaurant_id != current_user.restaurant_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    status = payload.get("status")
+    if status in ['NEW', 'KITCHEN_PREPARING', 'READY_FOR_RIDER', 'DELIVERED']:
+        order.status = status
+        db.commit()
+        
+        # Here we would also call Zomato/Swiggy API to update status on their end!
+        # e.g. if status == 'READY_FOR_RIDER': push_status_to_zomato(order.platform_order_id)
+        
+    return {"message": "Status updated"}
+
+# --- The Real Webhook Stubs for Future ---
+
+@router.post("/webhooks/zomato")
+async def zomato_live_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Real endpoint where Zomato will POST order data.
+    """
+    payload = await request.json()
+    # 1. Verify Zomato Signature Header
+    # 2. Find restaurant_id using payload['store_id'] from restaurant_config table
+    # 3. Create AggregatorOrder
+    return {"status": "success", "message": "Order received"}
+
+@router.post("/webhooks/swiggy")
+async def swiggy_live_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Real endpoint where Swiggy will POST order data.
+    """
+    payload = await request.json()
+    return {"status": "success", "message": "Order received"}
+\n--- backend/api\api_v1\analytics.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from datetime import datetime, timezone, time, timedelta
+from typing import Dict, Any, List
+
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from models.order import Order, OrderStatus
+from api.api_v1.users import require_owner
+
+router = APIRouter()
+
+@router.get("/today", response_model=Dict[str, Any])
+def get_daily_analytics(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """Secure endpoint to calculate high-level operational statistics for today."""
+    
+    # Calculate bounds for "today"
+    today_start = datetime.combine(datetime.now(timezone.utc).date(), time.min).replace(tzinfo=timezone.utc)
+    
+    # 1. Total Daily Revenue (across all orders not cancelled/deleted)
+    # We'll calculate it from ACCEPTED, PREPARING, READY, SERVED statuses. Let's just say anything not PENDING? Wait, PENDING orders haven't been accepted yet, so they don't count towards guaranteed revenue untill accepted. But wait, we can just sum anything that exists and isn't deleted. Let's do SERVED + READY + PREPARING + ACCEPTED
+    valid_statuses = [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]
+    
+    daily_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= today_start,
+        Order.status.in_(valid_statuses)
+    ).all()
+    
+    total_revenue = sum([o.total_amount for o in daily_orders if o.total_amount])
+    total_orders_count = len(daily_orders)
+    
+    # 2. Active Orders waiting (Kitchen/Waiter bounds)
+    active_orders = len([o for o in daily_orders if o.status in [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY]])
+    
+    # 3. Served today
+    served_orders = len([o for o in daily_orders if o.status == OrderStatus.SERVED])
+    
+    # Calculate Payment Methods
+    from models.billing import Bill, PaymentStatus
+    today_bills = db.query(Bill).filter(
+        Bill.restaurant_id == str(restaurant_id),
+        Bill.created_at >= today_start,
+        Bill.status == PaymentStatus.COMPLETED
+    ).all()
+    
+    pm_stats = {}
+    for b in today_bills:
+        pm = b.payment_method or "Cash"
+        pm_stats[pm] = pm_stats.get(pm, 0) + (b.amount_paid or b.total_amount or 0)
+        
+    payment_methods = []
+    total_paid = sum(pm_stats.values())
+    if total_paid > 0:
+        for pm, amount in pm_stats.items():
+            payment_methods.append({
+                "name": pm,
+                "value": round((amount / total_paid) * 100),
+                "amount": amount
+            })
+            
+    # Calculate Hourly Heatmap
+    hourly_counts = {str(i).zfill(2) + ":00": 0 for i in range(24)}
+    for o in daily_orders:
+        if o.created_at:
+            hour_str = o.created_at.strftime("%H:00")
+            if hour_str in hourly_counts:
+                hourly_counts[hour_str] += 1
+                
+    hourly_heatmap = []
+    max_count = max(hourly_counts.values()) if hourly_counts else 0
+    for hour, count in hourly_counts.items():
+        intensity = "low"
+        if max_count > 0:
+            if count >= max_count * 0.7:
+                intensity = "high"
+            elif count >= max_count * 0.3:
+                intensity = "medium"
+        hourly_heatmap.append({
+            "hour": hour,
+            "ordersCount": count,
+            "intensity": intensity
+        })
+
+    # Calculate Revenue Leakage
+    cancelled_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= today_start,
+        Order.status == OrderStatus.CANCELLED
+    ).all()
+    
+    cancelled_amount = sum([o.total_amount or 0.0 for o in cancelled_orders])
+    complimentary_bills = [b for b in today_bills if b.discount_amount and b.discount_amount > 0]
+    complimentary_amount = sum([b.discount_amount for b in complimentary_bills])
+    total_leakage = cancelled_amount + complimentary_amount
+    
+    leakage_percent = 0
+    if total_revenue + total_leakage > 0:
+        leakage_percent = round((total_leakage / (total_revenue + total_leakage)) * 100, 1)
+
+    # Calculate Yesterday's Stats for Deltas
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= yesterday_start,
+        Order.created_at < today_start,
+        Order.status.in_(valid_statuses)
+    ).all()
+    
+    y_revenue = sum([o.total_amount for o in yesterday_orders if o.total_amount])
+    y_orders = len(yesterday_orders)
+    y_served = len([o for o in yesterday_orders if o.status == OrderStatus.SERVED])
+    
+    today_aov = total_revenue / served_orders if served_orders > 0 else 0
+    y_aov = y_revenue / y_served if y_served > 0 else 0
+    
+    def calc_delta(today_val, yesterday_val):
+        if yesterday_val == 0:
+            return 100.0 if today_val > 0 else 0.0
+        return round(((today_val - yesterday_val) / yesterday_val) * 100, 1)
+        
+    deltas = {
+        "revenue": calc_delta(total_revenue, y_revenue),
+        "orders": calc_delta(total_orders_count, y_orders),
+        "served": calc_delta(served_orders, y_served),
+        "aov": calc_delta(today_aov, y_aov)
+    }
+
+    return {
+        "today_revenue": total_revenue,
+        "total_orders": total_orders_count,
+        "active_orders": active_orders,
+        "served_orders": served_orders,
+        "payment_methods": payment_methods,
+        "hourly_heatmap": hourly_heatmap,
+        "deltas": deltas,
+        "leakage": {
+            "percent": leakage_percent,
+            "total": total_leakage,
+            "cancelled": cancelled_amount,
+            "cancelled_count": len(cancelled_orders),
+            "complimentary": complimentary_amount,
+            "complimentary_count": len(complimentary_bills)
+        }
+    }
+
+@router.get("/history", response_model=List[Dict[str, Any]])
+def get_historical_analytics(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """Secure endpoint to calculate stats for the last 7 days."""
+    
+    from datetime import datetime, timezone, time, timedelta
+    
+    # Use timezone-aware UTC for DB comparisons
+    now_utc = datetime.now(timezone.utc)
+    today_start = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc)
+    start_date = today_start - timedelta(days=6)  # 7 days including today
+    
+    valid_statuses = [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]
+    all_statuses = valid_statuses + [OrderStatus.PENDING, OrderStatus.CANCELLED]
+    
+    orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= start_date,
+        Order.status.in_(all_statuses)
+    ).all()
+
+    history = []
+    
+    for i in range(7):
+        day_start = start_date + timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        
+        # Both day_start and order.created_at are naive UTC — comparison is safe
+        daily_orders = [o for o in orders if o.created_at and day_start <= o.created_at < day_end]
+        
+        revenue = sum([o.total_amount for o in daily_orders if o.status in valid_statuses and o.total_amount])
+        total_orders = len(daily_orders)
+        completed = len([o for o in daily_orders if o.status == OrderStatus.SERVED])
+        
+        history.append({
+            "date": day_start.strftime("%b %d"),
+            "revenue": revenue,
+            "total_orders": total_orders,
+            "active_orders": 0,
+            "completed": completed
+        })
+        
+    return history
+
+@router.get("/staff-performance", response_model=List[Dict[str, Any]])
+def get_staff_performance(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    from models.user import User
+    
+    # Get last 7 days
+    now_utc = datetime.now(timezone.utc)
+    start_date = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc) - timedelta(days=6)
+    
+    orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= start_date,
+        Order.waiter_id.isnot(None),
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    staff_stats = {}
+    for o in orders:
+        wid = str(o.waiter_id)
+        if wid not in staff_stats:
+            staff_stats[wid] = {"orders": 0, "revenue": 0.0}
+        staff_stats[wid]["orders"] += 1
+        staff_stats[wid]["revenue"] += (o.total_amount or 0.0)
+        
+    if not staff_stats:
+        return []
+        
+    users = db.query(User).filter(User.id.in_(list(staff_stats.keys()))).all()
+    user_map = {str(u.id): u.full_name for u in users}
+    
+    result = []
+    for wid, stats in staff_stats.items():
+        result.append({
+            "name": user_map.get(wid, "Unknown Staff"),
+            "orders": stats["orders"],
+            "revenue": stats["revenue"]
+        })
+        
+    return sorted(result, key=lambda x: x["orders"], reverse=True)
+
+@router.get("/inventory-velocity", response_model=List[Dict[str, Any]])
+def get_inventory_velocity(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    from models.order import OrderItem
+    from models.menu import MenuItem
+    
+    # Top selling items last 7 days
+    now_utc = datetime.now(timezone.utc)
+    start_date = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc) - timedelta(days=6)
+    
+    order_items = db.query(OrderItem).join(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= start_date,
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    item_stats = {}
+    for oi in order_items:
+        mid = str(oi.menu_item_id)
+        if mid not in item_stats:
+            item_stats[mid] = 0
+        item_stats[mid] += oi.quantity
+        
+    if not item_stats:
+        return []
+        
+    menu_items = db.query(MenuItem).filter(MenuItem.id.in_(list(item_stats.keys()))).all()
+    menu_map = {str(m.id): m.name for m in menu_items}
+    
+    result = []
+    for mid, qty in item_stats.items():
+        result.append({
+            "name": menu_map.get(mid, "Unknown Item"),
+            "quantity": qty
+        })
+        
+    # Get top 5
+    return sorted(result, key=lambda x: x["quantity"], reverse=True)[:5]
+
+
+@router.get("/ai-insights", response_model=List[Dict[str, Any]])
+def get_ai_insights(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """Generate predictive AI insights based on restaurant data."""
+    insights = []
+    
+    # 1. Check Inventory Alerts
+    from models.inventory import StockItem
+    low_stock_items = db.query(StockItem).filter(
+        StockItem.restaurant_id == str(restaurant_id),
+        StockItem.quantity <= StockItem.minimum_threshold
+    ).all()
+    
+    if low_stock_items:
+        names = ", ".join([item.name for item in low_stock_items[:3]])
+        if len(low_stock_items) > 3:
+            names += f" and {len(low_stock_items) - 3} more"
+        insights.append({
+            "type": "warning",
+            "title": "Critical Inventory Alert",
+            "description": f"Stock is running critically low for {names}. Restock immediately to avoid menu unavailability."
+        })
+    else:
+        insights.append({
+            "type": "success",
+            "title": "Inventory Optimal",
+            "description": "All raw materials are currently above their minimum thresholds."
+        })
+        
+    # 2. Revenue Prediction (compare today vs yesterday)
+    now_utc = datetime.now(timezone.utc)
+    today_start = datetime.combine(now_utc.date(), time.min).replace(tzinfo=timezone.utc)
+    yesterday_start = today_start - timedelta(days=1)
+    
+    today_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= today_start,
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    yesterday_orders = db.query(Order).filter(
+        Order.restaurant_id == str(restaurant_id),
+        Order.created_at >= yesterday_start,
+        Order.created_at < today_start,
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED])
+    ).all()
+    
+    today_rev = sum([o.total_amount for o in today_orders if o.total_amount])
+    yest_rev = sum([o.total_amount for o in yesterday_orders if o.total_amount])
+    
+    if yest_rev > 0 and today_rev > yest_rev * 1.1:
+        insights.append({
+            "type": "success",
+            "title": "High Traffic Expected",
+            "description": f"Revenue is trending {((today_rev - yest_rev) / yest_rev * 100):.0f}% higher than yesterday. Prepare for a busy shift!"
+        })
+    elif today_rev > 0 and today_rev < yest_rev * 0.8:
+        insights.append({
+            "type": "info",
+            "title": "Slow Period Detected",
+            "description": "Footfall is slightly lower today. Consider running a flash promotion or happy hour."
+        })
+        
+    # 3. AI General Recommendation
+    insights.append({
+        "type": "info",
+        "title": "AI Recommendation",
+        "description": "Based on regional dining trends, weekend sales are projected to spike by 15%. Ensure enough kitchen staff are rostered."
+    })
+    
+    return insights
+\n--- backend/api\api_v1\auth.py ---\nfrom fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Request
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from api.deps import get_db, get_current_user_token
+from schemas.auth import (
+    SignupRequest, OwnerSignupRequest, StaffSignupRequest, 
+    LoginRequest, AuthResponse, GenericResponse, 
+    OTPVerifyRequest, OTPSendRequest
+)
+from services.otp_service import OTPService
+from models.user import User, UserRole
+from models.restaurant import Restaurant
+from core.config import settings
+from db.supabase import supabase_client
+import jwt as pyjwt
+import bcrypt
+import uuid
+import logging
+import io, time, os
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# ... (Helpers) ...
+def _make_local_token(user_id: str, email: str, role: str) -> str:
+    """Mint a local JWT signed with JWT_SECRET — used in dev mode."""
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "role": role,
+        "exp": datetime.utcnow() + timedelta(days=7),
+        "iat": datetime.utcnow(),
+    }
+    return pyjwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def _build_auth_data(local_user: User, access_token: str) -> AuthResponse:
+    return AuthResponse(
+        access_token=access_token,
+        user_id=str(local_user.id),
+        email=local_user.email,
+        role=local_user.role.value,
+        full_name=local_user.full_name,
+        phone_number=local_user.phone_number,
+        is_verified=local_user.is_verified,
+        created_at=local_user.created_at,
+        restaurant_name=local_user.restaurant.name if local_user.restaurant else None,
+        restaurant_logo=local_user.restaurant.logo_url if local_user.restaurant else None,
+        subscription_status=local_user.restaurant.subscription_status if local_user.restaurant else None,
+        subscription_plan=local_user.restaurant.subscription_plan if local_user.restaurant else None,
+    )
+
+
+# ─── Signup Endpoints ─────────────────────────────────────────────────────────
+
+@router.post("/signup/owner", response_model=GenericResponse, status_code=status.HTTP_201_CREATED)
+async def signup_owner(
+    email: str = Form(...),
+    password: str = Form(...),
+    full_name: str = Form(...),
+    phone_number: str = Form(...),
+    restaurant_name: str = Form(...),
+    logo: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    """Register a new restaurant owner with direct logo upload."""
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    # Save logo if provided
+    logo_url = None
+    if logo and logo.filename:
+        print(f"DEBUG: Logo received: {logo.filename}, type: {logo.content_type}")
+        
+        # Validate MIME type
+        if logo.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+            print(f"DEBUG: Invalid logo type rejected: {logo.content_type}")
+            raise HTTPException(status_code=400, detail="Invalid image type. Use JPEG, PNG or WebP.")
+
+        image_data = await logo.read()
+        
+        # Generate unique filename using UUID
+        filename = f"logo_{uuid.uuid4().hex}.png"
+
+        final_bytes = image_data
+        content_type = logo.content_type
+
+        try:
+            # Process image with PIL for optimization
+            from PIL import Image
+            print("DEBUG: Processing logo with PIL...")
+            img = Image.open(io.BytesIO(image_data))
+            # Keep RGBA for transparency support in PNG
+            if img.mode not in ("RGBA", "RGB"):
+                img = img.convert("RGBA")
+            img.thumbnail((800, 800))
+            
+            # Save as PNG to preserve transparency
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG", optimize=True)
+            buffer.seek(0)
+            final_bytes = buffer.getvalue()
+            content_type = "image/png"
+            print("DEBUG: PIL processing complete (PNG).")
+        except Exception as pil_err:
+            print(f"DEBUG: PIL processing failed ({pil_err}), falling back to raw upload.")
+
+        try:
+            print(f"DEBUG: Uploading to Supabase bucket 'logos', path: {filename}, size: {len(final_bytes)} bytes")
+            # Upload to Supabase Storage (upsert=True avoids conflicts on retry)
+            res = supabase_client.storage.from_("logos").upload(
+                path=filename,
+                file=final_bytes,
+                file_options={"content-type": content_type, "upsert": "true"}
+            )
+            print(f"DEBUG: Supabase upload response: {res}")
+
+            # Check if the response indicates an error (handling multiple supabase-py versions)
+            if hasattr(res, 'error') and res.error:
+                raise Exception(f"Supabase storage error: {res.error}")
+
+            # Get the public URL
+            logo_url = supabase_client.storage.from_("logos").get_public_url(filename)
+            print(f"DEBUG: Generated Public URL: {logo_url}")
+
+            if not logo_url:
+                print("DEBUG: WARNING — get_public_url returned empty string!")
+                logo_url = None
+
+        except Exception as storage_err:
+            import traceback
+            print(f"DEBUG: Supabase storage upload FAILED: {storage_err}")
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            logger.error(f"Supabase storage upload failed: {storage_err}")
+            # Ensure logo_url remains None on failure
+            logo_url = None
+    else:
+        print("DEBUG: No logo provided in request.")
+
+    # First create the Restaurant with trial
+    restaurant = Restaurant(
+        name=restaurant_name,
+        logo_url=logo_url,
+        subscription_status="trial",
+        trial_ends_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.add(restaurant)
+    db.flush() # flush to get the UUID
+
+    new_user = User(
+        email=email,
+        full_name=full_name,
+        phone_number=phone_number,
+        role=UserRole.OWNER,
+        restaurant_id=restaurant.id,
+        password_hash=_hash_password(password),
+        is_verified=False,
+        is_approved=True  # Owner is auto-approved
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Trigger OTP
+    OTPService.create_otp(db, email)
+
+    return GenericResponse(
+        message="Owner registered successfully with branding. Please verify your OTP.",
+        data={"email": email}
+    )
+
+
+@router.post("/signup/staff", response_model=GenericResponse, status_code=status.HTTP_201_CREATED)
+def signup_staff(payload: StaffSignupRequest, db: Session = Depends(get_db)):
+    """Register a new waiter or kitchen staff."""
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    try:
+        role = UserRole(payload.role.upper())
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.RUNNER]:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, or RUNNER.")
+
+    # Find owner to link restaurant
+    owner = db.query(User).filter(
+        User.email == payload.restaurant_email,
+        User.role == UserRole.OWNER
+    ).first()
+    
+    if not owner or not owner.restaurant_id:
+        raise HTTPException(
+            status_code=404, 
+            detail="Restaurant owner not found. Please check the owner's email address."
+        )
+
+    new_user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        phone_number=payload.phone_number,
+        role=role,
+        restaurant_id=owner.restaurant_id,
+        restaurant_email=payload.restaurant_email,
+        password_hash=_hash_password(payload.password),
+        is_verified=False,
+        is_approved=False  # Must wait for owner approval
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Trigger OTP
+    OTPService.create_otp(db, payload.email)
+
+    return GenericResponse(
+        message="Staff registered successfully. Please verify your OTP.",
+        data={"email": payload.email}
+    )
+
+
+# ─── Auth Endpoints ───────────────────────────────────────────────────────────
+
+@router.post("/login", response_model=GenericResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    """Log in with email + password."""
+    local_user = db.query(User).filter(User.email == payload.email).first()
+
+    if not local_user or not _verify_password(payload.password, local_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials.",
+        )
+
+    if not local_user.is_verified:
+        # Trigger OTP generation
+        OTPService.create_otp(db, local_user.email)
+        return GenericResponse(
+            message="OTP verification required",
+            data={"email": local_user.email, "is_verified": False}
+        )
+
+    # Staff must be approved by owner before login
+    if local_user.role in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER] and not local_user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Awaiting owner approval. Please contact your restaurant owner to activate your account."
+        )
+
+    # Owner must be approved by super admin before login
+    if local_user.role == UserRole.OWNER and local_user.restaurant and not local_user.restaurant.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is pending approval from the admin. Please contact support."
+        )
+
+    access_token = _make_local_token(str(local_user.id), local_user.email, local_user.role.value)
+    
+    # Build auth data before commit to avoid DetachedInstanceError or expired attributes
+    auth_data = _build_auth_data(local_user, access_token)
+    
+    # Update last_login_at
+    local_user.last_login_at = datetime.utcnow()
+    db.commit()
+
+    return GenericResponse(
+        message="Login successful",
+        data=auth_data
+    )
+
+
+@router.post("/send-otp", response_model=GenericResponse)
+def send_otp(payload: OTPSendRequest, db: Session = Depends(get_db)):
+    """Generate and send a new OTP."""
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    
+    OTPService.create_otp(db, payload.email)
+    return GenericResponse(message="OTP sent successfully.")
+
+
+@router.post("/verify-otp", response_model=GenericResponse)
+def verify_otp(payload: OTPVerifyRequest, db: Session = Depends(get_db)):
+    """Verify the provided OTP."""
+    success = OTPService.verify_otp(db, payload.email, payload.otp_code)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP.")
+    
+    return GenericResponse(message="Account verified successfully.")
+
+
+@router.get("/me", response_model=GenericResponse)
+def get_current_user_info(
+    token_payload: dict = Depends(get_current_user_token),
+    db: Session = Depends(get_db),
+):
+    """Returns the current authenticated user's profile."""
+    user_email = token_payload.get("email")
+    local_user = db.query(User).filter(User.email == user_email).first()
+    
+    if not local_user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    return GenericResponse(
+        message="Profile retrieved",
+        data={
+            "id": str(local_user.id),
+            "email": local_user.email,
+            "role": local_user.role.value,
+            "full_name": local_user.full_name,
+            "phone_number": local_user.phone_number,
+            "is_verified": local_user.is_verified,
+            "restaurant_id": str(local_user.restaurant_id) if local_user.restaurant_id else None,
+            "restaurant_name": local_user.restaurant.name if local_user.restaurant else None,
+            "restaurant_logo": local_user.restaurant.logo_url if local_user.restaurant else None,
+            "restaurant_gstin": local_user.restaurant.gstin if local_user.restaurant else None,
+            "restaurant_fssai": local_user.restaurant.fssai if local_user.restaurant else None,
+            "restaurant_email": local_user.restaurant_email,
+            "subscription_status": local_user.restaurant.subscription_status if local_user.restaurant else None,
+            "subscription_plan": local_user.restaurant.subscription_plan if local_user.restaurant else None,
+
+            "trial_ends_at": local_user.restaurant.trial_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.trial_ends_at else None,
+            "subscription_ends_at": local_user.restaurant.subscription_ends_at.isoformat() if local_user.restaurant and local_user.restaurant.subscription_ends_at else None,
+            "model_3d_credits": local_user.restaurant.model_3d_credits if local_user.restaurant else 0,
+            "created_at": local_user.created_at.isoformat() if local_user.created_at else None,
+        }
+    )
+
+\n--- backend/api\api_v1\billing.py ---\nfrom fastapi import APIRouter, Depends, BackgroundTasks
+from sqlalchemy.orm import Session
+from uuid import UUID
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.billing import BillCreate, BillRead, PaymentConfirmation
+from services import billing_service
+from models.notification import MessageType
+from services.whatsapp_service import trigger_whatsapp_message
+
+router = APIRouter()
+
+@router.post("/{order_id}/generate", response_model=BillRead)
+def generate_order_bill(
+    order_id: UUID, 
+    bill_in: BillCreate, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token), # Secure route
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    bill = billing_service.generate_bill(db, order_id, bill_in, str(restaurant_id))
+    
+    if bill.order.customer_phone:
+        background_tasks.add_task(
+            trigger_whatsapp_message, bill.order.id, bill.order.customer_phone, MessageType.BILL_GENERATED, 
+            f"Your bill for {bill.total_amount} has been structurally generated!"
+        )
+        
+    return bill
+
+@router.put("/{order_id}/confirm", response_model=BillRead)
+def apply_payment_confirmation(
+    order_id: UUID, 
+    confirmation: PaymentConfirmation, 
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return billing_service.confirm_payment(db, order_id, confirmation, str(restaurant_id))
+\n--- backend/api\api_v1\cash_register.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.cash_register import (
+    OpenShiftRequest, CloseShiftRequest,
+    CashShiftRead, CashTransactionCreate, CashTransactionRead, ShiftSummary
+)
+from services import cash_service
+
+router = APIRouter()
+
+# ── Open Shift ─────────────────────────────────────────────────────────────────
+@router.post("/shift/open", response_model=CashShiftRead)
+def open_shift(
+    payload: OpenShiftRequest,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Open a new cash shift. Only one shift can be open at a time."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required to open a shift.")
+    return cash_service.open_shift(db, str(restaurant_id), token["sub"], payload.opening_balance)
+
+
+# ── Get Current Shift ──────────────────────────────────────────────────────────
+@router.get("/shift/current", response_model=CashShiftRead)
+def get_current_shift(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Get the currently open shift (if any)."""
+    shift = cash_service.get_current_shift(db, str(restaurant_id))
+    if not shift:
+        raise HTTPException(status_code=404, detail="No shift is currently open.")
+    return shift
+
+
+# ── Close Shift ────────────────────────────────────────────────────────────────
+@router.put("/shift/{shift_id}/close", response_model=CashShiftRead)
+def close_shift(
+    shift_id: UUID,
+    payload: CloseShiftRequest,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Close the active shift. Requires physically counted closing balance."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required to close a shift.")
+    return cash_service.close_shift(db, str(shift_id), str(restaurant_id), token["sub"], payload.closing_balance, payload.notes)
+
+
+# ── Add Transaction ────────────────────────────────────────────────────────────
+@router.post("/shift/{shift_id}/transaction", response_model=CashTransactionRead)
+def add_transaction(
+    shift_id: UUID,
+    payload: CashTransactionCreate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Add a manual CASH_IN or CASH_OUT entry to the active shift."""
+    return cash_service.add_transaction(
+        db, str(shift_id), str(restaurant_id), token["sub"],
+        payload.type, payload.amount, payload.description
+    )
+
+
+# ── Shift History ──────────────────────────────────────────────────────────────
+@router.get("/shift/history", response_model=List[CashShiftRead])
+def get_shift_history(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Get all past shifts for this restaurant (Owner only)."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required.")
+    return cash_service.get_shift_history(db, str(restaurant_id))
+\n--- backend/api\api_v1\crm.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from typing import List, Dict, Any
+import io
+import csv
+import jwt
+from datetime import datetime
+
+from api.deps import get_db, get_current_restaurant
+from models.customer import Customer
+from models.user import User
+from api.api_v1.users import require_owner
+from core.config import settings
+
+router = APIRouter()
+
+@router.get("/", response_model=List[Dict[str, Any]])
+def get_all_customers(
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """
+    Secure endpoint to fetch all customers for the restaurant's CRM.
+    Orders them by loyalty points (highest first) as default sorting.
+    """
+    customers = db.query(Customer).filter(
+        Customer.restaurant_id == str(restaurant_id)
+    ).order_by(Customer.loyalty_points.desc()).all()
+    
+    return [
+        {
+            "id": str(c.id),
+            "name": c.name or "Guest",
+            "phone_number": c.phone_number,
+            "email": c.email,
+            "loyalty_points": c.loyalty_points,
+            "total_spent": c.total_spent,
+            "total_visits": c.total_visits,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "last_visit": c.updated_at.isoformat() if c.updated_at else None
+        }
+        for c in customers
+    ]
+
+@router.get("/csv")
+def download_customers_csv(
+    token_str: str = None,
+    db: Session = Depends(get_db)
+):
+    """Download CRM customers report in CSV format."""
+    
+    # Try resolving token from query param since this is a direct browser download
+    if token_str:
+        try:
+            token = jwt.decode(token_str, settings.JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid query token")
+    elif not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    require_owner(token)
+    
+    # Manually get restaurant_id from token
+    user = db.query(User).filter(User.email == token.get("email")).first()
+    if not user or not user.restaurant_id:
+        raise HTTPException(status_code=400, detail="User not linked to any restaurant")
+    restaurant_id = user.restaurant_id
+    
+    customers = db.query(Customer).filter(
+        Customer.restaurant_id == str(restaurant_id)
+    ).order_by(Customer.loyalty_points.desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write Header Info
+    writer.writerow(["CUSTOMER CRM EXPORT"])
+    writer.writerow(["Exported On:", datetime.now().strftime('%d-%b-%Y %H:%M')])
+    writer.writerow([])
+    
+    # Write Column Headers
+    writer.writerow([
+        "Customer Name", 
+        "Phone Number", 
+        "Email", 
+        "Loyalty Points", 
+        "Total Spent (Rs)", 
+        "Total Visits", 
+        "First Visit",
+        "Last Visit"
+    ])
+    
+    for c in customers:
+        writer.writerow([
+            c.name or "Guest",
+            c.phone_number or "N/A",
+            c.email or "N/A",
+            c.loyalty_points,
+            round(c.total_spent, 2),
+            c.total_visits,
+            c.created_at.strftime('%d-%b-%Y') if c.created_at else "N/A",
+            c.updated_at.strftime('%d-%b-%Y') if c.updated_at else "N/A"
+        ])
+        
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]), 
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=customers_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )
+\n--- backend/api\api_v1\enterprise.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List, Dict, Any
+from uuid import UUID
+from api.deps import get_db, get_current_restaurant, get_current_user
+from models.enterprise import (
+    ExpenseVoucher, Coupon, HappyHour, BogoRule,
+    BranchOutlet, CentralStockItem, StockTransfer, AggregatorOrder
+)
+
+router = APIRouter()
+
+# --- EXPENSES ---
+@router.get("/expenses")
+def get_expenses(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(ExpenseVoucher).filter(ExpenseVoucher.restaurant_id == restaurant_id).order_by(ExpenseVoucher.created_at.desc()).all()
+    return [{
+        "id": str(i.id),
+        "voucher_id": i.voucher_id,
+        "payee": i.payee,
+        "category": i.category,
+        "amount": i.amount,
+        "paymentMode": i.payment_mode,
+        "timestamp": i.timestamp,
+        "remarks": i.remarks,
+        "verifiedBy": i.verified_by
+    } for i in items]
+
+@router.post("/expenses")
+def create_expense(
+    data: dict, 
+    db: Session = Depends(get_db), 
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    user = Depends(get_current_user)
+):
+    item = ExpenseVoucher(
+        restaurant_id=restaurant_id,
+        voucher_id=data.get("id", data.get("voucher_id", "EXP-NEW")),
+        payee=data.get("payee", ""),
+        category=data.get("category", "Miscellaneous"),
+        amount=float(data.get("amount", 0.0)),
+        payment_mode=data.get("paymentMode", data.get("payment_mode", "CASH")),
+        timestamp=data.get("timestamp", ""),
+        remarks=data.get("remarks", ""),
+        verified_by=data.get("verifiedBy", "Owner Portal")
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    
+    # Auto-sync with Cash Register if payment is CASH
+    if item.payment_mode.upper() == "CASH":
+        from services.cash_service import get_current_shift, add_transaction
+        from models.cash_register import TransactionType
+        shift = get_current_shift(db, str(restaurant_id))
+        if shift:
+            add_transaction(
+                db=db,
+                shift_id=str(shift.id),
+                restaurant_id=str(restaurant_id),
+                user_id=str(user.id),
+                type=TransactionType.CASH_OUT,
+                amount=item.amount,
+                description=f"Expense Voucher {item.voucher_id}: {item.payee} - {item.remarks}"
+            )
+            
+    return {"status": "success", "id": str(item.id)}
+
+@router.delete("/expenses/{id}")
+def delete_expense(id: str, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    db.query(ExpenseVoucher).filter(ExpenseVoucher.id == id, ExpenseVoucher.restaurant_id == restaurant_id).delete()
+    db.commit()
+    return {"status": "deleted"}
+
+# --- DISCOUNTS ---
+@router.get("/coupons")
+def get_coupons(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(Coupon).filter(Coupon.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "code": i.code,
+        "type": i.type,
+        "value": i.value,
+        "minOrder": i.min_order,
+        "active": i.active,
+        "expiry": i.expiry,
+        "usageCount": i.usage_count
+    } for i in items]
+
+@router.post("/coupons")
+def create_coupon(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    item = Coupon(
+        restaurant_id=restaurant_id,
+        code=data.get("code", "PROMO"),
+        type=data.get("type", "PERCENTAGE"),
+        value=float(data.get("value", 10)),
+        min_order=float(data.get("minOrder", 0)),
+        active=data.get("active", True),
+        expiry=data.get("expiry", "2026-12-31"),
+        usage_count=int(data.get("usageCount", 0))
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.get("/happy-hours")
+def get_happy_hours(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(HappyHour).filter(HappyHour.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "title": i.title,
+        "days": i.days.split(",") if i.days else [],
+        "startTime": i.start_time,
+        "endTime": i.end_time,
+        "discountPercent": i.discount_percent,
+        "category": i.category,
+        "active": i.active
+    } for i in items]
+
+@router.post("/happy-hours")
+def create_happy_hour(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    item = HappyHour(
+        restaurant_id=restaurant_id,
+        title=data.get("title", ""),
+        days=",".join(data.get("days", [])) if isinstance(data.get("days"), list) else "Mon,Tue,Wed",
+        start_time=data.get("startTime", "15:00"),
+        end_time=data.get("endTime", "18:00"),
+        discount_percent=float(data.get("discountPercent", 20)),
+        category=data.get("category", "Beverages"),
+        active=data.get("active", True)
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.get("/bogo")
+def get_bogo_rules(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(BogoRule).filter(BogoRule.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "buyItem": i.buy_item,
+        "buyQty": i.buy_qty,
+        "getItem": i.get_item,
+        "getQty": i.get_qty,
+        "active": i.active
+    } for i in items]
+
+@router.post("/bogo")
+def create_bogo_rule(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    item = BogoRule(
+        restaurant_id=restaurant_id,
+        buy_item=data.get("buyItem", ""),
+        buy_qty=int(data.get("buyQty", 1)),
+        get_item=data.get("getItem", ""),
+        get_qty=int(data.get("getQty", 1)),
+        active=data.get("active", True)
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+# --- FRANCHISE COMMISSARY ---
+@router.get("/branches")
+def get_branches(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(BranchOutlet).filter(BranchOutlet.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "branch_code": i.branch_code,
+        "name": i.name,
+        "location": i.location,
+        "manager": i.manager,
+        "status": i.status,
+        "today_sales": i.today_sales,
+        "health_score": i.health_score
+    } for i in items]
+
+@router.post("/branches")
+def create_branch(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    b_code = data.get("id", data.get("branch_code", ""))
+    if not b_code or b_code == "BR-NEW":
+        b_code = f"BR-{random.randint(100, 999)}"
+        
+    item = BranchOutlet(
+        restaurant_id=restaurant_id,
+        branch_code=b_code,
+        name=data.get("name", ""),
+        location=data.get("location", ""),
+        manager=data.get("manager", ""),
+        status=data.get("status", "Online (Connected)"),
+        today_sales=data.get("today_sales", "₹0"),
+        health_score=data.get("health_score", "100%")
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.delete("/branches/{id}")
+def delete_branch(id: str, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    db.query(BranchOutlet).filter(BranchOutlet.id == id, BranchOutlet.restaurant_id == restaurant_id).delete()
+    db.commit()
+    return {"status": "deleted"}
+
+@router.get("/stock")
+def get_central_stock(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(CentralStockItem).filter(CentralStockItem.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "item_code": i.item_code,
+        "name": i.name,
+        "total_batch": i.total_batch,
+        "unit": i.unit,
+        "batch_date": i.batch_date,
+        "expiry": i.expiry,
+        "temperature": i.temperature,
+        "qc_status": i.qc_status
+    } for i in items]
+
+@router.post("/stock")
+def create_central_stock(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    s_code = data.get("id", data.get("item_code", ""))
+    if not s_code or s_code == "STK-NEW":
+        s_code = f"STK-{random.randint(1000, 9999)}"
+
+    item = CentralStockItem(
+        restaurant_id=restaurant_id,
+        item_code=s_code,
+        name=data.get("name", ""),
+        total_batch=float(data.get("total_batch", 100)),
+        unit=data.get("unit", "Kg"),
+        batch_date=data.get("batch_date", ""),
+        expiry=data.get("expiry", ""),
+        temperature=data.get("temperature", "4°C Chilled"),
+        qc_status=data.get("qc_status", "Passed (Chef Approved 🟢)")
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.delete("/stock/{id}")
+def delete_central_stock(id: str, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    db.query(CentralStockItem).filter(CentralStockItem.id == id, CentralStockItem.restaurant_id == restaurant_id).delete()
+    db.commit()
+    return {"status": "deleted"}
+
+@router.get("/transfers")
+def get_transfers(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(StockTransfer).filter(StockTransfer.restaurant_id == restaurant_id).all()
+    return [{
+        "id": str(i.id),
+        "transfer_code": i.transfer_code,
+        "voucher_number": i.voucher_number,
+        "source_kitchen": i.source_kitchen,
+        "destination_branch": i.destination_branch,
+        "item_name": i.item_name,
+        "quantity": i.quantity,
+        "unit": i.unit,
+        "dispatched_at": i.dispatched_at,
+        "status": i.status,
+        "driver_name": i.driver_name
+    } for i in items]
+
+@router.post("/transfers")
+def create_transfer(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    import random
+    from datetime import datetime
+    
+    qty_requested = float(data.get("quantity", 0))
+    item_name = data.get("item_name", "")
+    
+    # 1. Check Central Stock First
+    central_item = db.query(CentralStockItem).filter(
+        CentralStockItem.restaurant_id == restaurant_id,
+        CentralStockItem.name == item_name
+    ).first()
+    
+    if not central_item:
+        raise HTTPException(status_code=400, detail=f"Item '{item_name}' not found in Central HQ Stock.")
+    
+    if central_item.total_batch < qty_requested:
+        raise HTTPException(status_code=400, detail=f"Insufficient Central Stock. Only {central_item.total_batch} {central_item.unit} available.")
+        
+    # 2. Deduct the stock
+    central_item.total_batch -= qty_requested
+    
+    # 3. Generate Codes
+    t_code = data.get("id", data.get("transfer_code", ""))
+    if not t_code or t_code == "TR-NEW":
+        t_code = f"TR-{random.randint(1000, 9999)}"
+        
+    v_number = data.get("voucher_number", "")
+    if not v_number or v_number == "WTV-NEW":
+        v_number = f"WTV-{datetime.now().year}-{random.randint(1000, 9999)}"
+
+    item = StockTransfer(
+        restaurant_id=restaurant_id,
+        transfer_code=t_code,
+        voucher_number=v_number,
+        source_kitchen=data.get("source_kitchen", "Central Commissary (Base Kitchen HQ)"),
+        destination_branch=data.get("destination_branch", ""),
+        item_name=item_name,
+        quantity=qty_requested,
+        unit=data.get("unit", central_item.unit),
+        dispatched_at=data.get("dispatched_at", ""),
+        status=data.get("status", "IN_TRANSIT"),
+        driver_name=data.get("driver_name", "")
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.put("/transfers/{id}/receive")
+def mark_transfer_received(id: str, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    t = db.query(StockTransfer).filter(StockTransfer.id == id, StockTransfer.restaurant_id == restaurant_id).first()
+    if t:
+        t.status = "RECEIVED"
+        db.commit()
+    return {"status": "updated"}
+
+# --- AGGREGATORS ---
+@router.get("/aggregators")
+def get_aggregators(db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    items = db.query(AggregatorOrder).filter(AggregatorOrder.restaurant_id == restaurant_id).all()
+    return [{
+        "id": i.order_id, # return order_id as id for frontend matching e.g. ZOM-84921
+        "db_id": str(i.id),
+        "platform": i.platform,
+        "customer_name": i.customer_name,
+        "items_summary": i.items_summary,
+        "gross_amount": i.gross_amount,
+        "platform_commission_rate": i.platform_commission_rate,
+        "ad_deduction": i.ad_deduction,
+        "gst_on_commission": i.gst_on_commission,
+        "net_payout": i.net_payout,
+        "rider_name": i.rider_name,
+        "rider_status": i.rider_status,
+        "eta": i.eta,
+        "status": i.status,
+        "ordered_at": i.ordered_at
+    } for i in items]
+
+@router.post("/aggregators")
+def create_aggregator_order(data: dict, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    item = AggregatorOrder(
+        restaurant_id=restaurant_id,
+        order_id=data.get("id", "ON-NEW"),
+        platform=data.get("platform", "Zomato"),
+        customer_name=data.get("customer_name", ""),
+        items_summary=data.get("items_summary", ""),
+        gross_amount=float(data.get("gross_amount", 0)),
+        platform_commission_rate=float(data.get("platform_commission_rate", 0)),
+        ad_deduction=float(data.get("ad_deduction", 0)),
+        gst_on_commission=float(data.get("gst_on_commission", 0)),
+        net_payout=float(data.get("net_payout", 0)),
+        rider_name=data.get("rider_name", "Unassigned"),
+        rider_status=data.get("rider_status", "ASSIGNED_WAITING"),
+        eta=data.get("eta", "Arriving soon"),
+        status=data.get("status", "NEW"),
+        ordered_at=data.get("ordered_at", "Just Now")
+    )
+    db.add(item)
+    db.commit()
+    return {"status": "success", "id": str(item.id)}
+
+@router.delete("/aggregators/{order_id}")
+def delete_aggregator_order(order_id: str, db: Session = Depends(get_db), restaurant_id: UUID = Depends(get_current_restaurant)):
+    db.query(AggregatorOrder).filter(AggregatorOrder.order_id == order_id, AggregatorOrder.restaurant_id == restaurant_id).delete()
+    db.commit()
+    return {"status": "deleted"}
+\n--- backend/api\api_v1\health.py ---\nfrom fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/health")
+async def health_check():
+    """
+    Check if the API is running correctly.
+    """
+    return {
+        "status": "ok", 
+        "message": "Smart Restaurant API is healthy and running!"
+    }
+
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from api.deps import get_db
+from models.settings import PlatformConfig
+from schemas.superadmin import PlatformSettingResponse
+from typing import List
+
+@router.get("/platform-settings", response_model=List[PlatformSettingResponse])
+def get_public_platform_settings(db: Session = Depends(get_db)):
+    """Fetch public platform settings like pricing and trial length."""
+    return db.query(PlatformConfig).all()
+\n--- backend/api\api_v1\inventory.py ---\nfrom fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.inventory import StockItemCreate, StockItemRead, StockAdjustment, StockItemUpdate
+from services import inventory_service
+
+router = APIRouter()
+
+@router.get("/", response_model=List[StockItemRead])
+def get_inventory(
+    active_only: bool = True, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """List current stock securely."""
+    return inventory_service.get_all_stock(db, active_only, str(restaurant_id))
+
+@router.post("/", response_model=StockItemRead)
+def create_stock(
+    item_in: StockItemCreate, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Add a new raw ingredient to track."""
+    return inventory_service.create_stock_item(db, item_in, str(restaurant_id))
+
+@router.put("/{item_id}/adjust", response_model=StockItemRead)
+def adjust_stock(
+    item_id: UUID, 
+    adjustment: StockAdjustment, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Manually add or remove quantity (e.g., used 5kg of flour -> pass -5 in payload)."""
+    return inventory_service.adjust_stock(db, item_id, adjustment.quantity_change, str(restaurant_id))
+
+@router.put("/{item_id}", response_model=StockItemRead)
+def update_stock(
+    item_id: UUID, 
+    item_in: StockItemUpdate, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Edit stock item details."""
+    return inventory_service.update_stock_item(db, item_id, item_in, str(restaurant_id))
+
+@router.delete("/{item_id}")
+def delete_stock(
+    item_id: UUID, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Delete a stock item."""
+    return inventory_service.delete_stock_item(db, item_id, str(restaurant_id))
+\n--- backend/api\api_v1\menu.py ---\nfrom fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from typing import List
+from api.deps import get_db, get_current_user_token, get_current_restaurant, get_current_user, get_optional_user_token
+from schemas.menu import CategoryCreate, CategoryRead, MenuItemCreate, MenuItemRead, MenuItemUpdate
+from services import menu_service
+from uuid import UUID
+from fastapi import HTTPException
+
+router = APIRouter()
+
+@router.get("/categories", response_model=List[CategoryRead])
+def get_categories(
+    restaurant_id: UUID = None,
+    token: dict = Depends(get_optional_user_token), # Optional token check
+    db: Session = Depends(get_db)
+):
+    """Fetch all active categories along with their menu items. Customers must pass restaurant_id. Waiters use token."""
+    user = None
+    if token and "email" in token:
+        from models.user import User
+        user = db.query(User).filter(User.email == token["email"]).first()
+        if not restaurant_id and user and user.restaurant_id:
+            restaurant_id = user.restaurant_id
+            
+    if not restaurant_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="restaurant_id is required")
+        
+    all_categories = menu_service.get_all_active_categories(db, str(restaurant_id))
+    
+    # Apply category-level RBAC restrictions for specialized waiters
+    if user and getattr(user, 'allowed_categories', None):
+        return [c for c in all_categories if str(c.id) in user.allowed_categories]
+        
+    return all_categories
+
+@router.post("/categories", response_model=CategoryRead)
+def create_category(
+    cat_in: CategoryCreate, 
+    db: Session = Depends(get_db), 
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """(Secure) Create a new category (Burgers, Drinks, etc)."""
+    return menu_service.create_category(db, cat_in, str(restaurant_id))
+
+@router.post("/items", response_model=MenuItemRead)
+def create_menu_item(
+    item_in: MenuItemCreate, 
+    db: Session = Depends(get_db), 
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """(Secure) Create a new menu item inside a category."""
+    return menu_service.create_menu_item(db, item_in, str(restaurant_id))
+
+@router.put("/items/{item_id}", response_model=MenuItemRead)
+def update_menu_item_details(
+    item_id: str,
+    item_update: MenuItemUpdate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Update menu item (Owner only feature to toggle availability)."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    return menu_service.update_menu_item(db, item_id, item_update.model_dump(exclude_unset=True), str(restaurant_id))
+
+@router.delete("/items/{item_id}")
+def delete_menu_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Delete menu item (Owner only feature)."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    return menu_service.delete_menu_item(db, item_id, str(restaurant_id))
+
+
+from fastapi import File, UploadFile
+@router.post("/items/{item_id}/upload-image", response_model=MenuItemRead)
+def upload_menu_item_image(
+    item_id: str,
+    slot: str = "main",
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Upload an image for a menu item. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    # verify item belongs to restaurant
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="No valid image provided")
+        
+    from db.supabase import supabase_client
+    import uuid
+    import io
+    from PIL import Image
+    
+    image_content = image.file.read()
+    
+    try:
+        img = Image.open(io.BytesIO(image_content))
+        if img.mode != 'RGB' and img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        output = io.BytesIO()
+        img.save(output, format="PNG")
+        image_content = output.getvalue()
+        file_ext = "png"
+        content_type = "image/png"
+    except Exception as e:
+        print(f"Image conversion failed: {e}")
+        file_ext = image.filename.split('.')[-1]
+        content_type = image.content_type
+        
+    file_name = f"{uuid.uuid4()}.{file_ext}"
+    
+    res = supabase_client.storage.from_('logos').upload(
+        path=f"menu/{file_name}",
+        file=image_content,
+        file_options={"content-type": content_type}
+    )
+    
+    public_url = supabase_client.storage.from_('logos').get_public_url(f"menu/{file_name}")
+    
+    if slot == "extra1":
+        item.image_url_extra1 = public_url
+    elif slot == "extra2":
+        item.image_url_extra2 = public_url
+    else:
+        item.image_url = public_url
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.delete("/items/{item_id}/image")
+def delete_menu_item_image(
+    item_id: str,
+    slot: str = "main",
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Delete an image for a menu item. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if slot == "extra1":
+        item.image_url_extra1 = None
+    elif slot == "extra2":
+        item.image_url_extra2 = None
+    else:
+        item.image_url = None
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
+from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead
+@router.post("/items/{item_id}/recipe", response_model=List[RecipeIngredientRead])
+def update_menu_item_recipe(
+    item_id: str,
+    ingredients: List[RecipeIngredientCreate],
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Set the BOM recipe for a menu item. Replaces existing recipe."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem, RecipeIngredient
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    # Delete old recipe
+    db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item_id).delete()
+    
+    # Add new recipe
+    new_ingredients = []
+    for ing in ingredients:
+        new_ing = RecipeIngredient(
+            menu_item_id=item_id,
+            stock_item_id=ing.stock_item_id,
+            quantity=ing.quantity,
+            unit=ing.unit
+        )
+        db.add(new_ing)
+        new_ingredients.append(new_ing)
+        
+    db.commit()
+    for ing in new_ingredients:
+        db.refresh(ing)
+        
+    return new_ingredients
+
+from schemas.menu import RecipeIngredientCreate, RecipeIngredientRead, Model3DGenerateRequest
+from services import meshy_service
+
+def _upload_model_to_supabase(file_url: str) -> str:
+    import requests
+    import uuid
+    from db.supabase import supabase_client
+    try:
+        resp = requests.get(file_url)
+        resp.raise_for_status()
+        file_name = f"{uuid.uuid4().hex}.glb"
+        supabase_client.storage.from_('logos').upload(
+            path=f"models/{file_name}",
+            file=resp.content,
+            file_options={"content-type": "model/gltf-binary"}
+        )
+        return supabase_client.storage.from_('logos').get_public_url(f"models/{file_name}")
+    except Exception as e:
+        print(f"Failed to upload model to Supabase: {e}")
+        return file_url
+
+@router.post("/items/{item_id}/generate-3d")
+def generate_3d_model(
+    item_id: str,
+    params: Model3DGenerateRequest,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Trigger Meshy API to generate a 3D model for this menu item."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.restaurant import Restaurant
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    # Check 3D credit balance
+    if restaurant.model_3d_credits <= 0:
+        raise HTTPException(
+            status_code=403, 
+            detail="Insufficient 3D credits. Please purchase more credits to generate 3D models."
+        )
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if not item.image_url:
+        raise HTTPException(status_code=400, detail="Menu item must have an image_url to generate a 3D model")
+        
+    try:
+        # Construct image URLs array
+        image_urls = [item.image_url]
+        if item.image_url_extra1:
+            image_urls.append(item.image_url_extra1)
+        if item.image_url_extra2:
+            image_urls.append(item.image_url_extra2)
+
+        # Start generation task using advanced parameters
+        task_id = meshy_service.generate_3d_model_task(
+            image_urls=image_urls,
+            ai_model=params.ai_model,
+            enable_pbr=params.enable_pbr,
+            texture_resolution=params.texture_resolution
+        )
+        item.model_3d_task_id = task_id
+        
+        # Deduct 1 credit from restaurant
+        restaurant.model_3d_credits -= 1
+        
+        db.commit()
+        return {
+            "message": "3D generation started", 
+            "task_id": task_id, 
+            "remaining_credits": restaurant.model_3d_credits
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/items/{item_id}/3d-status")
+def check_3d_model_status(
+    item_id: str,
+    db: Session = Depends(get_db)
+):
+    """Check the status of 3D model generation and update DB if complete."""
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    if item.model_3d_url:
+        return {"status": "success", "model_url": item.model_3d_url}
+        
+    if not item.model_3d_task_id:
+        return {"status": "none", "message": "No 3D generation task found"}
+        
+    try:
+        # Unified status check using meshy_service which handles prefixes automatically
+        status_info = meshy_service.check_3d_model_status(item.model_3d_task_id)
+        
+        if status_info["status"] == "success" and status_info["model_url"]:
+            if item.model_3d_task_id.startswith("resize_"):
+                permanent_url = _upload_model_to_supabase(status_info["model_url"])
+                item.model_3d_url = permanent_url
+                item.model_3d_task_id = None  # Clear task ID on completion
+                db.commit()
+            else:
+                # Generation succeeded! Now trigger Resize API
+                target_height_m = (item.model_3d_height or 12.0) / 100.0
+                try:
+                    resize_task_id = meshy_service.resize_3d_model_task(
+                        input_task_id=item.model_3d_task_id,
+                        resize_height_meters=target_height_m
+                    )
+                    item.model_3d_task_id = resize_task_id
+                    db.commit()
+                    return {"status": "running", "message": "Optimizing & resizing model to target height..."}
+                except Exception as resize_err:
+                    print(f"Failed to submit Resize task: {resize_err}")
+                    # Fallback: Save original GLB if resizing fails
+                    permanent_url = _upload_model_to_supabase(status_info["model_url"])
+                    item.model_3d_url = permanent_url
+                    item.model_3d_task_id = None
+                    db.commit()
+                    return status_info
+        elif status_info["status"] == "failed":
+            item.model_3d_task_id = None  # Clear failed task ID so they can retry
+            
+            # Refund the credit
+            from models.restaurant import Restaurant
+            restaurant = db.query(Restaurant).filter(Restaurant.id == item.restaurant_id).first()
+            if restaurant:
+                restaurant.model_3d_credits += 1
+                
+            db.commit()
+            
+        return status_info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/items/{item_id}/3d")
+def delete_3d_model(
+    item_id: str,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """(Secure) Clear/delete the generated 3D model for this item."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    item.model_3d_url = None
+    item.model_3d_task_id = None
+    db.commit()
+    return {"message": "3D model deleted successfully"}
+
+from fastapi.responses import StreamingResponse
+
+from starlette.background import BackgroundTask
+
+@router.get("/models/serve/{item_id}")
+async def serve_3d_model(
+    item_id: str,
+    db: Session = Depends(get_db)
+):
+    """Proxy endpoint to serve 3D models with proper CORS headers. Uses async streaming and passes Content-Length."""
+    from models.menu import MenuItem
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if not item or not item.model_3d_url:
+        raise HTTPException(status_code=404, detail="Model not found")
+        
+    import httpx
+    
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0), follow_redirects=True)
+    req = client.build_request("GET", item.model_3d_url)
+    try:
+        r = await client.send(req, stream=True)
+        r.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {str(e)}")
+    
+    # Extract Content-Length if present
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*"
+    }
+    
+    content_length = r.headers.get("Content-Length")
+    if content_length:
+        headers["Content-Length"] = content_length
+        
+    # Also pass Content-Type just in case
+    content_type = r.headers.get("Content-Type", "model/gltf-binary")
+                    
+    return StreamingResponse(
+        r.aiter_bytes(chunk_size=1024 * 1024),
+        media_type=content_type,
+        headers=headers,
+        background=BackgroundTask(r.aclose)
+    )
+\n--- backend/api\api_v1\orders.py ---\nfrom fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderUpdateItems, PaymentStatusUpdate, ClearHistoryRequest
+from services import order_service
+from models.order import OrderStatus
+from models.notification import MessageType
+from services.whatsapp_service import trigger_whatsapp_message
+from fastapi import WebSocket, WebSocketDisconnect, Query
+from core.config import settings
+import jwt
+from jwt.exceptions import InvalidTokenError
+from services.ws_manager import manager as ws_manager
+
+router = APIRouter()
+
+def notify_kds(background_tasks: BackgroundTasks, restaurant_id: str, order_id: UUID, db: Session):
+    from sqlalchemy.orm import joinedload
+    from models.order import Order
+    order = db.query(Order).options(joinedload(Order.items)).filter(Order.id == order_id).first()
+    if not order:
+        return
+    
+    message = {
+        "event": "ORDER_UPDATE",
+        "id": str(order.id),
+        "table_id": str(order.table_id) if order.table_id else None,
+        "order_type": order.order_type,
+        "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
+        "created_at": order.created_at.isoformat() + "Z" if order.created_at else "",
+        "items": [{
+            "id": str(item.id),
+            "menu_item_id": str(item.menu_item_id),
+            "quantity": item.quantity,
+            "notes": item.notes,
+            "status": item.status,
+            "is_parcel": item.is_parcel
+        } for item in order.items]
+    }
+    background_tasks.add_task(ws_manager.broadcast, str(restaurant_id), message)
+
+@router.post("/", response_model=OrderRead)
+def create_new_order(
+    order_in: OrderCreate, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Open QR route. Hooks into BackgroundTasks to alert customers instantly."""
+    order = order_service.create_order(db, order_in)
+    
+    if order.customer_phone:
+        background_tasks.add_task(
+            trigger_whatsapp_message, order.id, order.customer_phone, MessageType.ORDER_CONFIRMED, 
+            "Your order has been received and sent to the kitchen!"
+        )
+    notify_kds(background_tasks, str(order.restaurant_id), order.id, db)
+    return order
+
+@router.get("/kitchen/active", response_model=List[OrderRead])
+def pull_kds_orders(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Strictly fetches PENDING and PREPARING orders for Kitchen displays that are accepted."""
+    return order_service.get_active_kitchen_orders(db, str(restaurant_id))
+
+@router.get("/waiter/active", response_model=List[OrderRead])
+def pull_waiter_orders(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Fetches PENDING and PREPARING orders for Waiter displays including unaccepted customer orders."""
+    from models.order import Order, OrderStatus
+    from models.billing import Bill, PaymentStatus
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).outerjoin(Bill, Order.id == Bill.order_id).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status.in_([OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.SERVED]),
+        (Bill.id == None) | (Bill.status != PaymentStatus.COMPLETED),
+        Order.payment_status != 'PAID'
+    ).order_by(Order.created_at.desc()).all()
+
+@router.get("/table/{table_id}", response_model=List[OrderRead])
+def get_table_orders(table_id: UUID, db: Session = Depends(get_db)):
+    return order_service.get_orders_by_table(db, table_id)
+
+@router.put("/table/{table_id}/verify-payment")
+def verify_table_payments(table_id: UUID, db: Session = Depends(get_db)):
+    from models.order import Order
+    orders = db.query(Order).filter(Order.table_id == table_id, Order.payment_status == 'PENDING').all()
+    for o in orders:
+        o.payment_status = 'VERIFYING'
+    db.commit()
+    return {"message": "Updated to VERIFYING"}
+
+@router.put("/{order_id}/accept", response_model=OrderRead)
+def accept_customer_order(
+    order_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from models.user import User
+    from fastapi import HTTPException
+    waiter = db.query(User).filter(User.id == token["sub"]).first()
+    if not waiter:
+        raise HTTPException(status_code=401, detail="Waiter not found in database")
+    order = order_service.accept_order(db, order_id, waiter.id, str(restaurant_id))
+    notify_kds(background_tasks, str(restaurant_id), order.id, db)
+    return order
+
+@router.put("/{order_id}/status", response_model=OrderRead)
+def update_order_status(
+    order_id: UUID, 
+    status_update: OrderStatusUpdate, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    order = order_service.update_order_status(db, order_id, status_update.status, str(restaurant_id))
+    
+    if order.customer_phone:
+        if order.status == OrderStatus.PREPARING:
+            background_tasks.add_task(
+                trigger_whatsapp_message, order.id, order.customer_phone, MessageType.ORDER_PREPARING, 
+                "Our chefs have started preparing your meal!"
+            )
+        elif order.status == OrderStatus.READY:
+            background_tasks.add_task(
+                trigger_whatsapp_message, order.id, order.customer_phone, MessageType.ORDER_READY, 
+                "Your food is ready!"
+            )
+            
+    notify_kds(background_tasks, str(restaurant_id), order.id, db)
+    return order
+
+from schemas.order import OrderItemStatusUpdate, OrderItemRead
+@router.put("/items/{item_id}/status", response_model=OrderItemRead)
+def update_item_status(
+    item_id: UUID,
+    status_update: OrderItemStatusUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    item = order_service.update_order_item_status(db, item_id, status_update.status, str(restaurant_id))
+    notify_kds(background_tasks, str(restaurant_id), item.order_id, db)
+    return item
+
+@router.put("/{order_id}/payment-status", response_model=OrderRead)
+def update_order_payment_status(
+    order_id: UUID,
+    status_update: PaymentStatusUpdate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return order_service.update_payment_status(db, order_id, status_update.payment_status, str(restaurant_id))
+
+@router.delete("/{order_id}")
+def delete_customer_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return order_service.delete_order(db, order_id, str(restaurant_id))
+
+@router.put("/{order_id}/items", response_model=OrderRead)
+def update_order_items(
+    order_id: UUID,
+    items_update: OrderUpdateItems,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    order = order_service.update_order_items(
+        db, order_id, items_update.items, str(restaurant_id), 
+        items_update.status, items_update.customer_name, 
+        items_update.customer_phone, items_update.guests_count, 
+        items_update.tip_amount
+    )
+    notify_kds(background_tasks, str(restaurant_id), order.id, db)
+    return order
+
+@router.get("/history/owner")
+def get_owner_order_history(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from models.order import Order
+    from models.menu import MenuItem
+    
+    # Secure role check
+    from api.api_v1.users import require_owner
+    require_owner(token)
+
+    from sqlalchemy.orm import joinedload
+    orders = db.query(Order).options(joinedload(Order.items)).filter(Order.restaurant_id == restaurant_id).order_by(Order.created_at.desc()).limit(150).all()
+    
+    # Pre-fetch menu items to avoid N+1 queries
+    menu_items = db.query(MenuItem).all() # Just fetching all here is fine since it's cached by SQLAlchemy or we can filter by restaurant
+    menu_map = {str(item.id): item.name for item in menu_items}
+    
+    result = []
+    from datetime import timezone
+    for order in orders:
+        items_data = []
+        for oi in order.items:
+            items_data.append({
+                "name": menu_map.get(str(oi.menu_item_id), "Unknown Item"),
+                "quantity": oi.quantity,
+                "subtotal": oi.subtotal
+            })
+        
+        # Format local time easily
+        local_dt = order.created_at.astimezone() if order.created_at.tzinfo else order.created_at
+        
+        result.append({
+            "id": str(order.id),
+            "date": local_dt.strftime("%d %b"),
+            "time": local_dt.strftime("%I:%M %p"),
+            "day": local_dt.strftime("%A"),
+            "customer_phone": order.customer_phone or "Walk-in",
+            "customer_name": order.customer_name or "",
+            "total_amount": order.total_amount,
+            "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
+            "items": items_data
+        })
+    return result
+
+@router.post("/history/clear")
+def clear_order_history(
+    req: ClearHistoryRequest,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    user_id = token.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return order_service.clear_order_history(db, str(restaurant_id), req.password, user_id)
+
+@router.websocket("/ws/kitchen/{restaurant_id}")
+async def websocket_kitchen_endpoint(websocket: WebSocket, restaurant_id: str, token: str = Query(...)):
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False}
+        )
+    except InvalidTokenError:
+        await websocket.close(code=1008)
+        return
+
+    await ws_manager.connect(websocket, restaurant_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Respond to pings if needed
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, restaurant_id)
+\n--- backend/api\api_v1\payments.py ---\nimport razorpay
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from pydantic import BaseModel
+import json
+
+from api.deps import get_db, get_current_restaurant
+from services import settings_service
+from models.order import Order
+
+router = APIRouter()
+
+class CreateOrderRequest(BaseModel):
+    table_id: UUID
+
+class ConfirmPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str  # Required for verification
+
+from models.table import Table
+
+@router.post("/confirm")
+def confirm_razorpay_payment(req: ConfirmPaymentRequest, db: Session = Depends(get_db)):
+    """
+    Called directly by the frontend after Razorpay's success handler fires.
+    Verifies the Razorpay signature to prevent fake confirmations.
+    """
+    import hmac
+    import hashlib
+
+    # --- Find the orders and get the restaurant's key_secret for verification ---
+    orders = db.query(Order).filter(Order.razorpay_order_id == req.razorpay_order_id).all()
+    if not orders:
+        raise HTTPException(status_code=404, detail="No orders found for this Razorpay order.")
+
+    # Get the restaurant's Razorpay key_secret
+    restaurant_id = str(orders[0].restaurant_id)
+    key_secret = settings_service.get_config_value(db, "razorpay_key_secret", restaurant_id)
+    if not key_secret:
+        raise HTTPException(status_code=400, detail="Razorpay not configured for this restaurant.")
+
+    # --- Verify Razorpay Signature (prevents fake payments) ---
+    message = f"{req.razorpay_order_id}|{req.razorpay_payment_id}"
+    expected_signature = hmac.new(
+        key_secret.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, req.razorpay_signature):
+        raise HTTPException(status_code=400, detail="Invalid payment signature. Possible fraud attempt.")
+
+    # --- Signature valid — Mark orders as PAID ---
+    for order in orders:
+        order.payment_status = 'PAID'
+        order.razorpay_payment_id = req.razorpay_payment_id
+    db.commit()
+    return {"status": "ok", "orders_updated": len(orders)}
+
+@router.post("/create-order")
+def create_razorpay_order(
+    req: CreateOrderRequest,
+    db: Session = Depends(get_db)
+):
+    # Fetch table to get restaurant_id
+    table = db.query(Table).filter(Table.id == req.table_id).first()
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+        
+    restaurant_id = table.restaurant_id
+
+    # Fetch Razorpay credentials
+    key_id = settings_service.get_config_value(db, "razorpay_key_id", str(restaurant_id))
+    key_secret = settings_service.get_config_value(db, "razorpay_key_secret", str(restaurant_id))
+    
+    if not key_id or not key_secret:
+        raise HTTPException(status_code=400, detail="Razorpay is not configured for this restaurant.")
+
+    # Get pending orders for the table
+    pending_orders = db.query(Order).filter(
+        Order.table_id == req.table_id,
+        Order.payment_status == 'PENDING',
+        Order.status != 'CANCELLED'
+    ).all()
+
+    if not pending_orders:
+        raise HTTPException(status_code=400, detail="No pending orders found for this table.")
+
+    # Calculate total amount
+    total_amount = sum(order.total_amount for order in pending_orders)
+    amount_in_paise = int(total_amount * 100)
+
+    # Create Razorpay order
+    try:
+        client = razorpay.Client(auth=(key_id, key_secret))
+        rp_order = client.order.create({
+            "amount": amount_in_paise,
+            "currency": "INR",
+            "receipt": str(req.table_id)
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {str(e)}")
+
+    # Update orders with razorpay_order_id
+    for order in pending_orders:
+        order.razorpay_order_id = rp_order['id']
+        order.payment_status = 'VERIFYING' # Set to verifying while user pays
+    
+    db.commit()
+
+    return {
+        "razorpay_order_id": rp_order['id'],
+        "razorpay_key_id": key_id,
+        "amount": amount_in_paise,
+        "currency": "INR"
+    }
+
+@router.post("/webhook")
+async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Receives payment.captured events from Razorpay.
+    Verifies signature if RAZORPAY_WEBHOOK_SECRET is set.
+    """
+    from core.config import settings
+    import hmac
+    import hashlib
+    import logging
+    logger = logging.getLogger(__name__)
+
+    body = await request.body()
+
+    # --- Signature Verification (non-blocking) ---
+    webhook_secret = settings.RAZORPAY_WEBHOOK_SECRET
+    if webhook_secret:
+        razorpay_signature = request.headers.get("x-razorpay-signature", "")
+        expected_signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_signature, razorpay_signature):
+            # Log warning but do NOT block — wrong secret config should not kill payments
+            logger.warning("Razorpay webhook signature mismatch. Check RAZORPAY_WEBHOOK_SECRET on Render.")
+
+    # --- Process Payload ---
+    try:
+        payload = json.loads(body.decode('utf-8'))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    event = payload.get('event')
+    logger.info(f"Razorpay webhook received event: {event}")
+
+    if event == 'payment.captured':
+        payment = payload['payload']['payment']['entity']
+        rp_order_id = payment.get('order_id')
+        rp_payment_id = payment.get('id')
+
+        logger.info(f"Payment captured: order_id={rp_order_id}, payment_id={rp_payment_id}")
+
+        if rp_order_id:
+            orders = db.query(Order).filter(Order.razorpay_order_id == rp_order_id).all()
+            logger.info(f"Found {len(orders)} order(s) matching razorpay_order_id={rp_order_id}")
+            for order in orders:
+                order.payment_status = 'PAID'
+                order.razorpay_payment_id = rp_payment_id
+            db.commit()
+            logger.info(f"Orders updated to PAID successfully.")
+
+    return {"status": "ok"}
+\n--- backend/api\api_v1\reports.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from datetime import datetime, date, timedelta
+from uuid import UUID
+import io
+import csv
+
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from models.order import Order, OrderStatus
+from models.restaurant import Restaurant
+from api.api_v1.users import require_owner
+import jwt
+from core.config import settings
+
+router = APIRouter()
+
+@router.get("/sales/csv")
+def download_sales_report(
+    start_date: date = None,
+    end_date: date = None,
+    token_str: str = None,
+    db: Session = Depends(get_db)
+):
+    """Download GST/Sales report in CSV format for CA/Accountant."""
+    
+    # Try resolving token from query param if not in header
+    if token_str:
+        try:
+            token = jwt.decode(token_str, settings.JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid query token")
+    elif not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    require_owner(token)
+    
+    # Manually get restaurant_id from token since Depends gets skipped for query tokens if we bypass standard auth
+    from models.user import User
+    user = db.query(User).filter(User.email == token.get("email")).first()
+    if not user or not user.restaurant_id:
+        raise HTTPException(status_code=400, detail="User not linked to any restaurant")
+    restaurant_id = user.restaurant_id
+    
+    if not start_date:
+        start_date = date.today() - timedelta(days=30)
+    if not end_date:
+        end_date = date.today()
+        
+    # Get Restaurant Info for headers
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    
+    # Query all completed/paid orders within date range
+    orders = db.query(Order).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status == OrderStatus.SERVED,
+        func.date(Order.created_at) >= start_date,
+        func.date(Order.created_at) <= end_date
+    ).order_by(Order.created_at.asc()).all()
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write Header Info
+    writer.writerow(["RESTAURANT SALES REPORT"])
+    writer.writerow(["Restaurant Name:", restaurant.name])
+    writer.writerow(["GSTIN:", restaurant.gstin or "N/A"])
+    writer.writerow(["FSSAI:", restaurant.fssai or "N/A"])
+    writer.writerow(["Date Range:", f"{start_date.strftime('%d-%b-%Y')} to {end_date.strftime('%d-%b-%Y')}"])
+    writer.writerow([])
+    
+    # Write Column Headers
+    writer.writerow([
+        "Order Date", 
+        "Order Time", 
+        "Customer Name", 
+        "Customer Phone", 
+        "Subtotal (₹)", 
+        "Tax Amount (₹)", 
+        "Total Amount (₹)", 
+        "Payment Status"
+    ])
+    
+    total_subtotal = 0.0
+    total_tax = 0.0
+    total_revenue = 0.0
+    
+    for order in orders:
+        local_dt = order.created_at.astimezone() if order.created_at.tzinfo else order.created_at
+        
+        # Fallback to total_amount if subtotal/tax wasn't populated in old orders
+        subtotal = getattr(order, 'subtotal_amount', 0.0)
+        tax = getattr(order, 'tax_amount', 0.0)
+        total = order.total_amount
+        
+        if subtotal == 0 and tax == 0 and total > 0:
+            # Legacy order calculation (assume 5% tax included backwards math or just put it all in subtotal)
+            subtotal = total
+            
+        total_subtotal += subtotal
+        total_tax += tax
+        total_revenue += total
+        
+        writer.writerow([
+            local_dt.strftime("%Y-%m-%d"),
+            local_dt.strftime("%H:%M:%S"),
+            order.customer_name or "Walk-in",
+            order.customer_phone or "N/A",
+            round(subtotal, 2),
+            round(tax, 2),
+            round(total, 2),
+            order.payment_status
+        ])
+        
+    writer.writerow([])
+    writer.writerow(["", "", "", "GRAND TOTAL:", round(total_subtotal, 2), round(total_tax, 2), round(total_revenue, 2)])
+    
+    output.seek(0)
+    
+    filename = f"Sales_Report_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}.csv"
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="{filename}"'
+    }
+    
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
+@router.get("/items/csv")
+def download_item_report(
+    start_date: date = None,
+    end_date: date = None,
+    token_str: str = None,
+    db: Session = Depends(get_db)
+):
+    """Download item-wise sales report in CSV format."""
+    if token_str:
+        try:
+            token = jwt.decode(token_str, settings.JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid query token")
+    else:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    require_owner(token)
+    from models.user import User
+    user = db.query(User).filter(User.email == token.get("email")).first()
+    if not user or not user.restaurant_id:
+        raise HTTPException(status_code=400, detail="User not linked to any restaurant")
+    restaurant_id = user.restaurant_id
+    
+    if not start_date:
+        start_date = date.today() - timedelta(days=30)
+    if not end_date:
+        end_date = date.today()
+        
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    
+    from models.order import OrderItem
+    from models.menu import MenuItem
+    
+    results = db.query(
+        MenuItem.name,
+        func.sum(OrderItem.quantity).label('total_qty'),
+        func.sum(OrderItem.quantity * OrderItem.price_at_order_time).label('total_revenue')
+    ).join(OrderItem, OrderItem.menu_item_id == MenuItem.id)\
+     .join(Order, Order.id == OrderItem.order_id)\
+     .filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status == OrderStatus.SERVED,
+        func.date(Order.created_at) >= start_date,
+        func.date(Order.created_at) <= end_date
+    ).group_by(MenuItem.name).order_by(func.sum(OrderItem.quantity).desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(["ITEM-WISE SALES REPORT"])
+    writer.writerow(["Restaurant Name:", restaurant.name])
+    writer.writerow(["Date Range:", f"{start_date.strftime('%d-%b-%Y')} to {end_date.strftime('%d-%b-%Y')}"])
+    writer.writerow([])
+    
+    writer.writerow(["Item Name", "Quantity Sold", "Total Revenue (₹)"])
+    
+    total_q = 0
+    total_rev = 0.0
+    for row in results:
+        total_q += row.total_qty
+        total_rev += row.total_revenue
+        writer.writerow([row.name, row.total_qty, round(row.total_revenue, 2)])
+        
+    writer.writerow([])
+    writer.writerow(["GRAND TOTAL", total_q, round(total_rev, 2)])
+    
+    output.seek(0)
+    filename = f"Item_Report_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}.csv"
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+@router.get("/shifts/csv")
+def download_shifts_report(
+    start_date: date = None,
+    end_date: date = None,
+    token_str: str = None,
+    db: Session = Depends(get_db)
+):
+    """Download shift-wise Z-Report in CSV format."""
+    if token_str:
+        try:
+            token = jwt.decode(token_str, settings.JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid query token")
+    else:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    require_owner(token)
+    from models.user import User
+    user = db.query(User).filter(User.email == token.get("email")).first()
+    if not user or not user.restaurant_id:
+        raise HTTPException(status_code=400, detail="User not linked to any restaurant")
+    restaurant_id = user.restaurant_id
+    
+    if not start_date:
+        start_date = date.today() - timedelta(days=30)
+    if not end_date:
+        end_date = date.today()
+        
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    
+    from models.cash_register import CashShift
+    
+    shifts = db.query(CashShift).filter(
+        CashShift.restaurant_id == restaurant_id,
+        func.date(CashShift.opened_at) >= start_date,
+        func.date(CashShift.opened_at) <= end_date
+    ).order_by(CashShift.opened_at.asc()).all()
+    
+    user_ids = list(set([s.opened_by for s in shifts] + [s.closed_by for s in shifts if s.closed_by]))
+    users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    user_map = {u.id: u.full_name for u in users}
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(["SHIFT-WISE Z-REPORT"])
+    writer.writerow(["Restaurant Name:", restaurant.name])
+    writer.writerow(["Date Range:", f"{start_date.strftime('%d-%b-%Y')} to {end_date.strftime('%d-%b-%Y')}"])
+    writer.writerow([])
+    
+    writer.writerow([
+        "Shift ID", "Status", "Opened At", "Closed At", "Opened By", "Closed By", 
+        "Opening Balance (₹)", "Net Sales (₹)", "Total Cash In (₹)", "Total Cash Out (₹)", 
+        "Expected Closing (₹)", "Actual Closing (₹)", "Discrepancy (₹)"
+    ])
+    
+    for s in shifts:
+        local_open = s.opened_at.astimezone() if s.opened_at.tzinfo else s.opened_at
+        local_close = s.closed_at.astimezone() if s.closed_at and s.closed_at.tzinfo else s.closed_at
+        
+        expected = s.expected_balance if s.expected_balance is not None else (s.opening_balance + s.net_sales + s.total_cash_in - s.total_cash_out)
+        actual = s.closing_balance if s.closing_balance is not None else 0.0
+        discrepancy = actual - expected if s.status == "CLOSED" else 0.0
+        
+        writer.writerow([
+            str(s.id)[:8],
+            s.status.value if hasattr(s.status, 'value') else str(s.status),
+            local_open.strftime("%Y-%m-%d %H:%M:%S"),
+            local_close.strftime("%Y-%m-%d %H:%M:%S") if local_close else "Ongoing",
+            user_map.get(s.opened_by, "Unknown"),
+            user_map.get(s.closed_by, "N/A") if s.closed_by else "N/A",
+            round(s.opening_balance, 2),
+            round(s.net_sales, 2),
+            round(s.total_cash_in, 2),
+            round(s.total_cash_out, 2),
+            round(expected, 2),
+            round(actual, 2) if s.status == "CLOSED" else "N/A",
+            round(discrepancy, 2) if s.status == "CLOSED" else "N/A"
+        ])
+        
+    output.seek(0)
+    filename = f"Z_Report_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}.csv"
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+@router.get("/advanced")
+def get_advanced_report(
+    report_type: str,
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """
+    Advanced Reporting Endpoint returning JSON data for 15+ report types.
+    Groups data in-memory to prevent SQL fan-out bugs on complex financial joins.
+    """
+    from models.order import Order, OrderItem, OrderStatus
+    from models.menu import MenuItem, Category
+    from models.user import User
+    from models.billing import Bill
+    from sqlalchemy import func
+
+    # 1. Fetch Orders
+    orders = db.query(Order).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status == OrderStatus.SERVED,
+        func.date(Order.created_at) >= start_date,
+        func.date(Order.created_at) <= end_date
+    ).all()
+
+    # 2. Extract IDs and batch fetch related data for fast lookup
+    order_ids = [o.id for o in orders]
+    if not order_ids:
+        return {"data": [], "totals": {}}
+
+    order_items = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).all()
+    menu_item_ids = list(set([oi.menu_item_id for oi in order_items]))
+    menu_items = db.query(MenuItem).filter(MenuItem.id.in_(menu_item_ids)).all()
+    
+    category_ids = list(set([mi.category_id for mi in menu_items]))
+    categories = db.query(Category).filter(Category.id.in_(category_ids)).all()
+    
+    waiter_ids = list(set([o.waiter_id for o in orders if o.waiter_id]))
+    waiters = db.query(User).filter(User.id.in_(waiter_ids)).all()
+
+    # Lookup dicts
+    mi_map = {mi.id: mi for mi in menu_items}
+    cat_map = {c.id: c.name for c in categories}
+    waiter_map = {w.id: w.full_name for w in waiters}
+    
+    # Pre-calculate item-level tax/discount allocation
+    # Since Barkat Order has subtotal/tax at order level, we distribute it proportionally
+    # to each item to allow perfect Category/Item grouping.
+    bills = db.query(Bill).filter(Bill.order_id.in_(order_ids)).all()
+    bill_discount_map = {b.order_id: b.discount_amount for b in bills}
+    
+    order_map = {}
+    for o in orders:
+        o_subtotal = getattr(o, 'subtotal_amount', 0.0) or o.total_amount
+        o_tax = getattr(o, 'tax_amount', 0.0)
+        o_discount = bill_discount_map.get(o.id, 0.0)
+        order_map[o.id] = {
+            "obj": o,
+            "subtotal": o_subtotal,
+            "tax": o_tax,
+            "discount": o_discount,
+            "total": o.total_amount
+        }
+
+    # Prepare grouping struct
+    grouped_data = {}
+    total_net = 0.0
+    total_tax = 0.0
+    total_sales = 0.0
+
+    # Execute Grouping Strategy
+    if report_type in ["category", "item"]:
+        for oi in order_items:
+            mi = mi_map.get(oi.menu_item_id)
+            if not mi: continue
+            
+            # Apportion Order Tax & Discount to this item based on its price ratio
+            o_data = order_map[oi.order_id]
+            ratio = (oi.subtotal / o_data["subtotal"]) if o_data["subtotal"] > 0 else 0
+            
+            allocated_tax = o_data["tax"] * ratio
+            allocated_discount = o_data["discount"] * ratio
+            allocated_sales = oi.subtotal + allocated_tax - allocated_discount
+
+            # Group Key
+            if report_type == "category":
+                key = cat_map.get(mi.category_id, "Uncategorized")
+            else:
+                key = mi.name
+
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "label": key,
+                    "orders_set": set(),
+                    "items": 0,
+                    "net_amount": 0.0,
+                    "discount": 0.0,
+                    "tax": 0.0,
+                    "sales": 0.0
+                }
+            
+            gd = grouped_data[key]
+            gd["orders_set"].add(oi.order_id)
+            gd["items"] += oi.quantity
+            gd["net_amount"] += oi.subtotal
+            gd["discount"] += allocated_discount
+            gd["tax"] += allocated_tax
+            gd["sales"] += allocated_sales
+            
+            total_net += oi.subtotal
+            total_tax += allocated_tax
+            total_sales += allocated_sales
+
+    elif report_type == "sales":
+        for o in orders:
+            local_dt = o.created_at.astimezone() if o.created_at.tzinfo else o.created_at
+            key = local_dt.strftime("%d %b %Y")
+            
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "label": key,
+                    "orders": 0,
+                    "dine_in": 0.0,
+                    "takeaway": 0.0,
+                    "delivery": 0.0,
+                    "net_amount": 0.0,
+                    "tax": 0.0,
+                    "sales": 0.0
+                }
+            
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            gd["tax"] += getattr(o, 'tax_amount', 0.0)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            
+            if o.order_type == "DINE_IN": gd["dine_in"] += order_sales
+            elif o.order_type == "TAKEAWAY": gd["takeaway"] += order_sales
+            else: gd["delivery"] += order_sales
+            
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_tax += getattr(o, 'tax_amount', 0.0)
+            total_sales += order_sales
+
+    elif report_type == "order_source":
+        for o in orders:
+            key = getattr(o, 'source', 'WAITER')
+            if key == "CUSTOMER": key = "QR Menu"
+            if getattr(o, 'razorpay_order_id', None): key = "Zomato/Swiggy/Online" # Placeholder mapping
+            
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "label": key,
+                    "orders": 0,
+                    "net_amount": 0.0,
+                    "tax": 0.0,
+                    "sales": 0.0
+                }
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            gd["tax"] += getattr(o, 'tax_amount', 0.0)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_tax += getattr(o, 'tax_amount', 0.0)
+            total_sales += order_sales
+
+    elif report_type in ["employee", "assignee"]:
+        for o in orders:
+            key = waiter_map.get(o.waiter_id, "Self Service / Online")
+            
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "label": key,
+                    "orders": 0,
+                    "net_amount": 0.0,
+                    "sales": 0.0
+                }
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_sales += order_sales
+
+    elif report_type == "nc":
+        # Non-Chargeable Items (Total = 0 or Order Discount = 100%)
+        for oi in order_items:
+            o_data = order_map.get(oi.order_id, {})
+            o_subtotal = o_data.get("subtotal", 0.0)
+            o_discount = o_data.get("discount", 0.0)
+            
+            is_100_percent_discount = (o_subtotal > 0 and o_discount >= o_subtotal)
+            
+            if oi.subtotal == 0 or is_100_percent_discount:
+                mi = mi_map.get(oi.menu_item_id)
+                if not mi: continue
+                key = mi.name
+                
+                if key not in grouped_data:
+                    grouped_data[key] = {
+                        "label": key,
+                        "orders": 0,
+                        "items": 0,
+                        "net_amount": 0.0,
+                        "tax": 0.0,
+                        "sales": 0.0
+                    }
+                gd = grouped_data[key]
+                gd["orders"] += 1
+                gd["items"] += oi.quantity
+    
+    elif report_type == "cover":
+        for o in orders:
+            if not getattr(o, 'guests_count', None): continue
+            key = f"{o.guests_count} Guests"
+            if key not in grouped_data:
+                grouped_data[key] = {"label": key, "orders": 0, "net_amount": 0.0, "tax": 0.0, "sales": 0.0}
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            gd["tax"] += getattr(o, 'tax_amount', 0.0)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_tax += getattr(o, 'tax_amount', 0.0)
+            total_sales += order_sales
+
+    elif report_type == "locality":
+        for o in orders:
+            if not getattr(o, 'customer_address', None): continue
+            key = o.customer_address
+            if key not in grouped_data:
+                grouped_data[key] = {"label": key, "orders": 0, "net_amount": 0.0, "tax": 0.0, "sales": 0.0}
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            gd["tax"] += getattr(o, 'tax_amount', 0.0)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_tax += getattr(o, 'tax_amount', 0.0)
+            total_sales += order_sales
+
+    elif report_type == "counter":
+        for o in orders:
+            key = getattr(o, 'counter_name', 'Main Register')
+            if key not in grouped_data:
+                grouped_data[key] = {"label": key, "orders": 0, "net_amount": 0.0, "tax": 0.0, "sales": 0.0}
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["net_amount"] += getattr(o, 'subtotal_amount', o.total_amount)
+            gd["tax"] += getattr(o, 'tax_amount', 0.0)
+            order_sales = getattr(o, 'subtotal_amount', o.total_amount) + getattr(o, 'tax_amount', 0.0)
+            gd["sales"] += order_sales
+            total_net += getattr(o, 'subtotal_amount', o.total_amount)
+            total_tax += getattr(o, 'tax_amount', 0.0)
+            total_sales += order_sales
+            
+    elif report_type == "tip":
+        for o in orders:
+            if not getattr(o, 'tip_amount', None): continue
+            local_dt = o.created_at.astimezone() if o.created_at.tzinfo else o.created_at
+            key = local_dt.strftime("%d %b %Y")
+            if key not in grouped_data:
+                grouped_data[key] = {"label": key, "orders": 0, "net_amount": 0.0, "tax": 0.0, "sales": 0.0}
+            gd = grouped_data[key]
+            gd["orders"] += 1
+            gd["sales"] += o.tip_amount # Represent tip as sales here
+            total_sales += o.tip_amount
+
+    elif report_type == "variation":
+        # Variations require joining with modifiers
+        from models.order import OrderItemModifier
+        from models.menu import Modifier
+        
+        modifiers_db = db.query(OrderItemModifier, Modifier).join(Modifier).join(
+            OrderItem, OrderItem.id == OrderItemModifier.order_item_id
+        ).filter(
+            OrderItem.order_id.in_([o.id for o in orders])
+        ).all()
+        
+        for oim, mod in modifiers_db:
+            key = mod.name
+            if key not in grouped_data:
+                grouped_data[key] = {"label": key, "orders_set": set(), "items": 0, "net_amount": 0.0, "tax": 0.0, "sales": 0.0}
+            gd = grouped_data[key]
+            gd["orders_set"].add(oim.order_item.order_id)
+            gd["items"] += oim.order_item.quantity
+            gd["net_amount"] += (oim.price_at_order_time * oim.order_item.quantity)
+            gd["sales"] += (oim.price_at_order_time * oim.order_item.quantity)
+            total_net += (oim.price_at_order_time * oim.order_item.quantity)
+            total_sales += (oim.price_at_order_time * oim.order_item.quantity)
+
+    else:
+        # Fallback for Group
+        grouped_data["Not Applicable"] = {
+            "label": "Not enough data collected for this metric",
+            "orders": 0,
+            "net_amount": 0.0,
+            "tax": 0.0,
+            "sales": 0.0
+        }
+
+    # Format output & calculate percentages
+    final_data = []
+    for k, v in grouped_data.items():
+        if "orders_set" in v:
+            v["orders"] = len(v["orders_set"])
+            del v["orders_set"]
+            
+        # Percentage calculation based on total_sales
+        v["percentage"] = round((v["sales"] / total_sales * 100), 2) if total_sales > 0 else 0.0
+        
+        # Round financial values
+        for field in ["net_amount", "discount", "tax", "sales", "dine_in", "takeaway", "delivery"]:
+            if field in v: v[field] = round(v[field], 2)
+            
+        final_data.append(v)
+        
+    # Sort data by sales descending
+    final_data = sorted(final_data, key=lambda x: x.get("sales", 0), reverse=True)
+
+    return {
+        "data": final_data,
+        "totals": {
+            "net_amount": round(total_net, 2),
+            "tax": round(total_tax, 2),
+            "sales": round(total_sales, 2),
+            "orders": len(orders),
+            "items": sum([oi.quantity for oi in order_items]) if order_items else 0
+        }
+    }
+\n--- backend/api\api_v1\reservations.py ---\nfrom fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from datetime import date
+from pydantic import BaseModel
+
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.reservation import ReservationCreateManual, ReservationCreatePublic, ReservationStatusUpdate, ReservationRead
+from models.reservation import Reservation
+from models.restaurant import Restaurant
+from models.notification import MessageType
+from services.whatsapp_service import trigger_whatsapp_message
+import razorpay
+from core.config import settings
+
+router = APIRouter()
+
+# FIX BUG-013: Payment credentials must be in request body (NOT query params)
+# Query params appear in server logs and browser history — security risk!
+class ReservationPaymentVerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+# Initialize Razorpay client
+def get_razorpay_client(key_id, key_secret):
+    if not key_id or not key_secret:
+        return None
+    return razorpay.Client(auth=(key_id, key_secret))
+
+@router.get("/", response_model=List[ReservationRead])
+def get_reservations(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Get all reservations for the owner dashboard"""
+    return db.query(Reservation).filter(Reservation.restaurant_id == restaurant_id).order_by(Reservation.reservation_date.desc(), Reservation.reservation_time.desc()).limit(100).all()
+
+@router.post("/manual", response_model=ReservationRead)
+def create_manual_reservation(
+    reservation_in: ReservationCreateManual,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Staff creates a manual reservation (already confirmed, no advance needed)"""
+    # If no table is assigned at booking, they are put on the WAITLIST
+    initial_status = "CONFIRMED" if reservation_in.table_id else "WAITLIST"
+
+    new_res = Reservation(
+        **reservation_in.model_dump(),
+        restaurant_id=restaurant_id,
+        status=initial_status
+    )
+    db.add(new_res)
+    db.commit()
+    db.refresh(new_res)
+    
+    # Notify customer
+    background_tasks.add_task(
+        trigger_whatsapp_message, new_res.id, new_res.customer_phone, MessageType.ORDER_CONFIRMED, 
+        f"Your table reservation for {new_res.guest_count} guests on {new_res.reservation_date} at {new_res.reservation_time} is confirmed."
+    )
+    
+    return new_res
+
+@router.get("/public/restaurant/{restaurant_id}")
+def get_public_restaurant_info(restaurant_id: UUID, db: Session = Depends(get_db)):
+    """Fetch public restaurant branding info for the booking page"""
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    
+    return {
+        "id": str(restaurant.id),
+        "name": restaurant.name,
+        "logo_url": restaurant.logo_url,
+        "advance_booking_fee": restaurant.advance_booking_fee
+    }
+
+@router.post("/public/{restaurant_id}", response_model=ReservationRead)
+def create_public_reservation(
+    restaurant_id: UUID,
+    reservation_in: ReservationCreatePublic,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Public customer requests a reservation"""
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    fee = restaurant.advance_booking_fee or 0.0
+    
+    new_res = Reservation(
+        **reservation_in.model_dump(),
+        restaurant_id=restaurant_id,
+        status="PENDING", # Pending until they pay or manager confirms
+        advance_amount=fee
+    )
+    db.add(new_res)
+    db.commit()
+    db.refresh(new_res)
+    
+    return new_res
+
+@router.post("/{res_id}/pay")
+def init_razorpay_payment(res_id: UUID, db: Session = Depends(get_db)):
+    """Initialize Razorpay order for advance payment"""
+    res = db.query(Reservation).filter(Reservation.id == res_id).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+        
+    from services.settings_service import get_config_value
+    key_id = get_config_value(db, "razorpay_key_id", str(res.restaurant_id))
+    key_secret = get_config_value(db, "razorpay_key_secret", str(res.restaurant_id))
+    
+    if not key_id or not key_secret:
+        # Cannot pay via razorpay, just accept it
+        res.status = "CONFIRMED"
+        db.commit()
+        return {"message": "Restaurant has no online payments. Booking confirmed automatically."}
+        
+    client = get_razorpay_client(key_id, key_secret)
+    if not client:
+        raise HTTPException(status_code=500, detail="Invalid payment keys")
+        
+    amount_paise = int(res.advance_amount * 100)
+    
+    try:
+        data = {"amount": amount_paise, "currency": "INR", "receipt": str(res.id)}
+        payment = client.order.create(data=data)
+        
+        res.razorpay_order_id = payment['id']
+        db.commit()
+        
+        return {
+            "razorpay_order_id": payment['id'],
+            "razorpay_key_id": key_id,
+            "amount": amount_paise,
+            "currency": "INR"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment initialization failed: {str(e)}")
+
+@router.post("/{res_id}/verify-payment")
+def verify_payment(
+    res_id: UUID,
+    req: ReservationPaymentVerifyRequest,   # FIX: body instead of URL query params
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    res = db.query(Reservation).filter(Reservation.id == res_id).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+        
+    from services.settings_service import get_config_value
+    key_id = get_config_value(db, "razorpay_key_id", str(res.restaurant_id))
+    key_secret = get_config_value(db, "razorpay_key_secret", str(res.restaurant_id))
+    
+    client = get_razorpay_client(key_id, key_secret)
+    try:
+        client.utility.verify_payment_signature({
+            'razorpay_order_id': req.razorpay_order_id,
+            'razorpay_payment_id': req.razorpay_payment_id,
+            'razorpay_signature': req.razorpay_signature
+        })
+        
+        res.status = "CONFIRMED"
+        res.payment_status = "PAID"
+        res.razorpay_payment_id = req.razorpay_payment_id
+        db.commit()
+        
+        background_tasks.add_task(
+            trigger_whatsapp_message, res.id, res.customer_phone, MessageType.ORDER_CONFIRMED, 
+            f"Your table reservation for {res.guest_count} guests on {res.reservation_date} at {res.reservation_time} is CONFIRMED with ₹{res.advance_amount} advance paid."
+        )
+        return {"message": "Payment successful"}
+        
+    except razorpay.errors.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid Signature")
+
+@router.put("/{res_id}/status", response_model=ReservationRead)
+def update_status(
+    res_id: UUID,
+    status_update: ReservationStatusUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    res = db.query(Reservation).filter(Reservation.id == res_id, Reservation.restaurant_id == restaurant_id).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+        
+    res.status = status_update.status
+    if status_update.table_id:
+        res.table_id = status_update.table_id
+        
+    db.commit()
+    db.refresh(res)
+    
+    if res.status == "CONFIRMED":
+        background_tasks.add_task(
+            trigger_whatsapp_message, res.id, res.customer_phone, MessageType.ORDER_CONFIRMED, 
+            f"Your table reservation is now CONFIRMED by the restaurant."
+        )
+        
+    return res
+\n--- backend/api\api_v1\router.py ---\nfrom fastapi import APIRouter
+from api.api_v1 import health, auth, menu, orders, tables, inventory, billing, users, analytics, settings, payments, reports, reservations, cash_register, superadmin, crm, enterprise, subscriptions, aggregators
+
+api_router = APIRouter()
+
+api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+api_router.include_router(users.router, prefix="/users", tags=["Users"])
+api_router.include_router(superadmin.router, prefix="/superadmin", tags=["SuperAdmin"])
+
+# Restaurant functional routes
+api_router.include_router(menu.router, prefix="/menu", tags=["Menu"])
+api_router.include_router(orders.router, prefix="/orders", tags=["Orders"])
+api_router.include_router(tables.router, prefix="/tables", tags=["Tables"])
+api_router.include_router(inventory.router, prefix="/inventory", tags=["Inventory"])
+api_router.include_router(billing.router, prefix="/billing", tags=["Billing"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+api_router.include_router(settings.router, prefix="/settings", tags=["Settings"])
+api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])
+api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
+api_router.include_router(reservations.router, prefix="/reservations", tags=["Reservations"])
+api_router.include_router(cash_register.router, prefix="/cash", tags=["Cash Register"])
+api_router.include_router(crm.router, prefix="/crm", tags=["CRM & Loyalty"])
+api_router.include_router(enterprise.router, prefix="/enterprise", tags=["Enterprise & Aggregator Hub"])
+api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["SaaS Subscriptions"])
+api_router.include_router(aggregators.router, prefix="/aggregators", tags=["Aggregators"])
+\n--- backend/api\api_v1\settings.py ---\nfrom fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from typing import Optional
+from sqlalchemy.orm import Session
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.settings import UPIConfig, RazorpayConfig, IntegrationsConfig
+from services import settings_service
+
+router = APIRouter()
+
+@router.put("/restaurant-profile")
+async def update_restaurant_profile(
+    name: str = Form(None),
+    logo: UploadFile = File(None),
+    gstin: Optional[str] = Form(None),
+    fssai: Optional[str] = Form(None),
+    advance_booking_fee: Optional[float] = Form(None),
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """(Secure) Update restaurant name and logo. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    from models.restaurant import Restaurant
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    if name:
+        restaurant.name = name
+    if gstin is not None:
+        restaurant.gstin = gstin
+    if fssai is not None:
+        restaurant.fssai = fssai
+    if advance_booking_fee is not None:
+        restaurant.advance_booking_fee = advance_booking_fee
+        
+    if logo and logo.filename:
+        from db.supabase import supabase_client
+        import uuid, io
+        from PIL import Image
+
+        # Read raw bytes (await is required for async UploadFile)
+        logo_content = await logo.read()
+
+        # Convert to PNG with PIL (preserves transparency)
+        try:
+            img = Image.open(io.BytesIO(logo_content))
+            if img.mode not in ("RGBA", "RGB"):
+                img = img.convert("RGBA")
+            img.thumbnail((800, 800))
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG", optimize=True)
+            buffer.seek(0)
+            final_bytes = buffer.getvalue()
+            content_type = "image/png"
+        except Exception as pil_err:
+            print(f"DEBUG settings: PIL failed ({pil_err}), using raw bytes")
+            final_bytes = logo_content
+            content_type = logo.content_type
+
+        file_name = f"logo_{uuid.uuid4().hex}.png"
+
+        res = supabase_client.storage.from_('logos').upload(
+            path=file_name,
+            file=final_bytes,
+            file_options={"content-type": content_type, "upsert": "true"}
+        )
+
+        # Get public URL
+        public_url = supabase_client.storage.from_('logos').get_public_url(file_name)
+        restaurant.logo_url = public_url
+        
+    db.commit()
+    return {"message": "Profile updated", "name": restaurant.name, "logo_url": restaurant.logo_url}
+
+@router.get("/upi", response_model=UPIConfig)
+def get_upi_id(
+    db: Session = Depends(get_db),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """Fetch the store's configured UPI ID."""
+    upi_id = settings_service.get_config_value(db, "upi_id", str(restaurant_id))
+    if not upi_id:
+        return {"upi_id": ""}
+    return {"upi_id": upi_id}
+
+@router.post("/upi", response_model=UPIConfig)
+def update_upi_id(
+    config_in: UPIConfig,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """(Secure) Update the store's UPI ID. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    settings_service.set_config_value(db, "upi_id", config_in.upi_id, str(restaurant_id))
+    return {"upi_id": config_in.upi_id}
+
+@router.get("/razorpay", response_model=RazorpayConfig)
+def get_razorpay_keys(
+    db: Session = Depends(get_db),
+    restaurant_id=Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Fetch the store's configured Razorpay keys. Owner only (for display in settings)."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    key_id = settings_service.get_config_value(db, "razorpay_key_id", str(restaurant_id))
+    key_secret = settings_service.get_config_value(db, "razorpay_key_secret", str(restaurant_id))
+    
+    return {
+        "razorpay_key_id": key_id or "",
+        "razorpay_key_secret": key_secret or ""
+    }
+
+@router.post("/razorpay", response_model=RazorpayConfig)
+def update_razorpay_keys(
+    config_in: RazorpayConfig,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """(Secure) Update the store's Razorpay keys. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    settings_service.set_config_value(db, "razorpay_key_id", config_in.razorpay_key_id, str(restaurant_id))
+    settings_service.set_config_value(db, "razorpay_key_secret", config_in.razorpay_key_secret, str(restaurant_id))
+    
+    return config_in
+
+@router.get("/integrations", response_model=IntegrationsConfig)
+def get_integrations_config(
+    db: Session = Depends(get_db),
+    restaurant_id=Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Fetch the store's configured aggregator integrations. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    z_id = settings_service.get_config_value(db, "zomato_store_id", str(restaurant_id))
+    s_id = settings_service.get_config_value(db, "swiggy_store_id", str(restaurant_id))
+    
+    return {
+        "zomato_store_id": z_id or "",
+        "swiggy_store_id": s_id or ""
+    }
+
+@router.post("/integrations", response_model=IntegrationsConfig)
+def update_integrations_config(
+    config_in: IntegrationsConfig,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token),
+    restaurant_id=Depends(get_current_restaurant)
+):
+    """(Secure) Update the store's aggregator integrations. Owner only."""
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    settings_service.set_config_value(db, "zomato_store_id", config_in.zomato_store_id, str(restaurant_id))
+    settings_service.set_config_value(db, "swiggy_store_id", config_in.swiggy_store_id, str(restaurant_id))
+    
+    return config_in
+\n--- backend/api\api_v1\subscriptions.py ---\nfrom fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime, timedelta
+import razorpay
+import uuid
+import hmac
+import hashlib
+
+from api.deps import get_db, get_current_user
+from models.saas_payment import SaaSPayment
+from models.restaurant import Restaurant
+from models.user import User, UserRole
+from models.settings import PlatformConfig
+from core.config import settings
+
+router = APIRouter()
+
+# Initialize Razorpay Client for SaaS Platform
+def get_saas_razorpay_client():
+    if not settings.SAAS_RAZORPAY_KEY_ID or not settings.SAAS_RAZORPAY_KEY_SECRET:
+        # If keys are missing (e.g. testing mode or user hasn't set them up yet),
+        # return None and we will mock the Razorpay order creation
+        return None
+    return razorpay.Client(auth=(settings.SAAS_RAZORPAY_KEY_ID, settings.SAAS_RAZORPAY_KEY_SECRET))
+
+class CreateSubscriptionOrderRequest(BaseModel):
+    plan_name: str
+    is_yearly: bool
+
+class VerifySubscriptionPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+@router.post("/create-order")
+def create_subscription_order(
+    req: CreateSubscriptionOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # FIX BUG-004: compare against UserRole enum, not the string "owner"
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=403, detail="Only owners can manage subscriptions")
+    
+    # Fetch prices from platform config
+    plan_key = f"{req.plan_name}_plan_price"
+    config_entry = db.query(PlatformConfig).filter(PlatformConfig.key == plan_key).first()
+    
+    if not config_entry:
+        raise HTTPException(status_code=400, detail="Invalid plan name or plan price not configured")
+        
+    try:
+        monthly_price = int(config_entry.value)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Invalid plan price configuration")
+        
+    amount = monthly_price * 10 if req.is_yearly else monthly_price
+        
+    client = get_saas_razorpay_client()
+    
+    order_id = None
+    if client:
+        try:
+            # Amount is in paise
+            data = {
+                "amount": amount * 100,
+                "currency": "INR",
+                "receipt": str(uuid.uuid4())[:15]
+            }
+            rzp_order = client.order.create(data=data)
+            order_id = rzp_order.get("id")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {str(e)}")
+    else:
+        # Mock order for testing when keys are absent
+        order_id = f"order_mock_{uuid.uuid4().hex[:10]}"
+
+    # Save payment intent in DB
+    payment = SaaSPayment(
+        restaurant_id=current_user.restaurant_id,
+        amount=amount,
+        plan_name=req.plan_name,
+        billing_cycle="yearly" if req.is_yearly else "monthly",
+        razorpay_order_id=order_id,
+        status="PENDING"
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "success": True,
+        "order_id": order_id,
+        "amount": amount * 100,
+        "currency": "INR",
+        "key_id": settings.SAAS_RAZORPAY_KEY_ID or "mock_key_id"
+    }
+
+@router.post("/verify")
+def verify_subscription_payment(
+    req: VerifySubscriptionPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    payment = db.query(SaaSPayment).filter(SaaSPayment.razorpay_order_id == req.razorpay_order_id).first()
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if payment.status == "PAID":
+        return {"success": True, "message": "Already paid"}
+
+    # Verify signature
+    client = get_saas_razorpay_client()
+    is_valid = False
+    
+    if client:
+        try:
+            client.utility.verify_payment_signature({
+                'razorpay_order_id': req.razorpay_order_id,
+                'razorpay_payment_id': req.razorpay_payment_id,
+                'razorpay_signature': req.razorpay_signature
+            })
+            is_valid = True
+        except Exception as e:
+            is_valid = False
+    else:
+        # Mock verification for testing
+        is_valid = True
+
+    if not is_valid:
+        payment.status = "FAILED"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid signature")
+        
+    # Update payment record
+    payment.status = "PAID"
+    payment.razorpay_payment_id = req.razorpay_payment_id
+    payment.razorpay_signature = req.razorpay_signature
+    
+    # Update restaurant subscription
+    restaurant = db.query(Restaurant).filter(Restaurant.id == payment.restaurant_id).first()
+    if restaurant:
+        restaurant.subscription_status = "active"
+        restaurant.subscription_plan = payment.plan_name
+        
+        # Extend subscription end date
+        now = datetime.now()
+        # If they already have an active sub with future end date, extend from there
+        if restaurant.subscription_ends_at and restaurant.subscription_ends_at > now:
+            start_date = restaurant.subscription_ends_at
+        else:
+            start_date = now
+            
+        if payment.billing_cycle == "yearly":
+            restaurant.subscription_ends_at = start_date + timedelta(days=365)
+        else:
+            restaurant.subscription_ends_at = start_date + timedelta(days=30)
+
+    db.commit()
+
+    return {"success": True, "message": "Subscription activated successfully"}
+\n--- backend/api\api_v1\superadmin.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import List
+from uuid import UUID
+
+from api.deps import get_db, get_current_user
+from models.user import User, UserRole
+from models.restaurant import Restaurant
+from models.announcement import Announcement
+from models.settings import PlatformConfig
+from models.ticket import Ticket
+from schemas.superadmin import RestaurantOverview, SuperAdminDashboardStats, UpdateSubscriptionRequest, UpdateCreditsRequest, UserOverview, PlatformFinancialsResponse, RestaurantFinancial, AnnouncementCreate, AnnouncementResponse, PlatformSettingResponse, PlatformSettingUpdate
+from schemas.auth import GenericResponse
+from schemas.ticket import TicketResponse, TicketUpdateStatus
+from models.billing import Bill, PaymentStatus
+
+router = APIRouter()
+
+def get_current_superadmin(current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized. Super Admin only.")
+    return current_user
+
+@router.get("/stats", response_model=SuperAdminDashboardStats)
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    total_restaurants = db.query(Restaurant).count()
+    pending_approvals = db.query(Restaurant).filter(Restaurant.is_approved == False).count()
+    active_subscriptions = db.query(Restaurant).filter(Restaurant.subscription_status == "active").count()
+    total_users = db.query(User).count()
+    
+    return SuperAdminDashboardStats(
+        total_restaurants=total_restaurants,
+        pending_approvals=pending_approvals,
+        active_subscriptions=active_subscriptions,
+        total_users=total_users
+    )
+
+@router.get("/financials", response_model=PlatformFinancialsResponse)
+def get_financials(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurants = db.query(Restaurant).all()
+    
+    # Calculate GMV per restaurant
+    gmv_by_restaurant = dict(
+        db.query(Bill.restaurant_id, func.sum(Bill.total_amount))
+        .filter(Bill.status == PaymentStatus.COMPLETED)
+        .group_by(Bill.restaurant_id)
+        .all()
+    )
+    
+    total_mrr = 0.0
+    total_gmv = sum(gmv_by_restaurant.values()) if gmv_by_restaurant else 0.0
+    active_subscriptions_by_plan = {"basic": 0, "pro": 0, "max": 0}
+    
+    restaurant_financials = []
+    
+    total_restaurants = len(restaurants)
+    active_count = 0
+    
+    # Fetch dynamic prices
+    basic_price = db.query(PlatformConfig).filter(PlatformConfig.key == "basic_plan_price").first()
+    pro_price = db.query(PlatformConfig).filter(PlatformConfig.key == "pro_plan_price").first()
+    max_price = db.query(PlatformConfig).filter(PlatformConfig.key == "max_plan_price").first()
+    
+    p_basic = float(basic_price.value) if basic_price else 499.0
+    p_pro = float(pro_price.value) if pro_price else 999.0
+    p_max = float(max_price.value) if max_price else 1399.0
+
+    for r in restaurants:
+        r_gmv = gmv_by_restaurant.get(r.id, 0.0)
+        r_mrr = 0.0
+        
+        if r.subscription_status == "active":
+            active_count += 1
+            if r.subscription_plan == "basic":
+                r_mrr = p_basic
+                active_subscriptions_by_plan["basic"] += 1
+            elif r.subscription_plan == "pro":
+                r_mrr = p_pro
+                active_subscriptions_by_plan["pro"] += 1
+            elif r.subscription_plan == "max":
+                r_mrr = p_max
+                active_subscriptions_by_plan["max"] += 1
+                
+        total_mrr += r_mrr
+        
+        owner = db.query(User).filter(User.restaurant_id == r.id, User.role == UserRole.OWNER).first()
+        
+        restaurant_financials.append(RestaurantFinancial(
+            restaurant_id=r.id,
+            name=r.name,
+            owner_email=owner.email if owner else None,
+            subscription_plan=r.subscription_plan,
+            subscription_status=r.subscription_status,
+            mrr=r_mrr,
+            gmv=r_gmv
+        ))
+        
+    arpu = (total_mrr / active_count) if active_count > 0 else 0.0
+    conversion_rate = (active_count / total_restaurants * 100) if total_restaurants > 0 else 0.0
+    
+    return PlatformFinancialsResponse(
+        total_mrr=total_mrr,
+        total_gmv=total_gmv,
+        arpu=arpu,
+        conversion_rate=conversion_rate,
+        active_subscriptions_by_plan=active_subscriptions_by_plan,
+        restaurant_financials=restaurant_financials
+    )
+
+@router.get("/restaurants", response_model=List[RestaurantOverview])
+def get_all_restaurants(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurants = db.query(Restaurant).all()
+    result = []
+    
+    for r in restaurants:
+        owner = db.query(User).filter(User.restaurant_id == r.id, User.role == UserRole.OWNER).first()
+        result.append(RestaurantOverview(
+            id=r.id,
+            name=r.name,
+            owner_name=owner.full_name if owner else None,
+            owner_email=owner.email if owner else None,
+            owner_phone=owner.phone_number if owner else None,
+            is_approved=r.is_approved,
+            subscription_status=r.subscription_status,
+            subscription_plan=r.subscription_plan,
+            subscription_ends_at=r.subscription_ends_at,
+            model_3d_credits=r.model_3d_credits,
+            created_at=r.created_at
+        ))
+    return result
+
+@router.put("/restaurants/{restaurant_id}/approve", response_model=RestaurantOverview)
+def approve_restaurant(
+    restaurant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    restaurant.is_approved = True
+    db.commit()
+    db.refresh(restaurant)
+    
+    owner = db.query(User).filter(User.restaurant_id == restaurant.id, User.role == UserRole.OWNER).first()
+    return RestaurantOverview(
+        id=restaurant.id,
+        name=restaurant.name,
+        owner_name=owner.full_name if owner else None,
+        owner_email=owner.email if owner else None,
+        owner_phone=owner.phone_number if owner else None,
+        is_approved=restaurant.is_approved,
+        subscription_status=restaurant.subscription_status,
+        subscription_plan=restaurant.subscription_plan,
+        subscription_ends_at=restaurant.subscription_ends_at,
+        model_3d_credits=restaurant.model_3d_credits,
+        created_at=restaurant.created_at
+    )
+
+@router.put("/restaurants/{restaurant_id}/subscription", response_model=RestaurantOverview)
+def update_subscription(
+    restaurant_id: str,
+    req: UpdateSubscriptionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    restaurant.subscription_plan = req.plan
+    restaurant.subscription_status = req.status
+    if req.expiry_date is not None:
+        restaurant.subscription_ends_at = req.expiry_date
+    db.commit()
+    db.refresh(restaurant)
+    
+    owner = db.query(User).filter(User.restaurant_id == restaurant.id, User.role == UserRole.OWNER).first()
+    return RestaurantOverview(
+        id=restaurant.id,
+        name=restaurant.name,
+        owner_name=owner.full_name if owner else None,
+        owner_email=owner.email if owner else None,
+        owner_phone=owner.phone_number if owner else None,
+        is_approved=restaurant.is_approved,
+        subscription_status=restaurant.subscription_status,
+        subscription_plan=restaurant.subscription_plan,
+        subscription_ends_at=restaurant.subscription_ends_at,
+        model_3d_credits=restaurant.model_3d_credits,
+        created_at=restaurant.created_at
+    )
+
+@router.put("/restaurants/{restaurant_id}/credits", response_model=GenericResponse)
+def update_restaurant_credits(
+    restaurant_id: str,
+    req: UpdateCreditsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    restaurant.model_3d_credits = req.model_3d_credits
+    db.commit()
+    
+    return GenericResponse(success=True, message="3D AR Credits updated successfully")
+
+@router.get("/users", response_model=List[UserOverview])
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    users = db.query(User).all()
+    result = []
+    for u in users:
+        result.append(UserOverview(
+            id=u.id,
+            full_name=u.full_name,
+            email=u.email,
+            phone_number=u.phone_number,
+            role=u.role.value,
+            restaurant_name=u.restaurant.name if u.restaurant else None,
+            is_approved=u.is_approved,
+            created_at=u.created_at
+        ))
+    return result
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if target_user.role == UserRole.SUPERADMIN and target_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own superadmin account")
+
+    db.delete(target_user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
+@router.delete("/restaurants/{restaurant_id}")
+def delete_restaurant(
+    restaurant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+    try:
+        from models.table import Table
+        from models.menu import Category, MenuItem
+        from models.order import Order, OrderItem
+        from models.billing import Bill
+        from models.inventory import StockItem
+        from models.settings import RestaurantConfig
+        from models.cash_register import CashShift, CashTransaction
+        from models.ticket import Ticket
+        
+        # We need to manually delete related records since we don't have DB level cascades
+        # Delete related Order Items first
+        orders = db.query(Order).filter(Order.restaurant_id == restaurant_id).all()
+        order_ids = [o.id for o in orders]
+        if order_ids:
+            db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+            
+        # Delete related Cash Transactions
+        shifts = db.query(CashShift).filter(CashShift.restaurant_id == restaurant_id).all()
+        shift_ids = [s.id for s in shifts]
+        if shift_ids:
+            db.query(CashTransaction).filter(CashTransaction.shift_id.in_(shift_ids)).delete(synchronize_session=False)
+
+        # Delete dependent tables directly
+        db.query(Bill).filter(Bill.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Order).filter(Order.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Category).filter(Category.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Table).filter(Table.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(StockItem).filter(StockItem.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(RestaurantConfig).filter(RestaurantConfig.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(CashShift).filter(CashShift.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.query(Ticket).filter(Ticket.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        
+        # Finally delete users and restaurant
+        db.query(User).filter(User.restaurant_id == restaurant_id).delete(synchronize_session=False)
+        db.delete(restaurant)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Cannot delete restaurant due to dependencies. Error: {str(e)}")
+
+    return {"message": "Restaurant and all its data deleted successfully"}
+
+@router.post("/restaurants/{restaurant_id}/impersonate", response_model=GenericResponse)
+def impersonate_restaurant_owner(
+    restaurant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    owner = db.query(User).filter(User.restaurant_id == restaurant_id, User.role == UserRole.OWNER).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Restaurant owner not found")
+        
+    from api.api_v1.auth import _make_local_token, _build_auth_data
+    access_token = _make_local_token(str(owner.id), owner.email, owner.role.value)
+    
+    return GenericResponse(
+        message=f"Impersonating owner: {owner.full_name or owner.email}",
+        data=_build_auth_data(owner, access_token)
+    )
+
+@router.post("/users/{user_id}/impersonate", response_model=GenericResponse)
+def impersonate_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if target_user.role == UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Cannot impersonate another super admin")
+        
+    from api.api_v1.auth import _make_local_token, _build_auth_data
+    access_token = _make_local_token(str(target_user.id), target_user.email, target_user.role.value)
+    
+    return GenericResponse(
+        message=f"Impersonating user: {target_user.full_name or target_user.email}",
+        data=_build_auth_data(target_user, access_token)
+    )
+
+@router.post("/announcements", response_model=AnnouncementResponse)
+def create_announcement(
+    payload: AnnouncementCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    announcement = Announcement(
+        title=payload.title,
+        message=payload.message,
+        target_role=payload.target_role,
+        is_active=payload.is_active
+    )
+    db.add(announcement)
+    db.commit()
+    db.refresh(announcement)
+    return announcement
+
+@router.get("/announcements", response_model=List[AnnouncementResponse])
+def get_all_announcements(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    return db.query(Announcement).order_by(Announcement.created_at.desc()).all()
+
+@router.delete("/announcements/{announcement_id}")
+def delete_announcement(
+    announcement_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
+    if not announcement:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+        
+    db.delete(announcement)
+    db.commit()
+    return {"message": "Announcement deleted successfully"}
+
+@router.get("/platform-settings", response_model=List[PlatformSettingResponse])
+def get_platform_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    return db.query(PlatformConfig).all()
+
+@router.put("/platform-settings")
+def update_platform_settings(
+    settings_in: List[PlatformSettingUpdate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    for s in settings_in:
+        config = db.query(PlatformConfig).filter(PlatformConfig.key == s.key).first()
+        if config:
+            config.value = s.value
+    db.commit()
+    return {"message": "Platform settings updated successfully"}
+
+@router.get("/tickets", response_model=List[TicketResponse])
+def get_all_tickets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    tickets = db.query(Ticket).order_by(Ticket.created_at.desc()).all()
+    # Populate restaurant names for superadmin
+    for t in tickets:
+        rest = db.query(Restaurant).filter(Restaurant.id == t.restaurant_id).first()
+        t.restaurant_name = rest.name if rest else "Unknown"
+    return tickets
+
+@router.put("/tickets/{ticket_id}", response_model=TicketResponse)
+def update_ticket_status(
+    ticket_id: UUID,
+    update_data: TicketUpdateStatus,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin)
+):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    ticket.status = update_data.status
+    if update_data.resolution_notes is not None:
+        ticket.resolution_notes = update_data.resolution_notes
+        
+    from datetime import datetime, timezone
+    if update_data.status == "RESOLVED" and not ticket.resolved_at:
+        ticket.resolved_at = datetime.now(timezone.utc)
+    elif update_data.status != "RESOLVED":
+        ticket.resolved_at = None
+        
+    db.commit()
+    db.refresh(ticket)
+    
+    rest = db.query(Restaurant).filter(Restaurant.id == ticket.restaurant_id).first()
+    ticket.restaurant_name = rest.name if rest else "Unknown"
+    return ticket
+\n--- backend/api\api_v1\tables.py ---\nfrom fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from api.deps import get_db, get_current_restaurant, get_current_user_token
+from core.config import settings
+from schemas.table import TableCreate, TableRead, TablePositionUpdate
+from models.table import Table
+
+router = APIRouter()
+
+@router.get("/", response_model=List[TableRead])
+def get_all_tables(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    return db.query(Table).filter(Table.restaurant_id == restaurant_id).all()
+
+@router.get("/{table_id}")
+def get_table_by_id(table_id: UUID, db: Session = Depends(get_db)):
+    table = db.query(Table).filter(Table.id == table_id).first()
+    if not table:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    # Fetch restaurant branding
+    from models.restaurant import Restaurant
+    restaurant = db.query(Restaurant).filter(Restaurant.id == table.restaurant_id).first()
+    
+    # Fetch UPI ID
+    from services import settings_service
+    upi_id = settings_service.get_config_value(db, "upi_id", str(table.restaurant_id))
+    
+    return {
+        "id": str(table.id),
+        "table_number": table.table_number,
+        "restaurant_id": str(table.restaurant_id),
+        "restaurant_name": restaurant.name if restaurant else "MyRestro",
+        "restaurant_logo": (restaurant.logo_url if restaurant.logo_url.startswith("http") else f"{settings.BASE_URL}{restaurant.logo_url}") if restaurant and restaurant.logo_url else None,
+        "restaurant_upi_id": upi_id,
+        "restaurant_gstin": restaurant.gstin if restaurant else None,
+        "restaurant_fssai": restaurant.fssai if restaurant else None
+    }
+
+@router.post("/", response_model=TableRead)
+def create_table(
+    table_in: TableCreate, 
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    obj = Table(**table_in.model_dump(), restaurant_id=restaurant_id)
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+@router.delete("/{table_id}")
+def delete_table(
+    table_id: UUID,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from fastapi import HTTPException
+    from sqlalchemy.exc import IntegrityError
+    
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+    
+    table = db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+        
+    try:
+        db.delete(table)
+        db.commit()
+        return {"message": "Table deleted successfully"}
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete this table because it has existing orders or reservations associated with it."
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete table: {str(e)}")
+
+@router.put("/positions", response_model=List[TableRead])
+def update_table_positions(
+    positions: List[TablePositionUpdate],
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    from fastapi import HTTPException
+    
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Owner access required")
+        
+    updated_tables = []
+    
+    for pos in positions:
+        table = db.query(Table).filter(Table.id == pos.id, Table.restaurant_id == restaurant_id).first()
+        if table:
+            table.position_x = pos.position_x
+            table.position_y = pos.position_y
+            updated_tables.append(table)
+            
+    db.commit()
+    for t in updated_tables:
+        db.refresh(t)
+        
+    return updated_tables
+\n--- backend/api\api_v1\users.py ---\nfrom fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from uuid import UUID
+from api.deps import get_db, get_current_user_token, get_current_restaurant
+from schemas.user import UserRead
+from models.user import User, UserRole
+from models.announcement import Announcement
+from schemas.superadmin import AnnouncementResponse
+from schemas.ticket import TicketCreate, TicketResponse
+from models.ticket import Ticket
+
+router = APIRouter()
+
+def require_owner(token: dict = Depends(get_current_user_token)):
+    if token.get("role") != "OWNER":
+        raise HTTPException(status_code=403, detail="Not authorized. Owner access required.")
+    return token
+
+from schemas.user import PasswordChange
+@router.put("/me/password")
+def change_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token)
+):
+    from api.api_v1.auth import _hash_password, _verify_password
+    
+    user = db.query(User).filter(User.id == token.get("sub")).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not _verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+    user.password_hash = _hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@router.get("/staff", response_model=List[UserRead])
+def get_staff_members(
+    db: Session = Depends(get_db), 
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Fetch all non-owner staff (waiters/kitchen)."""
+    return db.query(User).filter(User.role != UserRole.OWNER, User.restaurant_id == str(restaurant_id)).all()
+
+@router.put("/staff/{user_id}/verify", response_model=UserRead)
+def verify_staff_member(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Approve a staff member so they can log in."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.is_approved = True
+    user.is_verified = True  # Also mark as verified in case OTP was skipped
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.delete("/staff/{user_id}")
+def delete_staff_member(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Remove a staff member."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    db.delete(user)
+    db.commit()
+    return {"message": "Staff member deleted successfully"}
+
+from schemas.auth import StaffSignupRequest
+@router.post("/staff", response_model=UserRead)
+def create_staff_member(
+    payload: StaffSignupRequest,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Owner instantly creates a verified staff member."""
+    from api.api_v1.auth import _hash_password
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered.")
+        
+    try:
+        role = UserRole(payload.role.upper())
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER, UserRole.RUNNER]:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, MANAGER, or RUNNER.")
+
+    new_user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        phone_number=payload.phone_number,
+        role=role,
+        restaurant_id=str(restaurant_id),
+        restaurant_email=payload.restaurant_email,
+        password_hash=_hash_password(payload.password),
+        is_verified=True,   # Owner-created staff skips OTP
+        is_approved=True    # Owner-created staff is instantly approved
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+from pydantic import BaseModel
+class RoleUpdateRequest(BaseModel):
+    role: str
+
+@router.put("/staff/{user_id}/role", response_model=UserRead)
+def update_staff_role(
+    user_id: UUID,
+    payload: RoleUpdateRequest,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Update the role of an existing staff member."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    try:
+        role = UserRole(payload.role.upper())
+        if role not in [UserRole.WAITER, UserRole.KITCHEN, UserRole.MANAGER, UserRole.RUNNER]:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid staff role. Use WAITER, KITCHEN, MANAGER, or RUNNER.")
+        
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user
+
+class AccessUpdateRequest(BaseModel):
+    allowed_categories: list[str]
+
+@router.put("/staff/{user_id}/access", response_model=UserRead)
+def update_staff_access(
+    user_id: UUID,
+    payload: AccessUpdateRequest,
+    db: Session = Depends(get_db),
+    token: dict = Depends(require_owner),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Update the category access restrictions of a staff member (waiter)."""
+    user = db.query(User).filter(User.id == user_id, User.restaurant_id == str(restaurant_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.allowed_categories = payload.allowed_categories
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.get("/announcements/active", response_model=List[AnnouncementResponse])
+def get_active_announcements(
+    db: Session = Depends(get_db),
+    token: dict = Depends(get_current_user_token)
+):
+    """Fetch active announcements for the current user's role."""
+    role = token.get("role", "")
+    
+    # Target either 'ALL' or specifically the user's role (e.g. 'OWNER')
+    return db.query(Announcement).filter(
+        Announcement.is_active == True,
+        Announcement.target_role.in_(["ALL", role])
+    ).order_by(Announcement.created_at.desc()).all()
+
+@router.get("/tickets", response_model=List[TicketResponse])
+def get_restaurant_tickets(
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant)
+):
+    """Get all tickets created by this restaurant."""
+    return db.query(Ticket).filter(Ticket.restaurant_id == restaurant_id).order_by(Ticket.created_at.desc()).all()
+
+@router.post("/tickets", response_model=TicketResponse)
+def create_ticket(
+    ticket_in: TicketCreate,
+    db: Session = Depends(get_db),
+    restaurant_id: UUID = Depends(get_current_restaurant),
+    token: dict = Depends(get_current_user_token)
+):
+    """Create a new support ticket."""
+    user_id = UUID(token.get("sub"))
+    
+    ticket = Ticket(
+        restaurant_id=restaurant_id,
+        opened_by_id=user_id,
+        subject=ticket_in.subject,
+        description=ticket_in.description,
+        status="OPEN"
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+\n--- backend/api\api_v1\__init__.py ---\n

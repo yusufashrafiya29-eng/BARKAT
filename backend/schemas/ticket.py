@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
 class TicketBase(BaseModel):
-    subject: str
-    description: str
+    subject: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
 
 class TicketCreate(TicketBase):
     pass

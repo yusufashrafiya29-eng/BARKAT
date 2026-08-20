@@ -1,0 +1,1509 @@
+{
+  "backend": {
+    "todos": [],
+    "large_files": [
+      {
+        "file": ".\\backend\\api\\api_v1\\reports.py",
+        "lines": 622
+      }
+    ],
+    "bare_excepts": [
+      {
+        "file": ".\\backend\\api\\api_v1\\crm.py",
+        "line": 58,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\api\\api_v1\\payments.py",
+        "line": 150,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\api\\api_v1\\reports.py",
+        "line": 32,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\api\\api_v1\\reports.py",
+        "line": 141,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\api\\api_v1\\reports.py",
+        "line": 211,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\core\\config.py",
+        "line": 37,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\services\\billing_service.py",
+        "line": 126,
+        "text": "except Exception:"
+      },
+      {
+        "file": ".\\backend\\services\\order_service.py",
+        "line": 13,
+        "text": "except Exception:"
+      }
+    ],
+    "hardcoded_secrets": [],
+    "incomplete_code": [
+      {
+        "file": ".\\backend\\schemas\\billing.py",
+        "line": 25,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\inventory.py",
+        "line": 15,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\menu.py",
+        "line": 12,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\menu.py",
+        "line": 63,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\menu.py",
+        "line": 112,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\order.py",
+        "line": 12,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\table.py",
+        "line": 19,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\ticket.py",
+        "line": 11,
+        "text": "pass"
+      },
+      {
+        "file": ".\\backend\\schemas\\user.py",
+        "line": 22,
+        "text": "pass"
+      }
+    ]
+  },
+  "frontend": {
+    "todos": [],
+    "large_files": [
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "lines": 595
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\FranchiseCommissaryTab.tsx",
+        "lines": 693
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "lines": 693
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "lines": 1007
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\KitchenKDS.tsx",
+        "lines": 588
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "lines": 1167
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "lines": 1024
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "lines": 1677
+      }
+    ],
+    "any_types": [
+      {
+        "file": ".\\frontend\\src\\custom-elements.d.ts",
+        "line": 3,
+        "text": "'model-viewer': any;"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\auth.ts",
+        "line": 13,
+        "text": "signupStaff: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\auth.ts",
+        "line": 18,
+        "text": "login: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\customer.ts",
+        "line": 18,
+        "text": "placeOrder: async (orderData: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\customer.ts",
+        "line": 58,
+        "text": "createPublicReservation: async (restaurantId: string, payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\customer.ts",
+        "line": 68,
+        "text": "verifyReservationPayment: async (reservationId: string, paymentData: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 42,
+        "text": "addCategory: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 47,
+        "text": "addMenuItem: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 57,
+        "text": "updateMenuItem: async (itemId: string, payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 62,
+        "text": "updateMenuItemRecipe: async (itemId: string, payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 73,
+        "text": "addTable: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 89,
+        "text": "createVerifiedStaff: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 100,
+        "text": "addInventoryItem: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 105,
+        "text": "updateInventoryItem: async (itemId: string, payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 185,
+        "text": "changePassword: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 221,
+        "text": "addManualReservation: async (payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 243,
+        "text": "generate3DModel: async (itemId: string, payload: any = {}) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 263,
+        "text": "createExpense: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 276,
+        "text": "createCoupon: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 285,
+        "text": "createHappyHour: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 294,
+        "text": "createBogoRule: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 303,
+        "text": "createBranch: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 316,
+        "text": "createCentralStock: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 329,
+        "text": "createTransfer: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 343,
+        "text": "updateIntegrations: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\owner.ts",
+        "line": 353,
+        "text": "createAggregatorOrder: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\superadmin.ts",
+        "line": 35,
+        "text": "createAnnouncement: async (data: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\superadmin.ts",
+        "line": 76,
+        "text": "const payload: any = { plan, status };"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\waiter.ts",
+        "line": 36,
+        "text": "placeOrder: async (orderData: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\api\\waiter.ts",
+        "line": 67,
+        "text": "updateOrderItems: async (orderId: string, items: any[]) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CashRegisterTab.tsx",
+        "line": 80,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CashRegisterTab.tsx",
+        "line": 95,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CashRegisterTab.tsx",
+        "line": 116,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 6,
+        "text": "item: any;"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 8,
+        "text": "onAddToCart: (item: any, selectedModifiers: any[], quantity: number, notes: string) => void;"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 25,
+        "text": "const handleToggleModifier = (group: any, mod: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 60,
+        "text": "const group = item.modifier_groups?.find((g: any) => g.id === groupId);"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 106,
+        "text": "{item.modifier_groups?.map((group: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\CustomizationModal.tsx",
+        "line": 117,
+        "text": "{group.modifiers?.map((mod: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\DishARViewerModal.tsx",
+        "line": 30,
+        "text": "const handleModelError = (event: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\ReceiptPrinter.tsx",
+        "line": 3,
+        "text": "order: any;"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\ReceiptPrinter.tsx",
+        "line": 64,
+        "text": "{order.items?.map((item: any, idx: number) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\ReceiptPrinter.tsx",
+        "line": 81,
+        "text": "{item.modifiers.map((m: any) => `+ ${m.modifier?.name || 'Add-on'}`).join(', ')}"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 24,
+        "text": "const coloredPaymentMethods = paymentMethods.map((pm: any, idx: number) => ({"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 51,
+        "text": "{aiInsights.map((insight: any, idx: number) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 270,
+        "text": "formatter={(value: any) => [selectedMetric === 'revenue' || selectedMetric === 'aov' ? `\u20b9${value}` :"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 318,
+        "text": "{coloredPaymentMethods.map((entry: any, idx: number) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 328,
+        "text": "{coloredPaymentMethods.map((pm: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\AnalyticsTab.tsx",
+        "line": 404,
+        "text": "{hoursData.map((item: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\BillingTab.tsx",
+        "line": 32,
+        "text": "handler: async function (response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\BillingTab.tsx",
+        "line": 50,
+        "text": "rzp.on('payment.failed', function (response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\BillingTab.tsx",
+        "line": 54,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\CustomersTab.tsx",
+        "line": 18,
+        "text": "const getTag = (c: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\CustomersTab.tsx",
+        "line": 49,
+        "text": "const filteredCustomers = customers.filter((c: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\CustomersTab.tsx",
+        "line": 57,
+        "text": "const totalLoyaltyIssued = customers.reduce((sum: number, c: any) => sum + c.loyalty_points, 0);"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\CustomersTab.tsx",
+        "line": 173,
+        "text": "filteredCustomers.map((c: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\DayEndTab.tsx",
+        "line": 18,
+        "text": "const method = paymentMethods.find((pm: any) => pm.name.toUpperCase() === type.toUpperCase());"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 7,
+        "text": "item: any;"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 8,
+        "text": "categories: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 42,
+        "text": "const handleUpdateGroup = (index: number, key: string, value: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 60,
+        "text": "const handleUpdateModifier = (groupIndex: number, modIndex: number, key: string, value: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 73,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 198,
+        "text": "{formData.modifier_groups.map((group: any, gIndex: number) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\EditMenuItemModal.tsx",
+        "line": 258,
+        "text": "{group.modifiers.map((mod: any, mIndex: number) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\InventoryTab.tsx",
+        "line": 21,
+        "text": "const handleOpenModal = (item?: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\InventoryTab.tsx",
+        "line": 57,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\InventoryTab.tsx",
+        "line": 70,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\InventoryTab.tsx",
+        "line": 98,
+        "text": "{inventory.map((item: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 9,
+        "text": "export default function MenuTab({ handleOpenRecipeEditor, handleOpenEditMenu }: { handleOpenRecipeEd"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 60,
+        "text": "const handleOpenConfirmModal = (item: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 83,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 97,
+        "text": "setSelectedItemFor3D((prev: any) => ({ ...prev, model_3d_active: nextActive }));"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 99,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 115,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 122,
+        "text": "const handleGenerate3D = async (item: any, payload: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 137,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 158,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 171,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 190,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 215,
+        "text": ") : menuCategories.map((cat: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\MenuTab.tsx",
+        "line": 223,
+        "text": "{cat.menu_items?.map((item: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\OrdersTab.tsx",
+        "line": 19,
+        "text": "{historicalOrders.map((order: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\OrdersTab.tsx",
+        "line": 32,
+        "text": "{order.items.map((item: any, idx: number) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\ReservationsTab.tsx",
+        "line": 46,
+        "text": ") : reservations.map((res: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\SettingsTab.tsx",
+        "line": 55,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\SettingsTab.tsx",
+        "line": 73,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 40,
+        "text": "const openAccessModal = (user: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 69,
+        "text": "const pendingStaff = staff.filter((u: any) => !u.is_approved);"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 70,
+        "text": "const activeStaff  = staff.filter((u: any) => u.is_approved);"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 95,
+        "text": "{pendingStaff.map((user: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 157,
+        "text": "{activeStaff.map((user: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\StaffTab.tsx",
+        "line": 238,
+        "text": "{menuCategories.map((cat: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\SupportTab.tsx",
+        "line": 18,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\SupportTab.tsx",
+        "line": 38,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\TablesTab.tsx",
+        "line": 16,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\TablesTab.tsx",
+        "line": 50,
+        "text": "{tables.map((table: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\components\\owner-dashboard\\TablesTab.tsx",
+        "line": 52,
+        "text": "const tableReservations = reservations.filter((r: any) =>"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\AdvancedReportsPage.tsx",
+        "line": 79,
+        "text": "const map: any = {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 26,
+        "text": "modifier_groups?: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 40,
+        "text": "modifiers?: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 49,
+        "text": "modifiers?: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 152,
+        "text": "const link: any = document.querySelector(\"link[rel*='icon']\") || document.createElement('link');"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 158,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 210,
+        "text": "handler: async function (response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 238,
+        "text": "rzp.on('payment.failed', function (_response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 242,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 256,
+        "text": "const addToCart = (item: MenuItem, modifiers: any[] = [], quantity: number = 1, notes: string = '', "
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 303,
+        "text": "const group = item.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 334,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\CustomerMenu.tsx",
+        "line": 963,
+        "text": "onError={(e: any) => console.error(\"ModelViewer Error:\", e)}"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\Dashboard.tsx",
+        "line": 70,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\Dashboard.tsx",
+        "line": 292,
+        "text": "{workspaces.map((ws: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\KitchenKDS.tsx",
+        "line": 54,
+        "text": "menuRes.forEach((c: any) => c.menu_items?.forEach((i: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\KitchenKDS.tsx",
+        "line": 61,
+        "text": "tablesRes.forEach((t: any) => { tm[t.id] = t.table_number; });"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\KitchenKDS.tsx",
+        "line": 110,
+        "text": "let pollInterval: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\KitchenKDS.tsx",
+        "line": 111,
+        "text": "let reconnectTimeout: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\Login.tsx",
+        "line": 46,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 110,
+        "text": "const handleOpenEditMenu = (item: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 131,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 142,
+        "text": "const updateIngredientRow = (index: number, field: string, value: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 217,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 237,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 561,
+        "text": "const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerDashboard.tsx",
+        "line": 758,
+        "text": "{menuCategories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerSignup.tsx",
+        "line": 36,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\OwnerSignup.tsx",
+        "line": 38,
+        "text": "toast.error(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.m"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\PublicBooking.tsx",
+        "line": 54,
+        "text": "handler: async (response: any) => {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\PublicBooking.tsx",
+        "line": 63,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\PublicBooking.tsx",
+        "line": 85,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\StaffSignup.tsx",
+        "line": 28,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SubscriptionLock.tsx",
+        "line": 116,
+        "text": "handler: async function (response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SubscriptionLock.tsx",
+        "line": 138,
+        "text": "rzp.on('payment.failed', function (response: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SubscriptionLock.tsx",
+        "line": 142,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 81,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 97,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 110,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 122,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 138,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 151,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 186,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 197,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 213,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 229,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 247,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 753,
+        "text": ".sort((a: any, b: any) => b.gmv - a.gmv)"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\SuperAdminDashboard.tsx",
+        "line": 754,
+        "text": ".map((r: any) => ("
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\VerifyOTP.tsx",
+        "line": 56,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\VerifyOTP.tsx",
+        "line": 70,
+        "text": "} catch (error: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 22,
+        "text": "interface MenuItem { id: string; name: string; price: number; description?: string; category_id: str"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 25,
+        "text": "interface CartItem extends MenuItem { cartItemId: string; quantity: number; notes: string; is_parcel"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 26,
+        "text": "interface OrderItem { id: string; menu_item_id: string; quantity: number; price_at_order_time: numbe"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 122,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 140,
+        "text": "setTables(prev => prev.map((t: any) => ({"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 142,
+        "text": "status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Fr"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 143,
+        "text": "hasPendingCustomerOrder: ordersData.some((o: any) => o.table_id === t.id && o.source === 'CUSTOMER' "
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 160,
+        "text": "setTables(tablesData.map((t: any) => ({"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 162,
+        "text": "status: ordersData.some((o: any) => o.table_id === t.id && o.status !== 'SERVED') ? 'Occupied' : 'Fr"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 163,
+        "text": "hasPendingCustomerOrder: ordersData.some((o: any) => o.table_id === t.id && o.source === 'CUSTOMER' "
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 174,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 190,
+        "text": "const addToCart = (item: MenuItem, modifiers: any[] = [], quantity: number = 1, notes: string = '') "
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 210,
+        "text": "const group = i.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 224,
+        "text": "let createdOrder: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 299,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 307,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 323,
+        "text": "const handleServeOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessing"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 324,
+        "text": "const handleAcceptOrder = async (id: string) => { if (processingOrders.has(id)) return; setProcessin"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 350,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 356,
+        "text": "const handleDirectPaymentConfirm = async (id: string) => { if (processingOrders.has(id)) return; set"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 357,
+        "text": "const handleStartCheckout = async (order: Order) => { if (processingOrders.has(order.id)) return; se"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 369,
+        "text": "} catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); }"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 410,
+        "text": "} catch (e: any) { toast.error(e.response?.data?.detail || 'Payment failed'); }"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 568,
+        "text": "{!tables.every((t: any) => !t.category && !t.section) && ("
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 570,
+        "text": "const sectionTables = tables.filter((t: any) => (t.category || t.section || 'Non-AC') === section);"
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 666,
+        "text": "{tables.every((t: any) => !t.category && !t.section) && ("
+      },
+      {
+        "file": ".\\frontend\\src\\pages\\WaiterDashboard.tsx",
+        "line": 1031,
+        "text": "const group = item.modifier_groups?.find(g => g.modifiers?.some((gm: any) => gm.id === m.id));"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 16,
+        "text": "analytics: any;"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 17,
+        "text": "historyData: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 18,
+        "text": "historicalOrders: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 19,
+        "text": "staff: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 20,
+        "text": "menuCategories: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 21,
+        "text": "tables: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 22,
+        "text": "inventory: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 23,
+        "text": "reservations: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 24,
+        "text": "customers: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 25,
+        "text": "aiInsights: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 26,
+        "text": "inventoryVelocity: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 27,
+        "text": "staffPerformance: any[];"
+      },
+      {
+        "file": ".\\frontend\\src\\store\\ownerStore.ts",
+        "line": 196,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 2,
+        "text": "device: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 3,
+        "text": "server: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 4,
+        "text": "characteristic: any = null;"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 8,
+        "text": "const nav: any = navigator;"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 23,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 31,
+        "text": "const nav: any = navigator;"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 41,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\frontend\\src\\utils\\PrinterService.ts",
+        "line": 75,
+        "text": "} catch (err: any) {"
+      }
+    ],
+    "hardcoded_secrets": [],
+    "incomplete_code": []
+  },
+  "mobile": {
+    "todos": [],
+    "large_files": [
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "lines": 508
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "lines": 571
+      }
+    ],
+    "any_types": [
+      {
+        "file": ".\\captain-app\\src\\api\\waiterApi.ts",
+        "line": 14,
+        "text": "placeOrder: async (orderData: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\api\\waiterApi.ts",
+        "line": 43,
+        "text": "updateOrderItems: async (orderId: string, items: any[]) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\api\\waiterApi.ts",
+        "line": 84,
+        "text": "const upiConfig = configs.find((c: any) => c.key === 'platform_upi_id');"
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 9,
+        "text": "item: any;"
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 11,
+        "text": "onAddToCart: (item: any, selectedModifiers: any[], quantity: number, notes: string) => void;"
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 43,
+        "text": "const handleToggleModifier = (group: any, mod: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 76,
+        "text": "const group = item.modifier_groups?.find((g: any) => g.id === groupId);"
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 124,
+        "text": "{(item.modifier_groups || []).map((group: any) => ("
+      },
+      {
+        "file": ".\\captain-app\\src\\components\\CustomizationModal.tsx",
+        "line": 136,
+        "text": "{group.modifiers?.map((mod: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\navigation\\AppNavigator.tsx",
+        "line": 63,
+        "text": "const CustomDrawerContent = (props: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 16,
+        "text": "export default function CartScreen({ route, navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 20,
+        "text": "(initialItems || []).map((item: any) => ({ ...item, notes: '', is_parcel: false }))"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 58,
+        "text": "const found = (res.data || []).find((o: any) => o.table_id === tableId);"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 79,
+        "text": "const modTotal = (i.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 83,
+        "text": "const buildCombinedItems = (newItems: any[]) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 85,
+        "text": "const combined: any[] = [];"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 86,
+        "text": "(activeOrder.items || []).forEach((ex: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 119,
+        "text": "let createdOrder: any;"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 137,
+        "text": "const payload: any = {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 179,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 187,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 198,
+        "text": "const renderItem = ({ item }: { item: any }) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 199,
+        "text": "const modTotal = (item.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CartScreen.tsx",
+        "line": 208,
+        "text": "{item.selected_modifiers.map((mod: any, idx: number) => ("
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 16,
+        "text": "export default function CheckoutScreen({ route, navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 41,
+        "text": "const found = (ordersData || []).find((o: any) => o.id === orderId);"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 65,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 79,
+        "text": "order.items?.forEach((item: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 80,
+        "text": "const modTotal = (item.modifiers || []).reduce((ms: number, m: any) => ms + (m.price_at_order_time |"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 110,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\CheckoutScreen.tsx",
+        "line": 160,
+        "text": "{order.items.map((item: any, i: number) => ("
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\KOTScreen.tsx",
+        "line": 28,
+        "text": "(o: any) => !['SERVED', 'CANCELLED'].includes(o.status)"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\KOTScreen.tsx",
+        "line": 67,
+        "text": "const renderKOT = ({ item: order }: { item: any }) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\KOTScreen.tsx",
+        "line": 93,
+        "text": "{order.items?.map((item: any, idx: number) => ("
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\MoreScreen.tsx",
+        "line": 19,
+        "text": "export default function MoreScreen({ navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 23,
+        "text": "export default function OrdersScreen({ navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 76,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 89,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 110,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 116,
+        "text": "const handleCheckout = (order: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 123,
+        "text": "const renderOrder = ({ item: order }: { item: any }) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 150,
+        "text": "{order.items?.map((item: any, idx: number) => ("
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 234,
+        "text": "keyExtractor={(item: any) => item.id || item.type + item.id}"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\OrdersScreen.tsx",
+        "line": 237,
+        "text": "renderItem={({ item }: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 18,
+        "text": "export default function TableMenuScreen({ route, navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 49,
+        "text": "const updateSimpleCartItem = (item: any, delta: number) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 68,
+        "text": "const handlePlus = (item: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 76,
+        "text": "const handleMinus = (item: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 97,
+        "text": "const addToCartWithModifiers = (item: any, selectedModifiers: any[], quantity: number, notes: string"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 134,
+        "text": "(c.menu_items || []).map((item: any) => ({ ...item, categoryName: c.name }))"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 137,
+        "text": "? allItems.filter((i: any) =>"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 142,
+        "text": "const renderItem = (item: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 181,
+        "text": "const renderSearchItem = (item: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TableMenuScreen.tsx",
+        "line": 258,
+        "text": "const items: any[] = cat.menu_items || [];"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 19,
+        "text": "export default function TablesScreen({ navigation }: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 56,
+        "text": "const activeOrders: any[] = ordersRes || [];"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 60,
+        "text": "activeOrders.forEach((o: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 66,
+        "text": "const mapped = (tablesRes || []).map((t: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 117,
+        "text": "const handleTablePress = (table: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 132,
+        "text": "const handleSettleAndSave = (table: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 141,
+        "text": "const handleAddOrder = (table: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 150,
+        "text": "const handleDeleteOrder = async (table: any) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 157,
+        "text": "} catch (e: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 188,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 197,
+        "text": "const renderTable = ({ item: table }: { item: any }) => {"
+      },
+      {
+        "file": ".\\captain-app\\src\\screens\\TablesScreen.tsx",
+        "line": 201,
+        "text": "const STATUS_COLORS: any = {"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 2,
+        "text": "device: any = null;"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 3,
+        "text": "server: any = null;"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 4,
+        "text": "characteristic: any = null;"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 8,
+        "text": "const nav: any = navigator;"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 23,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 31,
+        "text": "const nav: any = navigator;"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 41,
+        "text": "} catch (err: any) {"
+      },
+      {
+        "file": ".\\captain-app\\src\\utils\\PrinterService.ts",
+        "line": 75,
+        "text": "} catch (err: any) {"
+      }
+    ],
+    "hardcoded_secrets": [],
+    "incomplete_code": []
+  }
+}

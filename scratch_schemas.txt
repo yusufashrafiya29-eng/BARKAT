@@ -1,0 +1,725 @@
+\n--- backend/schemas\auth.py ---\nfrom pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
+
+
+from typing import Any
+
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+    phone_number: str
+    role: str = "WAITER"
+
+
+class OwnerSignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone_number: str
+    restaurant_name: str
+    logo_url: Optional[str] = None
+
+
+class StaffSignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone_number: str
+    restaurant_email: str
+    role: str  # WAITER or KITCHEN
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class OTPVerifyRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+
+
+class OTPSendRequest(BaseModel):
+    email: EmailStr
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    user_id: str
+    email: str
+    role: str
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    is_verified: bool = False
+    created_at: Optional[datetime] = None
+    restaurant_name: Optional[str] = None
+    restaurant_logo: Optional[str] = None
+    subscription_status: Optional[str] = None
+    subscription_plan: Optional[str] = None
+
+
+class GenericResponse(BaseModel):
+    message: str
+    data: Optional[Any] = None
+\n--- backend/schemas\billing.py ---\nfrom pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
+from datetime import datetime
+from models.billing import PaymentMethod, PaymentStatus
+
+from typing import List
+
+class PaymentTransactionRead(BaseModel):
+    id: UUID
+    amount: float
+    payment_method: str
+    transaction_reference: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class BillBase(BaseModel):
+    payment_method: PaymentMethod = PaymentMethod.CASH
+    discount_amount: float = 0.0
+
+class BillCreate(BillBase):
+    pass
+
+class PaymentConfirmation(BaseModel):
+    amount: float
+    payment_method: str
+    transaction_reference: Optional[str] = None
+
+class BillRead(BaseModel):
+    id: UUID
+    order_id: UUID
+    subtotal: float
+    tax_amount: float
+    discount_amount: float
+    total_amount: float
+    amount_paid: float
+    payment_method: PaymentMethod
+    status: PaymentStatus
+    transaction_id: Optional[str] = None
+    transactions: List[PaymentTransactionRead] = []
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\cash_register.py ---\nfrom pydantic import BaseModel
+from typing import Optional, List
+from uuid import UUID
+from datetime import datetime
+from models.cash_register import ShiftStatus, TransactionType
+
+
+# ── Transaction Schemas ────────────────────────────────────────────────────────
+class CashTransactionCreate(BaseModel):
+    type: TransactionType
+    amount: float
+    description: Optional[str] = None
+
+
+class CashTransactionRead(BaseModel):
+    id: UUID
+    shift_id: UUID
+    type: TransactionType
+    amount: float
+    description: Optional[str] = None
+    created_at: datetime
+    created_by: UUID
+
+    class Config:
+        from_attributes = True
+
+
+# ── Shift Schemas ──────────────────────────────────────────────────────────────
+class OpenShiftRequest(BaseModel):
+    opening_balance: float
+
+
+class CloseShiftRequest(BaseModel):
+    closing_balance: float  # physically counted amount
+    notes: Optional[str] = None
+
+
+class CashShiftRead(BaseModel):
+    id: UUID
+    restaurant_id: UUID
+    opened_by: UUID
+    closed_by: Optional[UUID] = None
+    opening_balance: float
+    closing_balance: Optional[float] = None
+    expected_balance: Optional[float] = None
+    net_sales: float
+    total_cash_in: float
+    total_cash_out: float
+    status: ShiftStatus
+    notes: Optional[str] = None
+    opened_at: datetime
+    closed_at: Optional[datetime] = None
+    transactions: List[CashTransactionRead] = []
+
+    class Config:
+        from_attributes = True
+
+
+class ShiftSummary(BaseModel):
+    """Lightweight version for shift history list."""
+    id: UUID
+    opening_balance: float
+    closing_balance: Optional[float] = None
+    expected_balance: Optional[float] = None
+    net_sales: float
+    total_cash_in: float
+    total_cash_out: float
+    status: ShiftStatus
+    discrepancy: Optional[float] = None
+    opened_at: datetime
+    closed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\inventory.py ---\nfrom pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
+from datetime import datetime
+
+class StockItemBase(BaseModel):
+    name: str
+    quantity: float = 0.0
+    unit: str
+    minimum_threshold: float = 0.0
+    cost_price: float = 0.0
+    is_active: bool = True
+
+class StockItemCreate(StockItemBase):
+    pass
+
+class StockItemUpdate(BaseModel):
+    name: Optional[str] = None
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    minimum_threshold: Optional[float] = None
+    cost_price: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class StockItemRead(StockItemBase):
+    id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class StockAdjustment(BaseModel):
+    quantity_change: float
+\n--- backend/schemas\menu.py ---\nfrom pydantic import BaseModel
+from typing import Optional, List
+from uuid import UUID
+from uuid import UUID
+
+class ModifierBase(BaseModel):
+    name: str
+    price: float = 0.0
+    is_available: bool = True
+
+class ModifierCreate(ModifierBase):
+    pass
+
+class ModifierRead(ModifierBase):
+    id: UUID
+    group_id: UUID
+    class Config:
+        from_attributes = True
+
+class ModifierGroupBase(BaseModel):
+    name: str
+    is_required: bool = False
+    min_selections: int = 0
+    max_selections: int = 1
+    price_replaces_base: bool = False
+
+class ModifierGroupCreate(ModifierGroupBase):
+    modifiers: List[ModifierCreate] = []
+
+class ModifierGroupRead(ModifierGroupBase):
+    id: UUID
+    menu_item_id: UUID
+    modifiers: List[ModifierRead] = []
+    class Config:
+        from_attributes = True
+
+class MenuItemBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    is_veg: bool = False
+    is_available: bool = True
+    preparation_time: Optional[int] = None
+    image_url: Optional[str] = None
+    tax_rate: float = 5.0
+    model_3d_url: Optional[str] = None
+    model_3d_task_id: Optional[str] = None
+    model_3d_height: float = 12.0
+    model_3d_active: bool = True
+    image_url_extra1: Optional[str] = None
+    image_url_extra2: Optional[str] = None
+
+
+class MenuItemCreate(MenuItemBase):
+    category_id: UUID
+
+class RecipeIngredientBase(BaseModel):
+    stock_item_id: UUID
+    quantity: float
+    unit: str
+
+class RecipeIngredientCreate(RecipeIngredientBase):
+    pass
+
+class RecipeIngredientRead(RecipeIngredientBase):
+    id: UUID
+    menu_item_id: UUID
+
+    class Config:
+        from_attributes = True
+
+class MenuItemRead(MenuItemBase):
+    id: UUID
+    category_id: UUID
+    recipe_ingredients: List[RecipeIngredientRead] = []
+    modifier_groups: List[ModifierGroupRead] = []
+
+    class Config:
+        from_attributes = True
+
+class MenuItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    is_veg: Optional[bool] = None
+    is_available: Optional[bool] = None
+    preparation_time: Optional[int] = None
+    image_url: Optional[str] = None
+    tax_rate: Optional[float] = None
+    model_3d_url: Optional[str] = None
+    model_3d_task_id: Optional[str] = None
+    model_3d_height: Optional[float] = None
+    model_3d_active: Optional[bool] = None
+    image_url_extra1: Optional[str] = None
+    image_url_extra2: Optional[str] = None
+    modifier_groups: Optional[List[ModifierGroupCreate]] = None
+
+class Model3DGenerateRequest(BaseModel):
+    ai_model: str = "meshy-6"
+    enable_pbr: bool = True
+    texture_resolution: str = "2k"
+
+
+
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_active: bool = True
+    station: str = "Kitchen"
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryRead(CategoryBase):
+    id: UUID
+    menu_items: List[MenuItemRead] = []
+
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\order.py ---\nimport re
+from pydantic import BaseModel, field_validator
+from typing import Optional, List, Any
+from uuid import UUID
+from datetime import datetime
+from models.order import OrderStatus
+
+class OrderItemModifierBase(BaseModel):
+    modifier_id: UUID
+
+class OrderItemModifierCreate(OrderItemModifierBase):
+    pass
+
+class ModifierSimpleRead(BaseModel):
+    name: str
+    price: float
+    
+    class Config:
+        from_attributes = True
+
+class OrderItemModifierRead(OrderItemModifierBase):
+    id: UUID
+    order_item_id: UUID
+    price_at_order_time: float
+    modifier: Optional[ModifierSimpleRead] = None
+    
+    class Config:
+        from_attributes = True
+
+class OrderItemCreate(BaseModel):
+    menu_item_id: UUID
+    quantity: int = 1
+    notes: Optional[str] = None
+    is_parcel: bool = False
+    modifiers: List[OrderItemModifierCreate] = []
+
+class OrderItemRead(BaseModel):
+    id: UUID
+    menu_item_id: UUID
+    quantity: int
+    price_at_order_time: float
+    subtotal: float
+    notes: Optional[str] = None
+    status: str = "PENDING"
+    is_parcel: bool = False
+    modifiers: List[OrderItemModifierRead] = []
+
+    class Config:
+        from_attributes = True
+
+class OrderCreate(BaseModel):
+    restaurant_id: Optional[UUID] = None
+    table_id: Optional[UUID] = None
+    order_type: str = "DINE_IN"
+    items: List[OrderItemCreate]
+    customer_phone: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    guests_count: Optional[int] = None
+    counter_name: str = "Main Register"
+    source: str = "CUSTOMER"
+    tip_amount: float = 0.0
+    status: Optional[str] = None
+    is_accepted: bool = False
+    
+    @field_validator("customer_phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if v:
+            return re.sub(r"[^\+0-9]", "", v)
+        return v
+
+class OrderRead(BaseModel):
+    id: UUID
+    restaurant_id: UUID
+    table_id: Optional[UUID] = None
+    order_type: str
+    waiter_id: Optional[UUID] = None
+    customer_phone: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    guests_count: Optional[int] = None
+    counter_name: str
+    status: OrderStatus
+    source: str
+    is_accepted: bool
+    payment_status: str
+    subtotal_amount: float
+    tax_amount: float
+    tip_amount: float
+    total_amount: float
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    items: List[OrderItemRead] = []
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+
+class PaymentStatusUpdate(BaseModel):
+    payment_status: str
+
+class OrderUpdateItems(BaseModel):
+    items: List[OrderItemCreate]
+    status: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    guests_count: Optional[int] = None
+    tip_amount: Optional[float] = None
+
+class OrderItemStatusUpdate(BaseModel):
+    status: str
+
+class ClearHistoryRequest(BaseModel):
+    password: str
+
+class AggregatorOrderResponse(BaseModel):
+    id: UUID
+    restaurant_id: UUID
+    platform: str
+    platform_order_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    items_summary: Optional[str] = None
+    raw_payload: Optional[Any] = None
+    gross_amount: float
+    platform_commission_rate: float
+    ad_deduction: float
+    gst_on_commission: float
+    net_payout: float
+    status: str
+    rider_name: Optional[str] = None
+    rider_phone: Optional[str] = None
+    rider_status: str
+    eta: Optional[str] = None
+    ordered_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\reservation.py ---\nfrom pydantic import BaseModel
+from typing import Optional
+from datetime import date, time, datetime
+from uuid import UUID
+
+class ReservationBase(BaseModel):
+    table_id: Optional[UUID] = None
+    customer_name: str
+    customer_phone: str
+    reservation_date: date
+    reservation_time: time
+    guest_count: int
+
+class ReservationCreateManual(ReservationBase):
+    pass # Staff creates it without Razorpay
+
+class ReservationCreatePublic(ReservationBase):
+    pass # Customers create it
+
+class ReservationStatusUpdate(BaseModel):
+    status: str # PENDING, CONFIRMED, CANCELLED, COMPLETED
+    table_id: Optional[UUID] = None # Optionally assign table when confirming
+
+class ReservationRead(ReservationBase):
+    id: UUID
+    restaurant_id: UUID
+    status: str
+    payment_status: str
+    advance_amount: float
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\settings.py ---\nfrom pydantic import BaseModel
+from pydantic.types import UUID4
+
+class RestaurantConfigBase(BaseModel):
+    key: str
+    value: str
+
+class RestaurantConfigRead(RestaurantConfigBase):
+    id: UUID4
+
+    class Config:
+        from_attributes = True
+
+class UPIConfig(BaseModel):
+    upi_id: str
+
+class RazorpayConfig(BaseModel):
+    razorpay_key_id: str
+    razorpay_key_secret: str
+
+class IntegrationsConfig(BaseModel):
+    zomato_store_id: str
+    swiggy_store_id: str
+\n--- backend/schemas\superadmin.py ---\nfrom pydantic import BaseModel, UUID4
+from typing import Optional, List
+from datetime import datetime
+
+class RestaurantOverview(BaseModel):
+    id: UUID4
+    name: str
+    owner_name: Optional[str] = None
+    owner_email: Optional[str] = None
+    owner_phone: Optional[str] = None
+    is_approved: bool
+    subscription_status: str
+    subscription_plan: str
+    subscription_ends_at: Optional[datetime] = None
+    model_3d_credits: int
+    created_at: datetime
+
+class SuperAdminDashboardStats(BaseModel):
+    total_restaurants: int
+    pending_approvals: int
+    active_subscriptions: int
+    total_users: int
+
+class UpdateSubscriptionRequest(BaseModel):
+    plan: str
+    status: str
+    expiry_date: Optional[datetime] = None
+
+class UpdateCreditsRequest(BaseModel):
+    model_3d_credits: int
+
+class UserOverview(BaseModel):
+    id: UUID4
+    full_name: Optional[str] = None
+    email: str
+    phone_number: Optional[str] = None
+    role: str
+    restaurant_name: Optional[str] = None
+    is_approved: bool
+    created_at: datetime
+
+class RestaurantFinancial(BaseModel):
+    restaurant_id: UUID4
+    name: str
+    owner_email: Optional[str] = None
+    subscription_plan: str
+    subscription_status: str
+    mrr: float
+    gmv: float
+    
+class PlatformFinancialsResponse(BaseModel):
+    total_mrr: float
+    total_gmv: float
+    arpu: float
+    conversion_rate: float
+    active_subscriptions_by_plan: dict
+    restaurant_financials: List[RestaurantFinancial]
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    target_role: str = "ALL"
+    is_active: bool = True
+
+class AnnouncementResponse(BaseModel):
+    id: UUID4
+    title: str
+    message: str
+    target_role: str
+    is_active: bool
+    created_at: datetime
+
+class PlatformSettingUpdate(BaseModel):
+    key: str
+    value: str
+
+class PlatformSettingResponse(BaseModel):
+    key: str
+    value: str
+    description: Optional[str] = None
+
+\n--- backend/schemas\table.py ---\nfrom pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
+
+class TableBase(BaseModel):
+    table_number: int
+    capacity: int = 4
+    category: str = "Non-AC"
+    qr_code_url: Optional[str] = None
+    position_x: Optional[float] = 0.0
+    position_y: Optional[float] = 0.0
+
+class TablePositionUpdate(BaseModel):
+    id: UUID
+    position_x: float
+    position_y: float
+
+class TableCreate(TableBase):
+    pass
+
+class TableRead(TableBase):
+    id: UUID
+    restaurant_id: UUID
+
+    class Config:
+        from_attributes = True
+\n--- backend/schemas\ticket.py ---\nfrom pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
+from datetime import datetime
+
+class TicketBase(BaseModel):
+    subject: str
+    description: str
+
+class TicketCreate(TicketBase):
+    pass
+
+class TicketResponse(TicketBase):
+    id: UUID
+    restaurant_id: UUID
+    opened_by_id: UUID
+    status: str
+    resolution_notes: Optional[str] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    
+    # Let's optionally return the restaurant name for super admin context
+    restaurant_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class TicketUpdateStatus(BaseModel):
+    status: str
+    resolution_notes: Optional[str] = None
+\n--- backend/schemas\user.py ---\nfrom pydantic import BaseModel, EmailStr
+from uuid import UUID
+from datetime import datetime
+from models.user import UserRole
+from typing import Optional
+
+
+class UserBase(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = None
+    phone_number: str  # Now required for OTP
+    role: UserRole = UserRole.WAITER
+    is_active: bool = True
+    is_verified: bool = False
+    is_approved: bool = False
+    restaurant_name: Optional[str] = None
+    restaurant_email: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    """Used when creating a user record manually (admin action)."""
+    pass
+
+
+class UserRead(UserBase):
+    id: UUID
+    allowed_categories: Optional[list[str]] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    """Partial update — all fields optional."""
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+    allowed_categories: Optional[list[str]] = None
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+\n--- backend/schemas\__init__.py ---\n

@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
 from uuid import UUID
 
 class ModifierBase(BaseModel):
-    name: str
-    price: float = 0.0
+    name: str = Field(..., min_length=1)
+    price: float = Field(default=0.0, ge=0.0)
     is_available: bool = True
 
 class ModifierCreate(ModifierBase):
@@ -18,10 +18,10 @@ class ModifierRead(ModifierBase):
         from_attributes = True
 
 class ModifierGroupBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     is_required: bool = False
-    min_selections: int = 0
-    max_selections: int = 1
+    min_selections: int = Field(default=0, ge=0)
+    max_selections: int = Field(default=1, ge=1)
     price_replaces_base: bool = False
 
 class ModifierGroupCreate(ModifierGroupBase):
@@ -35,9 +35,9 @@ class ModifierGroupRead(ModifierGroupBase):
         from_attributes = True
 
 class MenuItemBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     description: Optional[str] = None
-    price: float
+    price: float = Field(..., ge=0.0)
     is_veg: bool = False
     is_available: bool = True
     preparation_time: Optional[int] = None
@@ -56,8 +56,8 @@ class MenuItemCreate(MenuItemBase):
 
 class RecipeIngredientBase(BaseModel):
     stock_item_id: UUID
-    quantity: float
-    unit: str
+    quantity: float = Field(..., gt=0.0)
+    unit: str = Field(..., min_length=1)
 
 class RecipeIngredientCreate(RecipeIngredientBase):
     pass
@@ -103,7 +103,7 @@ class Model3DGenerateRequest(BaseModel):
 
 
 class CategoryBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     description: Optional[str] = None
     is_active: bool = True
     station: str = "Kitchen"

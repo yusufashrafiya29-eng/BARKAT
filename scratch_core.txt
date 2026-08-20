@@ -1,0 +1,280 @@
+\n--- backend/main.py ---\n
+import sys
+import os
+import logging
+from contextlib import asynccontextmanager
+
+# Ensures backend/ is on sys.path so bare imports (core.X, api.X) work
+# whether uvicorn runs from the project root or from inside backend/.
+sys.path.insert(0, os.path.dirname(__file__))
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from core.config import settings
+from api.router import main_router
+
+# Register all SQLAlchemy models with Base so create_all() picks them up.
+from db.session import engine, Base, SessionLocal
+import models
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run DB table creation on startup — but don't crash if DB is unreachable."""
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables verified/created.")
+        
+        # Initialize default platform config
+        with SessionLocal() as db:
+            from models.settings import PlatformConfig
+            defaults = [
+                ("trial_days_length", "14", "Duration of free trial in days"),
+                ("basic_plan_price", "499", "Monthly price for Basic plan"),
+                ("pro_plan_price", "999", "Monthly price for Pro plan"),
+                ("max_plan_price", "1399", "Monthly price for Max plan"),
+                ("platform_upi_id", "9979114665@kotak811", "UPI ID for platform payments")
+            ]
+            for key, val, desc in defaults:
+                if not db.query(PlatformConfig).filter(PlatformConfig.key == key).first():
+                    db.add(PlatformConfig(key=key, value=val, description=desc))
+            db.commit()
+            logger.info("✅ Platform defaults verified.")
+            
+    except Exception as e:
+        logger.warning(f"⚠️  Could not connect to database on startup: {e}")
+        logger.warning("App will still start — DB errors will occur on first request.")
+    yield  # App runs here
+
+# Ensure static directory exists before mounting
+os.makedirs("static", exist_ok=True)
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        version=settings.VERSION,
+        description="Backend for the Smart Restaurant Software",
+        lifespan=lifespan,
+    )
+
+    # CORS — origin list pulled from settings (set ALLOWED_ORIGINS env var in production)
+    # In dev: "*" is fine. In production: lock to your frontend domain.
+    allowed_origins = getattr(settings, 'ALLOWED_ORIGINS', ["*"])
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Mount the full API router tree (all endpoints live under /api/v1/...)
+    app.include_router(main_router)
+
+    # Static files for logos
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+    @app.get("/", tags=["Health"])
+    def root():
+        return {"status": "MyRestro API is running 🔥"}
+
+    return app
+
+app = create_app()\n--- backend/api/deps.py ---\nfrom fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from db.session import SessionLocal
+from core.config import settings
+import jwt
+from jwt.exceptions import InvalidTokenError
+from typing import Generator
+
+security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
+
+def get_db() -> Generator[Session, None, None]:
+    """Dependency to generate a database session per HTTP request."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verifies the JWT token from the Authorization header using our secret."""
+    try:
+        # Supabase signs JWTs with HS256 algorithm and the project's JWT Secret.
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} 
+            # Note: audience verification can be enabled if required (usually 'authenticated')
+        )
+        return payload
+    except InvalidTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials - Token invalid or expired.",
+        )
+
+def get_optional_user_token(credentials: HTTPAuthorizationCredentials = Depends(optional_security)) -> dict:
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} 
+        )
+        return payload
+    except InvalidTokenError:
+        return None
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    token_payload: dict = Depends(get_current_user_token)
+):
+    from models.user import User
+    user_email = token_payload.get("email")
+    if not user_email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+    
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
+    return user
+
+def get_current_restaurant(user = Depends(get_current_user)):
+    if not user.restaurant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="User is not linked to any restaurant."
+        )
+    return user.restaurant_id
+
+#     """
+#     Mocked security dependency. 
+#     Returns a fake token payload to bypass Supabase JWT authentication for local Postman testing.
+#     """
+#     return {
+#         "sub": "mock-admin-id-1234",
+#         "email": "admin@MyRestro.local",
+#         "role": "admin"
+#     }
+\n--- backend/api/router.py ---\nfrom fastapi import APIRouter
+from api.api_v1.router import api_router as api_v1_router
+
+main_router = APIRouter()
+
+# All business routes are versioned under /api/v1
+main_router.include_router(api_v1_router, prefix="/api/v1")
+\n--- backend/core/config.py ---\nimport sys
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import ValidationError, field_validator
+from typing import List
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "Smart Restaurant Software API"
+    VERSION: str = "1.0.0"
+    
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+    DATABASE_URL: str
+    JWT_SECRET: str
+    
+    WHATSAPP_API_URL: str = ""
+    WHATSAPP_API_KEY: str = ""
+    BASE_URL: str = "http://localhost:8000"
+    RAZORPAY_WEBHOOK_SECRET: str = ""
+    TRIPO_API_KEY: str = ""
+    MESHY_API_KEY: str = ""
+    
+    SAAS_RAZORPAY_KEY_ID: str = ""
+    SAAS_RAZORPAY_KEY_SECRET: str = ""
+    
+    # CORS: set ALLOWED_ORIGINS in Render env as a JSON list, e.g.:
+    # ["https://your-frontend.onrender.com","https://yourdomain.com"]
+    # Leave as ["*"] for local development only
+    ALLOWED_ORIGINS: List[str] = ["*"]
+    
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_origins(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except Exception:
+                return [o.strip() for o in v.split(",")]
+        return v
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+try:
+    settings = Settings()
+except ValidationError as e:
+    print("\n" + "="*60)
+    print("! STARTUP FAILED: Missing required environment variables")
+    print("="*60)
+    for error in e.errors():
+        field = " -> ".join(str(x) for x in error["loc"])
+        print(f"  * {field}: {error['msg']}")
+    print("\nSet these in your Render dashboard -> Environment tab:")
+    print("  DATABASE_URL, JWT_SECRET, SUPABASE_URL, SUPABASE_KEY")
+    print("="*60 + "\n")
+    sys.exit(1)
+\n--- backend/db/session.py ---\nfrom sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from core.config import settings
+
+# Supabase (and many cloud providers) give a postgres:// URL.
+# SQLAlchemy 1.4+ requires postgresql:// — fix it silently.
+db_url = settings.DATABASE_URL
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(
+    db_url,
+    pool_pre_ping=True,          # Verify connections before use
+    pool_recycle=300,             # Recycle connections every 5 min (Supabase pooler)
+    connect_args={"connect_timeout": 10},
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+\n--- backend/db/supabase.py ---\nfrom supabase import create_client, Client
+from core.config import settings
+
+def get_supabase_client() -> Client:
+    """Returns the initialized Supabase client."""
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+
+supabase_client: Client = get_supabase_client()
+\n--- backend/models/__init__.py ---\n# Ensure metadata creates all tables by importing them together
+from .user import User, UserRole
+from .table import Table
+from .menu import Category, MenuItem
+from .order import Order, OrderItem, OrderStatus
+from .billing import Bill, PaymentTransaction
+from .inventory import StockItem
+from .notification import NotificationLog
+from .otp import OTP
+from .settings import RestaurantConfig
+from .restaurant import Restaurant
+from .cash_register import CashShift, CashTransaction
+from .announcement import Announcement
+from .ticket import Ticket
+from .enterprise import (
+    ExpenseVoucher, Coupon, HappyHour, BogoRule,
+    BranchOutlet, CentralStockItem, StockTransfer
+)
+from .aggregator import AggregatorOrder
+from .customer import Customer
+from .reservation import Reservation
+\n--- backend/schemas/__init__.py ---\n\n--- backend/services/__init__.py ---\n

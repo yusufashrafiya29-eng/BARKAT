@@ -55,7 +55,12 @@ def download_customers_csv(
     if token_str:
         try:
             token = jwt.decode(token_str, settings.JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
-        except Exception:
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid query token")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Unexpected error decoding token in download_customers_csv")
             raise HTTPException(status_code=401, detail="Invalid query token")
     elif not token:
         raise HTTPException(status_code=401, detail="Not authenticated")

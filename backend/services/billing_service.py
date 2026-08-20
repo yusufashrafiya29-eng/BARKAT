@@ -123,5 +123,8 @@ def _handle_order_paid_side_effects(db: Session, order, restaurant_id: str, paym
         # Note: send_whatsapp_receipt is fire-and-forget; no DB state change
         try:
             send_whatsapp_receipt(order, customer)
-        except Exception:
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to send WhatsApp receipt")
             pass  # Non-fatal: receipt failure should not block payment confirmation

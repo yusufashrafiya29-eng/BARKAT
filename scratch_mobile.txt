@@ -1,0 +1,3689 @@
+
+--- captain-app/src\api\axios.ts ---
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// In web, localhost works fine. For Android Emulator, use 10.0.2.2.
+// For physical device, use your computer's local IP address (e.g. 192.168.1.5)
+const BASE_URL = 'http://localhost:8000/api/v1'; 
+
+const api = axios.create({
+  baseURL: BASE_URL,
+});
+
+api.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+
+--- captain-app/src\api\waiterApi.ts ---
+import api from './axios';
+
+export const waiterApi = {
+  getTables: async () => {
+    const response = await api.get('/tables/');
+    return response.data;
+  },
+
+  getMenu: async () => {
+    const response = await api.get('/menu/categories');
+    return response.data;
+  },
+
+  placeOrder: async (orderData: any) => {
+    const response = await api.post('/orders/', {
+      ...orderData,
+      source: 'WAITER',
+      is_accepted: true
+    });
+    return response.data;
+  },
+
+  getOrdersByTable: async (tableId: string) => {
+    const response = await api.get(`/orders/table/${tableId}`);
+    return response.data;
+  },
+
+  getAllOrders: async () => {
+    const response = await api.get('/orders/waiter/active');
+    return response.data;
+  },
+
+  acceptOrder: async (orderId: string) => {
+    const response = await api.put(`/orders/${orderId}/accept`, {});
+    return response.data;
+  },
+
+  deleteOrder: async (orderId: string) => {
+    const response = await api.delete(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  updateOrderItems: async (orderId: string, items: any[]) => {
+    const response = await api.put(`/orders/${orderId}/items`, { items });
+    return response.data;
+  },
+
+  updateOrderStatus: async (orderId: string, status: string) => {
+    const response = await api.put(`/orders/${orderId}/status`, { status });
+    return response.data;
+  },
+
+  updatePaymentStatus: async (orderId: string, payment_status: string) => {
+    const response = await api.put(`/orders/${orderId}/payment-status`, { payment_status });
+    return response.data;
+  },
+
+  generateBill: async (orderId: string, paymentMethod: string = 'CASH', discount: number = 0) => {
+    const response = await api.post(`/billing/${orderId}/generate`, {
+      payment_method: paymentMethod,
+      discount_amount: discount
+    });
+    return response.data;
+  },
+
+  confirmPayment: async (orderId: string, amount: number, paymentMethod: string, transactionReference?: string) => {
+    const response = await api.put(`/billing/${orderId}/confirm`, {
+      amount: amount,
+      payment_method: paymentMethod,
+      transaction_reference: transactionReference || null
+    });
+    return response.data;
+  },
+
+  getReservations: async () => {
+    const response = await api.get('/reservations/');
+    return response.data;
+  },
+
+  getUpiId: async () => {
+    try {
+      const response = await api.get('/settings/platform-config');
+      const configs = response.data || [];
+      const upiConfig = configs.find((c: any) => c.key === 'platform_upi_id');
+      return { upi_id: upiConfig?.value || null };
+    } catch {
+      return { upi_id: null };
+    }
+  }
+};
+
+--- captain-app/src\components\CustomizationModal.tsx ---
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, TextInput, Platform, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+
+const PRIMARY = '#6366f1';
+
+interface CustomizationModalProps {
+  visible: boolean;
+  item: any;
+  onClose: () => void;
+  onAddToCart: (item: any, selectedModifiers: any[], quantity: number, notes: string) => void;
+}
+
+export default function CustomizationModal({ visible, item, onClose, onAddToCart }: CustomizationModalProps) {
+  const [quantity, setQuantity] = useState(1);
+  const [notes, setNotes] = useState('');
+  const [selectedMods, setSelectedMods] = useState<Record<string, any[]>>({});
+
+  useEffect(() => {
+    if (visible) {
+      setQuantity(1);
+      setNotes('');
+      setSelectedMods({});
+    }
+
+    if (Platform.OS === 'web') {
+      if (visible) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = 'unset';
+      }
+    }
+
+    return () => {
+      if (Platform.OS === 'web') {
+        document.body.style.overflow = 'unset';
+      }
+    };
+  }, [visible]);
+
+  if (!item) return null;
+
+  const handleToggleModifier = (group: any, mod: any) => {
+    const currentSelected = selectedMods[group.id] || [];
+    const isSelected = currentSelected.some(m => m.id === mod.id);
+
+    if (isSelected) {
+      setSelectedMods({
+        ...selectedMods,
+        [group.id]: currentSelected.filter(m => m.id !== mod.id)
+      });
+    } else {
+      if (group.max_selections === 1) {
+        setSelectedMods({
+          ...selectedMods,
+          [group.id]: [mod]
+        });
+      } else {
+        if (currentSelected.length >= group.max_selections) {
+          const msg = `You can only select up to ${group.max_selections} options for ${group.name}`;
+          Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Limit Reached', msg);
+          return;
+        }
+        setSelectedMods({
+          ...selectedMods,
+          [group.id]: [...currentSelected, mod]
+        });
+      }
+    }
+  };
+
+  const calculateTotal = () => {
+    let modTotal = 0;
+    let basePrice = item.price;
+    Object.keys(selectedMods).forEach(groupId => {
+      const group = item.modifier_groups?.find((g: any) => g.id === groupId);
+      const mods = selectedMods[groupId] || [];
+      mods.forEach(m => {
+        if (group?.price_replaces_base) {
+          basePrice = m.price;
+        } else {
+          modTotal += m.price;
+        }
+      });
+    });
+    return (basePrice + modTotal) * quantity;
+  };
+
+  const handleAdd = () => {
+    for (const group of (item.modifier_groups || [])) {
+      const selected = selectedMods[group.id] || [];
+      if (group.is_required && selected.length === 0) {
+        const msg = `Please select an option for ${group.name}`;
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Required', msg);
+        return;
+      }
+      if (selected.length < group.min_selections) {
+        const msg = `Please select at least ${group.min_selections} options for ${group.name}`;
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Required', msg);
+        return;
+      }
+    }
+
+    const flatModifiers = Object.values(selectedMods).flat();
+    onAddToCart(item, flatModifiers, quantity, notes);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{item.name}</Text>
+              <Text style={styles.subtitle}>Customize your item</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Feather name="x" size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 40 }}>
+            {(item.modifier_groups || []).map((group: any) => (
+              <View key={group.id} style={styles.groupContainer}>
+                <View style={styles.groupHeader}>
+                  <Text style={styles.groupTitle}>{group.name}</Text>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {group.is_required ? 'Required' : 'Optional'}
+                      {group.max_selections > 1 && ` (Max ${group.max_selections})`}
+                    </Text>
+                  </View>
+                </View>
+
+                {group.modifiers?.map((mod: any) => {
+                  const isSelected = (selectedMods[group.id] || []).some(m => m.id === mod.id);
+                  return (
+                    <TouchableOpacity
+                      key={mod.id}
+                      style={[styles.modRow, isSelected && styles.modRowSelected]}
+                      onPress={() => handleToggleModifier(group, mod)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.modLeft}>
+                        <View style={[
+                          group.max_selections === 1 ? styles.radio : styles.checkbox,
+                          isSelected && styles.checked
+                        ]}>
+                          {isSelected && group.max_selections === 1 && <View style={styles.radioInner} />}
+                          {isSelected && group.max_selections > 1 && <Feather name="check" size={12} color="#fff" />}
+                        </View>
+                        <Text style={[styles.modName, isSelected && styles.modNameSelected]}>{mod.name}</Text>
+                      </View>
+                      {mod.price > 0 && <Text style={styles.modPrice}>+₹{mod.price}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+
+            <View style={styles.notesContainer}>
+              <Text style={styles.groupTitle}>Special Instructions</Text>
+              <TextInput
+                style={[styles.notesInput, { outlineStyle: 'none' } as any]}
+                placeholder="e.g. less spicy..."
+                placeholderTextColor="#94a3b8"
+                multiline
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
+
+            <View style={styles.qtyContainer}>
+              <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} style={styles.qtyBtn}>
+                <Feather name="minus" size={20} color="#0f172a" />
+              </TouchableOpacity>
+              <Text style={styles.qtyText}>{quantity}</Text>
+              <TouchableOpacity onPress={() => setQuantity(quantity + 1)} style={styles.qtyBtn}>
+                <Feather name="plus" size={20} color="#0f172a" />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.9}>
+              <Text style={styles.addBtnText}>Add Item</Text>
+              <Text style={styles.addBtnPrice}>₹{calculateTotal().toFixed(2)}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  title: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  subtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  closeBtn: { padding: 4 },
+  body: { padding: 20 },
+  groupContainer: { marginBottom: 20 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  groupTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 8 },
+  badge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  badgeText: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  modRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 8 },
+  modRowSelected: { borderColor: PRIMARY, backgroundColor: '#eef2ff' },
+  modLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
+  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
+  checked: { borderColor: PRIMARY, backgroundColor: PRIMARY },
+  radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+  modName: { fontSize: 14, fontWeight: '500', color: '#334155' },
+  modNameSelected: { color: PRIMARY, fontWeight: '600' },
+  modPrice: { fontSize: 14, color: '#64748b' },
+  notesContainer: { marginBottom: 20 },
+  notesInput: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12, fontSize: 14, color: '#0f172a', minHeight: 80, textAlignVertical: 'top' },
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginVertical: 10 },
+  qtyBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+  qtyText: { fontSize: 20, fontWeight: '800', color: '#0f172a', width: 30, textAlign: 'center' },
+  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#f1f5f9', backgroundColor: '#fff' },
+  addBtn: { backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  addBtnPrice: { fontSize: 16, fontWeight: '800', color: '#fff' }
+});
+
+--- captain-app/src\context\AuthContext.tsx ---
+import React, { createContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../api/axios';
+
+export const AuthContext = createContext<any>(null);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [userToken, setUserToken] = useState<string | null>(null);
+  const [restaurantName, setRestaurantName] = useState<string>('Captain Panel');
+
+  useEffect(() => {
+    checkToken();
+  }, []);
+
+  const checkToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const storedName = await AsyncStorage.getItem('restaurantName');
+      setUserToken(token);
+      if (storedName) {
+        setRestaurantName(storedName);
+      }
+    } catch (e) {
+      console.log('Failed to fetch token');
+    }
+    setIsLoading(false);
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      
+      const token = response.data?.data?.access_token || response.data?.access_token;
+      const restName = response.data?.data?.restaurant_name || 'Captain Panel';
+      
+      if (token) {
+        await AsyncStorage.setItem('userToken', token);
+        await AsyncStorage.setItem('restaurantName', restName);
+        setUserToken(token);
+        setRestaurantName(restName);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.log('Login error:', e);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    await AsyncStorage.removeItem('userToken');
+    await AsyncStorage.removeItem('restaurantName');
+    setUserToken(null);
+    setRestaurantName('Captain Panel');
+  };
+
+  return (
+    <AuthContext.Provider value={{ login, logout, isLoading, userToken, restaurantName }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+
+
+--- captain-app/src\navigation\AppNavigator.tsx ---
+import React, { useContext } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { ActivityIndicator, View, Text } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import { AuthContext } from '../context/AuthContext';
+
+import TablesScreen from '../screens/TablesScreen';
+import TableMenuScreen from '../screens/TableMenuScreen';
+import CartScreen from '../screens/CartScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import OrdersScreen from '../screens/OrdersScreen';
+import KOTScreen from '../screens/KOTScreen';
+import MoreScreen from '../screens/MoreScreen';
+import LoginScreen from '../screens/LoginScreen';
+
+const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
+const Stack = createNativeStackNavigator();
+
+const PRIMARY = '#6366f1';
+
+function BottomTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: PRIMARY,
+        tabBarInactiveTintColor: '#94a3b8',
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: '#f1f5f9',
+          elevation: 0,
+          backgroundColor: '#ffffff',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 4,
+        },
+        tabBarIcon: ({ color, size, focused }) => {
+          if (route.name === 'Tables') return <MaterialCommunityIcons name="table-chair" size={size} color={color} />;
+          if (route.name === 'Orders') return <Feather name="clock" size={size} color={color} />;
+          if (route.name === 'KOT') return <MaterialCommunityIcons name="receipt" size={size} color={color} />;
+          if (route.name === 'More') return <Feather name="more-horizontal" size={size} color={color} />;
+          return <Feather name="circle" size={size} color={color} />;
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+      })}
+    >
+      <Tab.Screen name="Tables" component={TablesScreen} />
+      <Tab.Screen name="Orders" component={OrdersScreen} />
+      <Tab.Screen name="KOT" component={KOTScreen} />
+      <Tab.Screen name="More" component={MoreScreen} />
+    </Tab.Navigator>
+  );
+}
+
+function MainAppDrawer() {
+  const { restaurantName, logout } = useContext(AuthContext);
+
+  const CustomDrawerContent = (props: any) => {
+    return (
+      <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
+        <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', marginBottom: 8 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: '#0f172a' }}>
+            {restaurantName || 'Captain App'}
+          </Text>
+          <Text style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Waiter Panel</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <DrawerItemList {...props} />
+        </View>
+        <DrawerItem
+          label="Log Out"
+          onPress={() => logout()}
+          labelStyle={{ color: '#ef4444', fontWeight: 'bold' }}
+          icon={() => <Feather name="log-out" size={18} color="#ef4444" />}
+        />
+      </DrawerContentScrollView>
+    );
+  };
+
+  return (
+    <Drawer.Navigator
+      initialRouteName="HomeTabs"
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={{
+        drawerActiveTintColor: PRIMARY,
+        drawerActiveBackgroundColor: '#fff1f2',
+        drawerLabelStyle: { fontWeight: '600' },
+      }}
+    >
+      <Drawer.Screen
+        name="HomeTabs"
+        component={BottomTabs}
+        options={{
+          title: restaurantName || 'Captain Panel',
+          headerTintColor: PRIMARY,
+          drawerLabel: 'Tables',
+          drawerIcon: ({ color }) => <MaterialCommunityIcons name="table-chair" size={20} color={color} />,
+        }}
+      />
+    </Drawer.Navigator>
+  );
+}
+
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Drawer" component={MainAppDrawer} />
+      <Stack.Screen name="TableMenu" component={TableMenuScreen} />
+      <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+    </Stack.Navigator>
+  );
+}
+
+export default function AppNavigator() {
+  const { userToken, isLoading } = useContext(AuthContext);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {userToken == null ? (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        ) : (
+          <Stack.Screen name="Main" component={MainStack} />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+
+
+--- captain-app/src\screens\CartScreen.tsx ---
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  SafeAreaView, ActivityIndicator, Alert, Platform, TextInput,
+  Modal, ScrollView, Share
+} from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import api from '../api/axios';
+import { printerService } from '../utils/PrinterService';
+
+const PRIMARY = '#6366f1';      // Indigo — matches web app
+const PRIMARY_DARK = '#4f46e5'; // Indigo dark
+const PRIMARY_LIGHT = '#eef2ff';// Indigo light
+const ORANGE = '#e85d04';       // KOT button — matches web app 'Fire KOT'
+
+export default function CartScreen({ route, navigation }: any) {
+  const { cartItems: initialItems, tableId, tableNumber, orderType: passedOrderType } = route.params;
+
+  const [cartItems, setCartItems] = useState<any[]>(
+    (initialItems || []).map((item: any) => ({ ...item, notes: '', is_parcel: false }))
+  );
+  const [activeOrder, setActiveOrder] = useState<any>(null);
+  const [fetchingActive, setFetchingActive] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const orderType = passedOrderType || 'DINE_IN';
+
+  // Customer details
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [guests, setGuests] = useState('');
+  const [tipAmount, setTipAmount] = useState('');
+
+  // More popup
+  const [showMore, setShowMore] = useState(false);
+  const moreRef = useRef<View>(null);
+
+  useEffect(() => { fetchActiveOrder(); }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (showMore) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = 'unset';
+      }
+    }
+
+    return () => {
+      if (Platform.OS === 'web') {
+        document.body.style.overflow = 'unset';
+      }
+    };
+  }, [showMore]);
+
+  const fetchActiveOrder = async () => {
+    try {
+      const res = await api.get('/orders/waiter/active');
+      const found = (res.data || []).find((o: any) => o.table_id === tableId);
+      if (found) setActiveOrder(found);
+    } catch { }
+    finally { setFetchingActive(false); }
+  };
+
+  const updateQty = (cartItemId: string, delta: number) =>
+    setCartItems(prev =>
+      prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)
+        .filter(i => i.quantity > 0)
+    );
+
+  const deleteItem = (cartItemId: string) => setCartItems(prev => prev.filter(i => (i.cartItemId || i.id) !== cartItemId));
+
+  const updateNotes = (cartItemId: string, text: string) =>
+    setCartItems(prev => prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, notes: text } : i));
+
+  const toggleParcel = (cartItemId: string) =>
+    setCartItems(prev => prev.map(i => (i.cartItemId || i.id) === cartItemId ? { ...i, is_parcel: !i.is_parcel } : i));
+
+  const grandTotal = cartItems.reduce((s, i) => {
+    const modTotal = (i.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);
+    return s + (i.price + modTotal) * i.quantity;
+  }, 0);
+
+  const buildCombinedItems = (newItems: any[]) => {
+    if (!activeOrder) return newItems;
+    const combined: any[] = [];
+    (activeOrder.items || []).forEach((ex: any) => {
+      combined.push({ menu_item_id: ex.menu_item_id, quantity: ex.quantity, notes: ex.notes || '', is_parcel: ex.is_parcel || false });
+    });
+    newItems.forEach(ni => {
+      const hasMods = ni.selected_modifiers && ni.selected_modifiers.length > 0;
+      if (!hasMods) {
+        const m = combined.find(c => c.menu_item_id === ni.menu_item_id && c.is_parcel === ni.is_parcel && (!c.selected_modifiers || c.selected_modifiers.length === 0));
+        if (m) { m.quantity += ni.quantity; }
+        else combined.push(ni);
+      } else {
+        combined.push(ni);
+      }
+    });
+    return combined;
+  };
+
+  const placeOrder = async (action: 'kot' | 'save_bill' | 'save_print' | 'save_print_direct' | 'ebill') => {
+    if (cartItems.length === 0) {
+      const msg = 'Add items to cart first';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Empty Cart', msg);
+      return;
+    }
+    setLoading(true);
+    setShowMore(false);
+    try {
+      const formattedItems = cartItems.map(i => ({
+        menu_item_id: i.id,
+        quantity: i.quantity,
+        notes: i.notes,
+        is_parcel: i.is_parcel,
+        selected_modifiers: i.selected_modifiers || []
+      }));
+
+      let createdOrder: any;
+
+      if (activeOrder) {
+        let ph = customerPhone.trim();
+        if (ph) {
+          ph = ph.replace(/\D/g, '');
+          ph = ph.length === 10 ? '+91' + ph : '+' + ph;
+        }
+        const res = await api.put(`/orders/${activeOrder.id}/items`, { 
+            items: buildCombinedItems(formattedItems),
+            status: action === 'save_print_direct' ? 'READY' : undefined,
+            customer_name: customerName.trim() || undefined,
+            customer_phone: ph || undefined,
+            guests_count: guests.trim() ? parseInt(guests) : undefined,
+            tip_amount: tipAmount.trim() ? parseFloat(tipAmount) : undefined
+        });
+        createdOrder = res.data || activeOrder;
+      } else {
+        const payload: any = {
+          table_id: tableId,
+          order_type: orderType,
+          items: formattedItems,
+          source: 'WAITER',
+          status: action === 'save_print_direct' ? 'READY' : undefined
+        };
+        if (customerName.trim()) payload.customer_name = customerName.trim();
+        if (customerPhone.trim()) {
+          let ph = customerPhone.trim().replace(/\D/g, '');
+          payload.customer_phone = ph.length === 10 ? '+91' + ph : '+' + ph;
+        }
+        if (guests.trim()) payload.guests_count = parseInt(guests);
+        if (tipAmount.trim()) payload.tip_amount = parseFloat(tipAmount);
+        const res = await api.post('/orders/', payload);
+        createdOrder = res.data;
+      }
+
+      if (action !== 'ebill') {
+        const msg = activeOrder ? 'Items added to kitchen!' : '🔥 Order sent to kitchen!';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('✅ Success', msg);
+      }
+
+      // Hardware Printing Logic
+      if (action === 'save_print' || action === 'save_print_direct') {
+        if (Platform.OS === 'web') {
+          const pType = localStorage.getItem('printer_type') || 'bluetooth';
+          try {
+            let billText = `*BARKAT KOT*\n`;
+            billText += `Table: ${tableNumber} | Order: ${createdOrder?.id?.slice(-4) || 'NEW'}\n`;
+            billText += `------------------------\n`;
+            cartItems.forEach(item => {
+              billText += `${item.quantity}x ${item.name}\n`;
+            });
+            billText += `------------------------\n`;
+            
+            if (pType === 'bluetooth') {
+              if (!printerService.device) await printerService.connectBluetooth();
+            } else {
+              if (!printerService.device) await printerService.connectUSB();
+            }
+            await printerService.printReceipt(billText, pType as any);
+          } catch (err: any) {
+            console.error('Print failed:', err);
+            window.alert('Print failed: ' + err.message);
+          }
+        }
+      }
+
+      navigation.reset({ index: 0, routes: [{ name: 'Drawer' }] });
+    } catch (err: any) {
+      const d = err.response?.data?.detail;
+      const msg = Array.isArray(d) ? d[0]?.msg : (typeof d === 'string' ? d : 'Failed to place order');
+      Platform.OS === 'web' ? window.alert(`Error: ${msg}`) : Alert.alert('Error', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const orderTypeLabel = orderType === 'DINE_IN' ? 'Dine In' : orderType === 'DELIVERY' ? 'Delivery' : 'Pick Up';
+
+  const renderItem = ({ item }: { item: any }) => {
+    const modTotal = (item.selected_modifiers || []).reduce((ms: number, m: any) => ms + m.price, 0);
+    const itemKey = item.cartItemId || item.id;
+    return (
+      <View style={styles.cartItem}>
+        <View style={styles.itemTop}>
+          <View style={styles.itemLeft}>
+            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+              <View style={{ marginTop: 2 }}>
+                {item.selected_modifiers.map((mod: any, idx: number) => (
+                  <Text key={idx} style={{ fontSize: 11, color: '#64748b' }}>
+                    • {mod.name} {mod.price ? `(+₹${mod.price})` : ''}
+                  </Text>
+                ))}
+              </View>
+            )}
+            <Text style={styles.itemPrice}>₹{((item.price + modTotal) * item.quantity).toFixed(2)}</Text>
+          </View>
+          <View style={styles.itemRight}>
+            <View style={styles.qtyRow}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(itemKey, -1)}>
+                <Feather name="minus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+              <Text style={styles.qtyNum}>{item.quantity}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(itemKey, 1)}>
+                <Feather name="plus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => deleteItem(itemKey)} style={styles.trashBtn}>
+              <Feather name="trash-2" size={15} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.itemBottom}>
+          <TextInput
+            style={[styles.notesInput, { outlineStyle: 'none' } as any]}
+            placeholder="Chef notes..."
+            placeholderTextColor="#94a3b8"
+            value={item.notes}
+            onChangeText={t => updateNotes(itemKey, t)}
+          />
+          <TouchableOpacity
+            style={[styles.parcelBtn, item.is_parcel && styles.parcelBtnActive]}
+            onPress={() => toggleParcel(itemKey)}
+          >
+            <MaterialCommunityIcons name="bag-personal" size={13} color={item.is_parcel ? '#f97316' : '#94a3b8'} />
+            <Text style={[styles.parcelTxt, item.is_parcel && { color: '#f97316' }]}>PARCEL</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Feather name="arrow-left" size={22} color="#0f172a" />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.headerTitle}>Table {tableNumber}</Text>
+            <Text style={styles.headerSub}>{orderTypeLabel}</Text>
+          </View>
+        </View>
+
+        {/* Customer Details */}
+        {!activeOrder && (
+          <View style={styles.customerSection}>
+            <View style={styles.custRow}>
+              <View style={styles.custInput}>
+                <Feather name="user" size={13} color="#94a3b8" />
+                <TextInput
+                  style={[styles.custTI, { outlineStyle: 'none' } as any]}
+                  placeholder="Customer Name"
+                  placeholderTextColor="#94a3b8"
+                  value={customerName} onChangeText={setCustomerName}
+                />
+              </View>
+              <View style={styles.custInput}>
+                <Feather name="phone" size={13} color="#94a3b8" />
+                <TextInput
+                  style={[styles.custTI, { outlineStyle: 'none' } as any]}
+                  placeholder="WhatsApp No."
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="phone-pad"
+                  value={customerPhone} onChangeText={setCustomerPhone}
+                />
+              </View>
+            </View>
+            <View style={styles.custRow}>
+              <View style={styles.custInput}>
+                <Feather name="users" size={13} color="#94a3b8" />
+                <TextInput
+                  style={[styles.custTI, { outlineStyle: 'none' } as any]}
+                  placeholder="Guests"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={guests} onChangeText={setGuests}
+                />
+              </View>
+              <View style={styles.custInput}>
+                <Text style={styles.rupeeIcon}>₹</Text>
+                <TextInput
+                  style={[styles.custTI, { outlineStyle: 'none' } as any]}
+                  placeholder="Tip Amount"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={tipAmount} onChangeText={setTipAmount}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Items list */}
+        <Text style={styles.sectionLbl}>DRAFT ITEMS</Text>
+        {fetchingActive ? (
+          <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={cartItems}
+            keyExtractor={item => item.cartItemId || item.id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: 220 }}
+            ListEmptyComponent={
+              <View style={styles.emptyCart}>
+                <Feather name="shopping-cart" size={32} color="#cbd5e1" />
+                <Text style={styles.emptyCartTxt}>No items in cart</Text>
+              </View>
+            }
+          />
+        )}
+
+        {/* Total */}
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLbl}>Grand Total</Text>
+          <Text style={styles.totalAmt}>₹{grandTotal.toFixed(0)}</Text>
+        </View>
+
+        {/* Bottom Action Bar */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity 
+            style={[styles.bottomBtn, { backgroundColor: '#f1f5f9', flex: 1, borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center', borderRadius: 10, gap: 3 }]} 
+            onPress={() => placeOrder('save_print_direct')} 
+            disabled={loading || cartItems.length === 0}
+          >
+            <Feather name="printer" size={16} color="#334155" />
+            <Text style={[styles.bottomBtnTxt, { color: '#334155', fontWeight: '800' }]}>Print KOT</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.kotBtn, { flex: 1.5 }, (loading || cartItems.length === 0) && { opacity: 0.6 }]}
+            onPress={() => placeOrder('kot')}
+            disabled={loading || cartItems.length === 0}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <>
+                  <Feather name="send" size={14} color="#fff" />
+                  <Text style={styles.kotBtnTxt}>Send to Kitchen</Text>
+                </>
+            }
+          </TouchableOpacity>
+        </View>
+
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 4,
+  },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
+  headerSub: { fontSize: 12, color: '#64748b' },
+  onlineBadge: {
+    backgroundColor: '#fff0f0', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: '#fecdd3',
+  },
+  onlineBadgeText: { fontSize: 11, fontWeight: '700', color: PRIMARY },
+  customerSection: {
+    backgroundColor: '#fff', padding: 10, gap: 8,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+  },
+  custRow: { flexDirection: 'row', gap: 8 },
+  custInput: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 9,
+    paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#f8fafc', gap: 6,
+  },
+  custTI: { flex: 1, fontSize: 13, color: '#334155' },
+  rupeeIcon: { fontSize: 13, color: '#94a3b8', fontWeight: '700' },
+  sectionLbl: {
+    fontSize: 10, fontWeight: '800', color: '#94a3b8', letterSpacing: 1,
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6,
+  },
+  cartItem: {
+    backgroundColor: '#fff', marginHorizontal: 10, marginBottom: 7,
+    borderRadius: 12, padding: 11,
+    borderWidth: 1, borderColor: '#f1f5f9',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
+  },
+  itemTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  itemLeft: { flex: 1, marginRight: 10 },
+  itemName: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  itemPrice: { fontSize: 13, color: PRIMARY, fontWeight: '700', marginTop: 2 },
+  itemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  qtyRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, overflow: 'hidden',
+  },
+  qtyBtn: { padding: 7, backgroundColor: '#f8fafc' },
+  qtyNum: { fontSize: 13, fontWeight: '700', color: '#0f172a', paddingHorizontal: 10, minWidth: 30, textAlign: 'center' },
+  trashBtn: { padding: 4 },
+  itemBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 7 },
+  notesInput: {
+    flex: 1, fontSize: 12, color: '#334155',
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#f8fafc',
+  },
+  parcelBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+    paddingHorizontal: 9, paddingVertical: 6, backgroundColor: '#f8fafc',
+  },
+  parcelBtnActive: { backgroundColor: '#fff7ed', borderColor: '#fed7aa' },
+  parcelTxt: { fontSize: 10, fontWeight: '700', color: '#94a3b8' },
+  emptyCart: { padding: 48, alignItems: 'center', gap: 10 },
+  emptyCartTxt: { color: '#94a3b8', fontSize: 14 },
+  totalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 14,
+    borderTopWidth: 1, borderTopColor: '#e2e8f0',
+  },
+  totalLbl: { fontSize: 15, fontWeight: '700', color: '#64748b' },
+  totalAmt: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
+  bottomBar: {
+    flexDirection: 'row', backgroundColor: '#fff',
+    borderTopWidth: 1, borderTopColor: '#e2e8f0',
+    paddingHorizontal: 6, paddingVertical: 8, gap: 5,
+  },
+  bottomBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 9, borderRadius: 10, gap: 3,
+    borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc',
+  },
+  bottomBtnTxt: { fontSize: 10, fontWeight: '700', color: '#334155' },
+  kotBtn: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ORANGE, borderRadius: 10, paddingVertical: 10, gap: 5,
+    shadowColor: ORANGE, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+  },
+  kotBtnTxt: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  // More popup — positioned above the "More" button (bottom-left)
+  moreOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end', paddingBottom: 65, paddingLeft: 8,
+  },
+  morePopup: {
+    backgroundColor: '#fff', borderRadius: 14, width: 200,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15, shadowRadius: 16, elevation: 10,
+    overflow: 'hidden',
+  },
+  moreItem: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 15, paddingHorizontal: 16,
+  },
+  moreItemTxt: { fontSize: 14, fontWeight: '600', color: '#334155' },
+});
+
+
+
+--- captain-app/src\screens\CheckoutScreen.tsx ---
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+  ActivityIndicator, Alert, Platform, ScrollView, TextInput, Image
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { waiterApi } from '../api/waiterApi';
+import api from '../api/axios';
+
+const PRIMARY = '#6366f1';      // Indigo
+const PRIMARY_DARK = '#4f46e5'; // Deep indigo
+const ORANGE = '#e85d04';       // For accent buttons
+
+type PayMethod = 'CASH' | 'CARD' | 'UPI';
+
+export default function CheckoutScreen({ route, navigation }: any) {
+  const { orderId, tableNumber } = route.params;
+
+  const [order, setOrder] = useState<any>(null);
+  const [bill, setBill] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+
+  const [payMethod, setPayMethod] = useState<PayMethod>('CASH');
+  const [discount, setDiscount] = useState('');
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('fixed');
+  const [customerPaid, setCustomerPaid] = useState('');
+  const [upiId, setUpiId] = useState<string | null>(null);
+
+  useEffect(() => { fetchBill(); }, []);
+
+  const fetchBill = async () => {
+    try {
+      // First get order details
+      const [ordersData, upiData] = await Promise.all([
+        waiterApi.getAllOrders(),
+        waiterApi.getUpiId()
+      ]);
+      
+      const found = (ordersData || []).find((o: any) => o.id === orderId);
+      if (found) setOrder(found);
+
+      if (upiData?.upi_id) setUpiId(upiData.upi_id);
+
+      // Generate bill
+      const billData = await waiterApi.generateBill(orderId, 'CASH', 0);
+      setBill(billData);
+    } catch (e) {
+      console.log('Checkout fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyDiscount = async () => {
+    try {
+      let discVal = parseFloat(discount) || 0;
+      if (discountType === 'percent' && bill?.subtotal) {
+        discVal = (bill.subtotal * discVal) / 100;
+      }
+      const billData = await waiterApi.generateBill(orderId, payMethod, discVal);
+      setBill(billData);
+      setStep(2);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Failed to generate bill';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    }
+  };
+
+  const sendEbill = async () => {
+    try {
+      const phoneRaw = (order?.customer_phone || '').replace(/\D/g, '');
+      if (phoneRaw.length >= 10) {
+        const phone = phoneRaw.length === 10 ? '91' + phoneRaw : phoneRaw;
+        let billText = `*BARKAT RESTAURANT*\n`;
+        billText += `Table: ${tableNumber}\n`;
+        billText += `------------------------\n`;
+        order.items?.forEach((item: any) => {
+          const modTotal = (item.modifiers || []).reduce((ms: number, m: any) => ms + (m.price_at_order_time || 0), 0);
+          billText += `${item.quantity}x ${item.menu_item?.name || 'Item'} - ₹${((item.price_at_order_time + modTotal) * item.quantity).toFixed(2)}\n`;
+        });
+        billText += `------------------------\n`;
+        billText += `*Grand Total: ₹${grandTotal.toFixed(2)}*\n\n`;
+        billText += `Thank you for dining with us! 🙏`;
+        
+        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(billText)}`;
+        if (Platform.OS === 'web') {
+          window.open(waUrl, '_blank');
+        } else {
+          const { Share } = require('react-native');
+          await Share.share({ message: billText });
+        }
+      } else {
+        const msg = 'No customer phone found for this order.';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('E-Bill', msg);
+      }
+    } catch (err) {
+      console.log('Ebill error', err);
+    }
+  };
+
+  const confirmPayment = async () => {
+    setProcessing(true);
+    try {
+      await waiterApi.confirmPayment(orderId, bill.total_amount, payMethod, payMethod !== 'CASH' ? `TRX-${Date.now()}` : undefined);
+      const msg = '✅ Payment confirmed! Table is now free.';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Payment Confirmed', msg);
+      navigation.reset({ index: 0, routes: [{ name: 'Drawer' }] });
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Payment failed';
+      Platform.OS === 'web' ? window.alert(`Error: ${msg}`) : Alert.alert('Error', msg);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const grandTotal = bill?.total_amount || 0;
+  const paid = parseFloat(customerPaid) || 0;
+  const change = paid > 0 ? paid - grandTotal : null;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.headerSmall}>Step {step}/2 — {step === 1 ? 'Bill Review' : 'Payment'}</Text>
+            <Text style={styles.headerTitle}>Table {tableNumber} · Settle & Save</Text>
+          </View>
+        </View>
+
+        {/* Step indicator */}
+        <View style={styles.stepRow}>
+          {[1, 2].map(s => (
+            <View key={s} style={[styles.stepBar, { backgroundColor: s <= step ? PRIMARY : '#e2e8f0' }]} />
+          ))}
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+
+          {/* ── STEP 1: BILL ── */}
+          {step === 1 && (
+            <>
+              {/* Items */}
+              {order?.items && (
+                <View style={styles.card}>
+                  <Text style={styles.sectionLabel}>ITEMS ORDERED</Text>
+                  {order.items.map((item: any, i: number) => (
+                    <View key={i} style={styles.itemRow}>
+                      <Text style={styles.itemName}>
+                        <Text style={{ fontWeight: '700' }}>{item.quantity}×</Text>{' '}
+                        {item.menu_item?.name || 'Item'}
+                      </Text>
+                      <Text style={styles.itemAmt}>
+                        ₹{((item.price_at_order_time || 0) * item.quantity).toFixed(2)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Bill summary */}
+              {bill && (
+                <View style={styles.card}>
+                  <Text style={styles.sectionLabel}>BILL SUMMARY</Text>
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>Subtotal</Text>
+                    <Text style={styles.billValue}>₹{bill.subtotal?.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>Tax</Text>
+                    <Text style={styles.billValue}>₹{bill.tax_amount?.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>Discount</Text>
+                    <View style={styles.discountControls}>
+                      <View style={styles.discountToggle}>
+                        <TouchableOpacity 
+                          style={[styles.toggleOption, discountType === 'percent' && styles.toggleActive]} 
+                          onPress={() => setDiscountType('percent')}
+                        >
+                          <Text style={[styles.toggleText, discountType === 'percent' && {color: '#fff'}]}>%</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.toggleOption, discountType === 'fixed' && styles.toggleActive]} 
+                          onPress={() => setDiscountType('fixed')}
+                        >
+                          <Text style={[styles.toggleText, discountType === 'fixed' && {color: '#fff'}]}>₹</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TextInput
+                        style={[styles.discountInput, { outlineStyle: 'none' } as any]}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#94a3b8"
+                        value={discount}
+                        onChangeText={setDiscount}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.divider} />
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Grand Total</Text>
+                    <Text style={styles.totalAmt}>₹{grandTotal.toFixed(2)}</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ── STEP 2: PAYMENT ── */}
+          {step === 2 && (
+            <>
+              {/* Amount reminder */}
+              <View style={[styles.card, { alignItems: 'center', paddingVertical: 20 }]}>
+                <Text style={styles.sectionLabel}>AMOUNT TO PAY</Text>
+                <Text style={styles.bigAmount}>₹{grandTotal.toFixed(2)}</Text>
+              </View>
+
+              {/* Payment methods */}
+              <View style={styles.card}>
+                <Text style={styles.sectionLabel}>SELECT PAYMENT METHOD</Text>
+                <View style={styles.payRow}>
+                  {(['CASH', 'CARD', 'UPI'] as PayMethod[]).map(m => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.payBtn, payMethod === m && styles.payBtnActive]}
+                      onPress={() => setPayMethod(m)}
+                    >
+                      <Feather
+                        name={m === 'CASH' ? 'dollar-sign' : m === 'CARD' ? 'credit-card' : 'smartphone'}
+                        size={20}
+                        color={payMethod === m ? '#fff' : '#64748b'}
+                      />
+                      <Text style={[styles.payLabel, payMethod === m && { color: '#fff' }]}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* UPI QR Code */}
+              {payMethod === 'UPI' && upiId && (
+                <View style={[styles.card, { alignItems: 'center', paddingVertical: 20 }]}>
+                  <Text style={styles.sectionLabel}>SCAN TO PAY</Text>
+                  <Image 
+                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=Restaurant&am=${grandTotal.toFixed(2)}&cu=INR`)}` }}
+                    style={{ width: 200, height: 200, marginTop: 10, borderRadius: 10 }}
+                  />
+                  <Text style={{ marginTop: 15, fontSize: 13, color: '#64748b', fontWeight: '600' }}>UPI ID: {upiId}</Text>
+                </View>
+              )}
+
+              {/* Cash change calculator */}
+              {payMethod === 'CASH' && (
+                <View style={styles.card}>
+                  <Text style={styles.sectionLabel}>CHANGE CALCULATOR</Text>
+                  <View style={styles.changeRow}>
+                    <Text style={styles.billLabel}>Customer Paid</Text>
+                    <View style={styles.paidInput}>
+                      <Text style={styles.rupee}>₹</Text>
+                      <TextInput
+                        style={[styles.paidInputText, { outlineStyle: 'none' } as any]}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#94a3b8"
+                        value={customerPaid}
+                        onChangeText={setCustomerPaid}
+                      />
+                    </View>
+                  </View>
+                  {change !== null && (
+                    <View style={[styles.changeBanner, { backgroundColor: change >= 0 ? '#ecfdf5' : '#fff1f2' }]}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: change >= 0 ? '#065f46' : '#be123c' }}>
+                        {change >= 0 ? 'Return to Customer' : 'Amount Short'}
+                      </Text>
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: change >= 0 ? '#10b981' : '#f43f5e' }}>
+                        ₹{Math.abs(change).toFixed(2)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>Settlement Amount</Text>
+                    <Text style={[styles.billValue, { fontWeight: '800' }]}>₹{grandTotal.toFixed(2)}</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+
+        {/* Footer buttons */}
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelText}>CANCEL</Text>
+          </TouchableOpacity>
+          {step === 1 ? (
+            <View style={{ flex: 2, flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[styles.settleBtn, { flex: 1, backgroundColor: '#10b981', shadowColor: '#10b981' }]} onPress={sendEbill}>
+                <Feather name="message-circle" size={16} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.settleBtn, { flex: 3 }]} onPress={applyDiscount}>
+                <Text style={styles.settleBtnText}>Next: Payment →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.settleBtn, processing && { opacity: 0.7 }]}
+              onPress={confirmPayment}
+              disabled={processing}
+            >
+              {processing
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.settleBtnText}>SETTLE & SAVE ✓</Text>
+              }
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: PRIMARY_DARK, paddingHorizontal: 16, paddingVertical: 14,
+  },
+  headerSmall: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginBottom: 2 },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  stepRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff' },
+  stepBar: { flex: 1, height: 4, borderRadius: 2 },
+  card: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    borderWidth: 1, borderColor: '#f1f5f9',
+  },
+  sectionLabel: { fontSize: 10, fontWeight: '800', color: '#94a3b8', letterSpacing: 1, marginBottom: 12 },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  itemName: { fontSize: 13, color: '#334155', flex: 1 },
+  itemAmt: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  billLabel: { fontSize: 13, color: '#64748b' },
+  billValue: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 8 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
+  totalAmt: { fontSize: 22, fontWeight: '800', color: PRIMARY },
+  discountControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  discountToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 2 },
+  toggleOption: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  toggleActive: { backgroundColor: PRIMARY },
+  toggleText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  discountInput: {
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6, fontSize: 14,
+    color: '#0f172a', width: 70, textAlign: 'right', backgroundColor: '#f8fafc'
+  },
+  bigAmount: { fontSize: 36, fontWeight: '900', color: '#0f172a', marginTop: 4 },
+  payRow: { flexDirection: 'row', gap: 10 },
+  payBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 16, borderRadius: 12, gap: 6,
+    backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
+  },
+  payBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  payLabel: { fontSize: 11, fontWeight: '700', color: '#64748b' },
+  changeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  paidInput: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  rupee: { fontSize: 16, fontWeight: '700', color: '#94a3b8', marginRight: 4 },
+  paidInputText: { fontSize: 16, fontWeight: '700', color: '#0f172a', width: 90, textAlign: 'right' },
+  changeBanner: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderRadius: 12, padding: 14, marginBottom: 12,
+  },
+  footer: {
+    flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 12,
+  },
+  cancelBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center',
+  },
+  cancelText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  settleBtn: {
+    flex: 2, paddingVertical: 14, borderRadius: 12,
+    backgroundColor: ORANGE, alignItems: 'center',
+    shadowColor: ORANGE, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+  },
+  settleBtnText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+});
+
+
+
+--- captain-app/src\screens\KOTScreen.tsx ---
+import React, { useState, useCallback, useRef } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  SafeAreaView, ActivityIndicator, RefreshControl
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Feather } from '@expo/vector-icons';
+import api from '../api/axios';
+
+const PRIMARY = '#6366f1';
+
+export default function KOTScreen() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [tables, setTables] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const intervalRef = useRef<any>(null);
+
+  const fetchOrders = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [ordersRes, tablesRes] = await Promise.all([
+        api.get('/orders/waiter/active'),
+        api.get('/tables/')
+      ]);
+      // KOT shows all non-served kitchen tickets
+      const kotOrders = (ordersRes.data || []).filter(
+        (o: any) => !['SERVED', 'CANCELLED'].includes(o.status)
+      );
+      setOrders(kotOrders);
+      setTables(tablesRes.data || []);
+    } catch { }
+    finally { if (!silent) setLoading(false); }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+      intervalRef.current = setInterval(() => fetchOrders(true), 5000);
+      return () => clearInterval(intervalRef.current);
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchOrders(true);
+    setRefreshing(false);
+  }, []);
+
+  const getTableNum = (tableId: string) =>
+    tables.find(t => t.id === tableId)?.table_number ?? '?';
+
+  const getElapsed = (dateStr: string) => {
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+  };
+
+  const STATUS_COLOR: Record<string, { bg: string; text: string; dot: string }> = {
+    PENDING:   { bg: '#fffbeb', text: '#b45309', dot: '#f59e0b' },
+    ACCEPTED:  { bg: '#eef2ff', text: '#4338ca', dot: '#6366f1' },
+    PREPARING: { bg: '#fdf4ff', text: '#7e22ce', dot: '#a855f7' },
+    READY:     { bg: '#ecfdf5', text: '#065f46', dot: '#10b981' },
+  };
+
+  const renderKOT = ({ item: order }: { item: any }) => {
+    const sc = STATUS_COLOR[order.status] || STATUS_COLOR.PENDING;
+    const tNum = getTableNum(order.table_id);
+
+    return (
+      <View style={[styles.kotCard, { backgroundColor: sc.bg }]}>
+        {/* KOT Header */}
+        <View style={styles.kotHeader}>
+          <View style={styles.kotLeft}>
+            <View style={[styles.dotIndicator, { backgroundColor: sc.dot }]} />
+            <Text style={[styles.kotTableNum, { color: sc.text }]}>Table {tNum}</Text>
+          </View>
+          <View style={styles.kotRight}>
+            <Text style={[styles.kotStatus, { color: sc.text }]}>{order.status}</Text>
+            <Text style={styles.kotTime}>{getElapsed(order.created_at)}</Text>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={[styles.kotDivider, { borderColor: sc.dot + '40' }]} />
+
+        {/* KOT Details */}
+        <Text style={styles.kotOrderNum}>KOT #{order.id.slice(0, 8).toUpperCase()}</Text>
+
+        {/* Items */}
+        <View style={styles.kotItems}>
+          {order.items?.map((item: any, idx: number) => (
+            <View key={idx} style={styles.kotItemRow}>
+              <Text style={[styles.kotQty, { color: sc.text }]}>{item.quantity}×</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.kotItemName, { color: sc.text }]}>
+                  {item.menu_item?.name || 'Item'}
+                </Text>
+                {item.notes ? (
+                  <Text style={styles.kotItemNotes}>📝 {item.notes}</Text>
+                ) : null}
+                {item.is_parcel ? (
+                  <Text style={styles.parcelTag}>📦 PARCEL</Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Footer: Total */}
+        <View style={[styles.kotFooter, { borderColor: sc.dot + '40' }]}>
+          <Text style={[styles.kotTotal, { color: sc.text }]}>
+            ₹{order.total_amount?.toFixed(2)}
+          </Text>
+          {order.customer_name && (
+            <Text style={[styles.kotCustomer, { color: sc.text }]}>
+              👤 {order.customer_name}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.pageHeader}>
+          <View>
+            <Text style={styles.pageTitle}>🔥 KOT Board</Text>
+            <Text style={styles.pageSubtitle}>Kitchen Order Tickets · {orders.length} active</Text>
+          </View>
+          <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchOrders()}>
+            <Feather name="refresh-cw" size={16} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+
+        {orders.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Feather name="check-circle" size={48} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>Kitchen All Clear!</Text>
+            <Text style={styles.emptySubtitle}>No pending kitchen tickets</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={orders}
+            keyExtractor={item => item.id}
+            renderItem={renderKOT}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: 12, paddingBottom: 80 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+          />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  pageHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#fff',
+  },
+  pageTitle: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
+  pageSubtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  refreshBtn: {
+    padding: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc',
+  },
+  kotCard: {
+    borderRadius: 14, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+  },
+  kotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  kotLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  kotRight: { alignItems: 'flex-end' },
+  dotIndicator: { width: 10, height: 10, borderRadius: 5 },
+  kotTableNum: { fontSize: 18, fontWeight: '800' },
+  kotStatus: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  kotTime: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  kotDivider: { borderTopWidth: 1, borderStyle: 'dashed', marginBottom: 10 },
+  kotOrderNum: { fontSize: 11, fontWeight: '700', color: '#94a3b8', letterSpacing: 1, marginBottom: 10 },
+  kotItems: { gap: 8, marginBottom: 12 },
+  kotItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  kotQty: { fontSize: 16, fontWeight: '900', minWidth: 28 },
+  kotItemName: { fontSize: 15, fontWeight: '600' },
+  kotItemNotes: { fontSize: 12, color: '#b45309', fontStyle: 'italic', marginTop: 2 },
+  parcelTag: { fontSize: 10, fontWeight: '700', color: '#f97316', marginTop: 2 },
+  kotFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderStyle: 'dashed', paddingTop: 10,
+  },
+  kotTotal: { fontSize: 18, fontWeight: '800' },
+  kotCustomer: { fontSize: 13, fontWeight: '600' },
+  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#64748b' },
+  emptySubtitle: { fontSize: 14, color: '#94a3b8' },
+});
+
+
+
+--- captain-app/src\screens\LoginScreen.tsx ---
+import React, { useState, useContext } from 'react';
+import { 
+  View, Text, TextInput, TouchableOpacity, StyleSheet, 
+  ActivityIndicator, KeyboardAvoidingView, Platform, 
+  Image, Dimensions
+} from 'react-native';
+import { AuthContext } from '../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+
+export default function LoginScreen() {
+  const { login } = useContext(AuthContext);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // States for input focus effects
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setError('');
+    const success = await login(email, password);
+    if (!success) {
+      setError('Invalid credentials. Please try again.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <LinearGradient
+      colors={['#f8fafc', '#eef2ff', '#e0e7ff']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+      >
+        <View style={styles.contentWrapper}>
+          
+          {/* Logo Section */}
+          <View style={styles.header}>
+            <Image 
+              source={require('../../assets/logo.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain" 
+            />
+            <View style={styles.logoDivider} />
+            <Text style={styles.subLogoText}>CAPTAIN PANEL</Text>
+          </View>
+          
+          {/* Glassmorphism Card */}
+          <View style={styles.card}>
+            <Text style={styles.welcomeText}>Welcome back</Text>
+            <Text style={styles.description}>Enter your details to access the POS.</Text>
+            
+            {error ? (
+              <View style={styles.errorBox}>
+                <Feather name="alert-circle" size={16} color="#ef4444" style={{marginRight: 8}} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email Address</Text>
+              <View style={[styles.inputWrapper, isEmailFocused && styles.inputWrapperFocused]}>
+                <Feather name="mail" size={18} color={isEmailFocused ? '#4f46e5' : '#94a3b8'} style={styles.inputIcon} />
+                <TextInput 
+                  style={styles.input}
+                  placeholder="name@restaurant.com"
+                  placeholderTextColor="#94a3b8"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  onFocus={() => setIsEmailFocused(true)}
+                  onBlur={() => setIsEmailFocused(false)}
+                />
+              </View>
+            </View>
+            
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <View style={styles.passwordHeader}>
+                <Text style={styles.label}>Password / PIN</Text>
+              </View>
+              <View style={[styles.inputWrapper, isPasswordFocused && styles.inputWrapperFocused]}>
+                <Feather name="lock" size={18} color={isPasswordFocused ? '#4f46e5' : '#94a3b8'} style={styles.inputIcon} />
+                <TextInput 
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#94a3b8"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
+                />
+              </View>
+            </View>
+            
+            {/* Gradient Button */}
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={handleLogin} 
+              disabled={loading}
+              style={styles.buttonShadowContainer}
+            >
+              <LinearGradient
+                colors={loading ? ['#a5b4fc', '#818cf8'] : ['#6366f1', '#4f46e5']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.button}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In to Dashboard</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            
+          </View>
+          
+          <Text style={styles.footerText}>Secured by MyRestro POS Engine</Text>
+        </View>
+      </KeyboardAvoidingView>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  logoImage: {
+    width: 280,
+    height: 90,
+  },
+  logoDivider: {
+    width: 40,
+    height: 3,
+    backgroundColor: '#4f46e5', // Brand Indigo
+    borderRadius: 2,
+    marginTop: -5,
+    marginBottom: 12,
+  },
+  subLogoText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#312e81', // Very dark indigo
+    letterSpacing: 4,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 24,
+    padding: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 1)',
+    // Premium diffuse shadow
+    shadowColor: '#312e81',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.08,
+    shadowRadius: 40,
+    elevation: 8,
+  },
+  welcomeText: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 15,
+    color: '#64748b',
+    marginBottom: 32,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  passwordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputWrapperFocused: {
+    borderColor: '#6366f1',
+    backgroundColor: '#ffffff',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#0f172a',
+    fontWeight: '500',
+    height: '100%',
+  },
+  buttonShadowContainer: {
+    marginTop: 12,
+    shadowColor: '#4f46e5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  button: {
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  footerText: {
+    marginTop: 32,
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  }
+});
+
+
+
+--- captain-app/src\screens\MoreScreen.tsx ---
+import React, { useContext } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+  Alert, Platform, Linking, ScrollView
+} from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AuthContext } from '../context/AuthContext';
+
+const PRIMARY = '#6366f1';
+
+const MENU_ITEMS = [
+  { icon: 'file-text', label: 'Quick Bill', sub: 'Create walk-in bill instantly', action: 'quick_bill' },
+  { icon: 'list', label: 'Billing', sub: 'All orders and billing history', action: 'billing' },
+  { icon: 'settings', label: 'Management', sub: 'Settings and configuration', action: 'management' },
+  { icon: 'bar-chart-2', label: 'Reports', sub: 'Sales and revenue reports', action: 'reports' },
+  { icon: 'moon', label: 'Day End', sub: 'End of day summary & close', action: 'day_end' },
+];
+
+export default function MoreScreen({ navigation }: any) {
+  const { restaurantName, logout } = useContext(AuthContext);
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to log out?')) logout();
+    } else {
+      Alert.alert('Log Out', 'Are you sure you want to log out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: logout }
+      ]);
+    }
+  };
+
+  const handleMenuAction = (action: string) => {
+    switch (action) {
+      case 'billing':
+        navigation.navigate('Orders');
+        break;
+      case 'quick_bill':
+        // Navigate to TableMenu with no table (walk-in)
+        navigation.navigate('TableMenu', { tableId: null, tableNumber: 'Walk-In', orderType: 'DINE_IN' });
+        break;
+      case 'management':
+      case 'reports':
+      case 'day_end':
+        const msg = `${action === 'management' ? 'Management' : action === 'reports' ? 'Reports' : 'Day End'} feature is available on the web dashboard.`;
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Info', msg);
+        break;
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+
+        {/* Header Card */}
+        <View style={styles.headerCard}>
+          <View style={styles.brandIcon}>
+            <Text style={styles.brandLetter}>
+              {(restaurantName || 'R').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={styles.restaurantName} numberOfLines={1}>{restaurantName || 'Restaurant'}</Text>
+            <View style={styles.rolePill}>
+              <Text style={styles.rolePillText}>Waiter Panel</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Menu Items */}
+        <View style={styles.section}>
+          {MENU_ITEMS.map((item, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={[styles.menuRow, idx < MENU_ITEMS.length - 1 && { borderBottomWidth: 1, borderBottomColor: '#f8fafc' }]}
+              onPress={() => handleMenuAction(item.action)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuIconBox}>
+                <Feather name={item.icon as any} size={20} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Text style={styles.menuSub}>{item.sub}</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="#cbd5e1" />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Quick Navigation */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>QUICK NAVIGATION</Text>
+          <View style={styles.quickGrid}>
+            {[
+              { icon: 'table-chair', label: 'Tables', tab: 'Tables' },
+              { icon: 'clock-outline', label: 'Orders', tab: 'Orders' },
+              { icon: 'receipt', label: 'KOT', tab: 'KOT' },
+            ].map((q, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.quickBtn}
+                onPress={() => navigation.navigate(q.tab)}
+              >
+                <MaterialCommunityIcons name={q.icon as any} size={24} color={PRIMARY} />
+                <Text style={styles.quickLabel}>{q.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Help Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>HELP?</Text>
+          <TouchableOpacity
+            style={styles.helpRow}
+            onPress={() => {
+              const url = 'tel:07969223344';
+              Platform.OS === 'web'
+                ? window.open(url)
+                : Linking.openURL(url);
+            }}
+          >
+            <Feather name="phone" size={16} color="#64748b" />
+            <Text style={styles.helpText}>07969 223344</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.helpRow}
+            onPress={() => {
+              const url = 'mailto:support@barkat.app';
+              Platform.OS === 'web'
+                ? window.open(url)
+                : Linking.openURL(url);
+            }}
+          >
+            <Feather name="mail" size={16} color="#64748b" />
+            <Text style={styles.helpText}>support@barkat.app</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
+          <Feather name="log-out" size={18} color="#ef4444" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+
+        {/* Footer */}
+        <Text style={styles.footer}>Biller: Waiter Panel · v1.0</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  headerCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', margin: 14, borderRadius: 16, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    borderWidth: 1, borderColor: '#f1f5f9',
+  },
+  brandIcon: {
+    width: 54, height: 54, borderRadius: 14, backgroundColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
+  },
+  brandLetter: { fontSize: 26, fontWeight: '900', color: '#fff' },
+  restaurantName: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
+  rolePill: {
+    marginTop: 4, alignSelf: 'flex-start',
+    backgroundColor: '#fff0f0', borderRadius: 20,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: '#fecdd3',
+  },
+  rolePillText: { fontSize: 11, fontWeight: '700', color: PRIMARY },
+  section: {
+    backgroundColor: '#fff', borderRadius: 14,
+    marginHorizontal: 14, marginBottom: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    borderWidth: 1, borderColor: '#f1f5f9',
+  },
+  sectionTitle: {
+    fontSize: 10, fontWeight: '800', color: '#94a3b8',
+    letterSpacing: 1, marginBottom: 14,
+  },
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, gap: 12,
+  },
+  menuIconBox: {
+    width: 40, height: 40, borderRadius: 10, backgroundColor: '#fff0f0',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  menuLabel: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  menuSub: { fontSize: 12, color: '#94a3b8', marginTop: 1 },
+  quickGrid: { flexDirection: 'row', gap: 10 },
+  quickBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 16,
+    backgroundColor: '#fff0f0', borderRadius: 12, gap: 6,
+    borderWidth: 1, borderColor: '#fecdd3',
+  },
+  quickLabel: { fontSize: 12, fontWeight: '700', color: PRIMARY },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  helpText: { fontSize: 14, color: '#475569', fontWeight: '500' },
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff1f2', borderRadius: 14, paddingVertical: 16, gap: 10,
+    borderWidth: 1, borderColor: '#fecdd3',
+    marginHorizontal: 14, marginBottom: 12,
+  },
+  logoutText: { fontSize: 15, fontWeight: '700', color: '#ef4444' },
+  footer: {
+    fontSize: 11, color: '#94a3b8', textAlign: 'center',
+    paddingBottom: 8, marginTop: 4,
+  },
+});
+
+
+
+--- captain-app/src\screens\OrdersScreen.tsx ---
+import React, { useState, useCallback, useRef } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  SafeAreaView, ActivityIndicator, RefreshControl, Alert, Platform
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import api from '../api/axios';
+
+const PRIMARY = '#6366f1';
+const AMBER = '#f59e0b';   // Accept button — matches web app
+const GREEN = '#10b981';   // Serve button — matches web app
+
+const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  PENDING:   { bg: '#fffbeb', text: '#b45309', border: '#fcd34d', label: '⚡ Pending' },
+  ACCEPTED:  { bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', label: '🍽 Accepted' },
+  PREPARING: { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff', label: '👨‍🍳 Preparing' },
+  READY:     { bg: '#ecfdf5', text: '#065f46', border: '#6ee7b7', label: '✅ Ready' },
+  SERVED:    { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0', label: '🍴 Served' },
+  CANCELLED: { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', label: '❌ Cancelled' },
+};
+
+export default function OrdersScreen({ navigation }: any) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [tables, setTables] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const intervalRef = useRef<any>(null);
+
+  const fetchOrders = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [ordersRes, tablesRes] = await Promise.all([
+        api.get('/orders/waiter/active'),
+        api.get('/tables/')
+      ]);
+      setOrders(ordersRes.data || []);
+      setTables(tablesRes.data || []);
+    } catch { }
+    finally { if (!silent) setLoading(false); }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+      intervalRef.current = setInterval(() => fetchOrders(true), 5000);
+      return () => clearInterval(intervalRef.current);
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchOrders(true);
+    setRefreshing(false);
+  }, []);
+
+  const getTableNum = (tableId: string) =>
+    tables.find(t => t.id === tableId)?.table_number ?? '?';
+
+  const getElapsed = (dateStr: string) => {
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+  };
+
+  const setProc = (id: string, val: boolean) => {
+    setProcessing(prev => { const n = new Set(prev); val ? n.add(id) : n.delete(id); return n; });
+  };
+
+  const handleAccept = async (id: string) => {
+    if (processing.has(id)) return;
+    setProc(id, true);
+    try {
+      await api.put(`/orders/${id}/accept`, {});
+      fetchOrders(true);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Failed';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    } finally { setProc(id, false); }
+  };
+
+  const handleReject = async (id: string) => {
+    if (processing.has(id)) return;
+    const doReject = async () => {
+      setProc(id, true);
+      try {
+        await api.put(`/orders/${id}/status`, { status: 'CANCELLED' });
+        fetchOrders(true);
+      } catch (e: any) {
+        const msg = e.response?.data?.detail || 'Failed';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      } finally { setProc(id, false); }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Reject this order?')) doReject();
+    } else {
+      Alert.alert('Reject Order?', 'This will cancel the order.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reject', style: 'destructive', onPress: doReject }
+      ]);
+    }
+  };
+
+  const handleServe = async (id: string) => {
+    if (processing.has(id)) return;
+    setProc(id, true);
+    try {
+      await api.put(`/orders/${id}/status`, { status: 'SERVED' });
+      fetchOrders(true);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Failed';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+    } finally { setProc(id, false); }
+  };
+
+  const handleCheckout = (order: any) => {
+    navigation.navigate('Checkout', {
+      orderId: order.id,
+      tableNumber: getTableNum(order.table_id)
+    });
+  };
+
+  const renderOrder = ({ item: order }: { item: any }) => {
+    const st = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
+    const tNum = getTableNum(order.table_id);
+    const isProc = processing.has(order.id);
+
+    return (
+      <View style={[styles.orderCard, { borderColor: st.border }]}>
+        {/* Color strip */}
+        <View style={[styles.strip, { backgroundColor: st.border }]} />
+
+        {/* Card header */}
+        <View style={styles.cardHead}>
+          <View style={[styles.tableChip, { backgroundColor: st.bg, borderColor: st.border }]}>
+            <Text style={[styles.tableChipText, { color: st.text }]}>T{tNum}</Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.orderId}>#{order.id.slice(0, 6)}</Text>
+            <Text style={styles.orderTime}>{getElapsed(order.created_at)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: st.bg, borderColor: st.border }]}>
+            <Text style={[styles.statusText, { color: st.text }]}>{st.label}</Text>
+          </View>
+          <Text style={styles.orderAmount}>₹{order.total_amount?.toFixed(0)}</Text>
+        </View>
+
+        {/* Items */}
+        <View style={styles.itemsList}>
+          {order.items?.map((item: any, idx: number) => (
+            <Text key={idx} style={styles.orderItem}>
+              <Text style={{ fontWeight: '700' }}>{item.quantity}×</Text>{' '}
+              {item.menu_item?.name || 'Item'}
+              {item.notes ? <Text style={styles.notes}> ({item.notes})</Text> : null}
+            </Text>
+          ))}
+        </View>
+
+        {/* Action buttons */}
+        <View style={styles.actionRow}>
+          {order.status === 'PENDING' && (
+            <>
+              <TouchableOpacity style={styles.rejectBtn} onPress={() => handleReject(order.id)} disabled={isProc}>
+                <Text style={styles.rejectText}>Reject</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(order.id)} disabled={isProc}>
+                {isProc ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.acceptText}>Accept ✓</Text>}
+              </TouchableOpacity>
+            </>
+          )}
+          {order.status === 'READY' && (
+            <TouchableOpacity style={styles.serveBtn} onPress={() => handleServe(order.id)} disabled={isProc}>
+              {isProc ? <ActivityIndicator color="#fff" size="small" /> : (
+                <>
+                  <Feather name="check-circle" size={14} color="#fff" />
+                  <Text style={styles.serveBtnText}>Mark Served</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          {order.status === 'SERVED' && order.payment_status !== 'PAID' && (
+            <TouchableOpacity style={styles.checkoutBtn} onPress={() => handleCheckout(order)}>
+              <Feather name="credit-card" size={14} color="#fff" />
+              <Text style={styles.checkoutBtnText}>💳 Checkout</Text>
+            </TouchableOpacity>
+          )}
+          {order.payment_status === 'PAID' && (
+            <View style={styles.paidBadge}>
+              <Feather name="check-circle" size={14} color="#10b981" />
+              <Text style={styles.paidText}>PAID</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // Group orders
+  const pending = orders.filter(o => o.status === 'PENDING');
+  const active = orders.filter(o => ['ACCEPTED', 'PREPARING', 'READY'].includes(o.status));
+  const served = orders.filter(o => o.status === 'SERVED');
+
+  const sections = [
+    ...(pending.length ? [{ type: 'header', label: '⚡ Pending Acceptance', id: 'h1' }, ...pending.map(o => ({ ...o, _section: 'pending' }))] : []),
+    ...(active.length ? [{ type: 'header', label: '🍽 Active Tickets', id: 'h2' }, ...active.map(o => ({ ...o, _section: 'active' }))] : []),
+    ...(served.length ? [{ type: 'header', label: '✅ Served — Checkout', id: 'h3' }, ...served.map(o => ({ ...o, _section: 'served' }))] : []),
+  ];
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>Order Queue</Text>
+          <Text style={styles.pageSubtitle}>{orders.length} active tickets</Text>
+        </View>
+
+        {orders.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <MaterialCommunityIcons name="check-circle-outline" size={48} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>All Clear!</Text>
+            <Text style={styles.emptySubtitle}>No active orders right now</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={sections}
+            keyExtractor={(item: any) => item.id || item.type + item.id}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />}
+            contentContainerStyle={{ padding: 12, paddingBottom: 80 }}
+            renderItem={({ item }: any) => {
+              if (item.type === 'header') {
+                return (
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeaderText}>{item.label}</Text>
+                    <View style={styles.sectionLine} />
+                  </View>
+                );
+              }
+              return renderOrder({ item });
+            }}
+          />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  pageHeader: {
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', backgroundColor: '#fff',
+  },
+  pageTitle: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
+  pageSubtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginVertical: 12, gap: 10 },
+  sectionHeaderText: {
+    fontSize: 11, fontWeight: '800', letterSpacing: 0.5,
+    paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: '#f1f5f9', borderRadius: 20, color: '#475569',
+  },
+  sectionLine: { flex: 1, height: 1, backgroundColor: '#e2e8f0' },
+  orderCard: {
+    backgroundColor: '#fff', borderRadius: 14, marginBottom: 10,
+    borderWidth: 1, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  strip: { height: 4, width: '100%' },
+  cardHead: { flexDirection: 'row', alignItems: 'center', padding: 14, paddingBottom: 8 },
+  tableChip: {
+    width: 44, height: 44, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1,
+  },
+  tableChipText: { fontSize: 14, fontWeight: '800' },
+  orderId: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  orderTime: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
+  statusBadge: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, borderWidth: 1, marginRight: 8,
+  },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  orderAmount: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  itemsList: { paddingHorizontal: 14, paddingBottom: 10 },
+  orderItem: { fontSize: 13, color: '#475569', marginBottom: 3 },
+  notes: { color: '#f59e0b', fontStyle: 'italic' },
+  actionRow: {
+    flexDirection: 'row', padding: 10, paddingTop: 0, gap: 8,
+    borderTopWidth: 1, borderTopColor: '#f8fafc',
+  },
+  rejectBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center',
+  },
+  rejectText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
+  acceptBtn: {
+    flex: 2, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: AMBER, alignItems: 'center',
+  },
+  acceptText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  serveBtn: {
+    flex: 1, flexDirection: 'row', paddingVertical: 10, borderRadius: 10,
+    backgroundColor: GREEN, justifyContent: 'center', alignItems: 'center', gap: 6,
+  },
+  serveBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  checkoutBtn: {
+    flex: 1, flexDirection: 'row', paddingVertical: 10, borderRadius: 10,
+    backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', gap: 6,
+  },
+  checkoutBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  paidBadge: {
+    flex: 1, flexDirection: 'row', paddingVertical: 10, borderRadius: 10,
+    backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderColor: '#6ee7b7',
+  },
+  paidText: { fontSize: 12, fontWeight: '800', color: '#10b981' },
+  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#64748b' },
+  emptySubtitle: { fontSize: 14, color: '#94a3b8' },
+});
+
+
+
+--- captain-app/src\screens\TableMenuScreen.tsx ---
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+  ActivityIndicator, TextInput, ScrollView, Alert, Platform,
+  LayoutAnimation, UIManager
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import api from '../api/axios';
+import CustomizationModal from '../components/CustomizationModal';
+
+const PRIMARY = '#6366f1';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+export default function TableMenuScreen({ route, navigation }: any) {
+  const { tableId, tableNumber, orderType = 'DINE_IN' } = route.params;
+  const orderTypeLabel = orderType === 'DINE_IN' ? 'Dine In'
+    : orderType === 'DELIVERY' ? 'Delivery' : 'Pick Up';
+
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [cart, setCart] = useState<any[]>([]);
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState(false);
+  const [selectedModItem, setSelectedModItem] = useState<any>(null);
+
+  useEffect(() => { fetchMenu(); }, []);
+
+  const fetchMenu = async () => {
+    try {
+      const res = await api.get('/menu/categories');
+      setCategories(res.data || []);
+    } catch (e) {
+      console.log('menu error', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleCategory = (catId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedCat(prev => prev === catId ? null : catId);
+  };
+
+  const updateSimpleCartItem = (item: any, delta: number) => {
+    setCart(prev => {
+      const existingIndex = prev.findIndex(c => c.id === item.id && (!c.selected_modifiers || c.selected_modifiers.length === 0));
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        const newQty = next[existingIndex].quantity + delta;
+        if (newQty <= 0) {
+          next.splice(existingIndex, 1);
+        } else {
+          next[existingIndex].quantity = newQty;
+        }
+        return next;
+      } else if (delta > 0) {
+        return [...prev, { ...item, cartItemId: `${item.id}-${Date.now()}`, quantity: delta, selected_modifiers: [], notes: '' }];
+      }
+      return prev;
+    });
+  };
+
+  const handlePlus = (item: any) => {
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setSelectedModItem(item);
+    } else {
+      updateSimpleCartItem(item, 1);
+    }
+  };
+
+  const handleMinus = (item: any) => {
+    if (item.modifier_groups && item.modifier_groups.length > 0) {
+      setCart(prev => {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].id === item.id) {
+            if (next[i].quantity > 1) {
+              next[i].quantity -= 1;
+            } else {
+              next.splice(i, 1);
+            }
+            break;
+          }
+        }
+        return next;
+      });
+    } else {
+      updateSimpleCartItem(item, -1);
+    }
+  };
+
+  const addToCartWithModifiers = (item: any, selectedModifiers: any[], quantity: number, notes: string) => {
+    setCart(prev => [
+      ...prev,
+      {
+        ...item,
+        cartItemId: `${item.id}-${Date.now()}`,
+        quantity,
+        selected_modifiers: selectedModifiers,
+        notes
+      }
+    ]);
+  };
+
+  const totalItems = cart.reduce((s, item) => s + item.quantity, 0);
+
+  const handleGoToCart = () => {
+    if (totalItems === 0) return;
+    navigation.navigate('Cart', { cartItems: cart, tableId, tableNumber, orderType });
+  };
+
+  const handleBack = () => {
+    if (totalItems > 0) {
+      if (Platform.OS === 'web') {
+        if (window.confirm('Items in cart will be lost. Go back?')) navigation.goBack();
+      } else {
+        Alert.alert('Discard Cart?', 'Going back will clear your cart.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go Back', style: 'destructive', onPress: () => navigation.goBack() }
+        ]);
+      }
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // Search across all categories
+  const allItems = categories.flatMap(c =>
+    (c.menu_items || []).map((item: any) => ({ ...item, categoryName: c.name }))
+  );
+  const searchResults = searchQuery.trim()
+    ? allItems.filter((i: any) =>
+        i.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+
+  const renderItem = (item: any) => {
+    const qty = cart.filter(c => c.id === item.id).reduce((s, c) => s + c.quantity, 0);
+    return (
+      <View key={item.id} style={styles.itemRow}>
+        {/* Veg / Non-Veg indicator */}
+        <View style={[styles.vegBox, { borderColor: item.is_veg ? '#10b981' : '#ef4444' }]}>
+          <View style={[styles.vegDot, { backgroundColor: item.is_veg ? '#10b981' : '#ef4444' }]} />
+        </View>
+
+        {/* Item info */}
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.itemPrice}>₹ {Number(item.price).toFixed(1)}</Text>
+        </View>
+
+        {/* Quantity controls */}
+        {item.is_available !== false ? (
+          qty > 0 ? (
+            <View style={styles.qtyControls}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => handleMinus(item)}>
+                <Feather name="minus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+              <Text style={styles.qtyNum}>{qty}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => handlePlus(item)}>
+                <Feather name="plus" size={14} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.addBtn} onPress={() => handlePlus(item)}>
+              <Feather name="plus" size={16} color={PRIMARY} />
+            </TouchableOpacity>
+          )
+        ) : (
+          <Text style={styles.unavailableTag}>Unavailable</Text>
+        )}
+      </View>
+    );
+  };
+
+  const renderSearchItem = (item: any) => {
+    return (
+      <View key={item.id}>
+        <Text style={styles.searchCatLabel}>{item.categoryName}</Text>
+        {renderItem(item)}
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+
+        {/* ── HEADER ── */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+            <Feather name="arrow-left" size={22} color="#0f172a" />
+          </TouchableOpacity>
+          <View style={styles.headerMid}>
+            <Text style={styles.headerTitle}>Table {tableNumber}</Text>
+            <Text style={styles.headerSub}>{orderTypeLabel}</Text>
+          </View>
+          <TouchableOpacity style={styles.searchIconBtn} onPress={() => { setSearchMode(s => !s); setSearchQuery(''); }}>
+            <Feather name={searchMode ? 'x' : 'search'} size={20} color="#334155" />
+          </TouchableOpacity>
+          <View style={styles.onlineBadge}>
+            <Text style={styles.onlineBadgeText}>Online Orders</Text>
+          </View>
+        </View>
+
+        {/* ── SEARCH BAR (full-screen mode) ── */}
+        {searchMode && (
+          <View style={styles.searchBar}>
+            <Feather name="search" size={16} color="#94a3b8" />
+            <TextInput
+              style={[styles.searchInput, { outlineStyle: 'none' } as any]}
+              placeholder="Search items by name..."
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Feather name="x" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ── CONTENT ── */}
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 110 }}
+        >
+          {searchMode && searchQuery.trim() ? (
+            // ── SEARCH RESULTS ──
+            searchResults.length > 0
+              ? searchResults.map(item => renderSearchItem(item))
+              : (
+                <View style={styles.emptyState}>
+                  <Feather name="search" size={32} color="#cbd5e1" />
+                  <Text style={styles.emptyText}>No items found for "{searchQuery}"</Text>
+                </View>
+              )
+          ) : (
+            // ── CATEGORY ACCORDION LIST ──
+            categories.map(cat => {
+              const items: any[] = cat.menu_items || [];
+              const isOpen = expandedCat === cat.id;
+              const catCartCount = items.reduce((s, i) => {
+                const itemQty = cart.filter(c => c.id === i.id).reduce((sum, c) => sum + c.quantity, 0);
+                return s + itemQty;
+              }, 0);
+
+              return (
+                <View key={cat.id} style={styles.categoryBlock}>
+                  {/* Category Header Row */}
+                  <TouchableOpacity
+                    style={[styles.catHeader, isOpen && styles.catHeaderOpen]}
+                    onPress={() => toggleCategory(cat.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.catLeft}>
+                      <View style={[styles.catIndicator, { backgroundColor: isOpen ? PRIMARY : '#cbd5e1' }]} />
+                      <Text style={[styles.catName, isOpen && styles.catNameOpen]}>{cat.name}</Text>
+                      {catCartCount > 0 && (
+                        <View style={styles.catBadge}>
+                          <Text style={styles.catBadgeText}>{catCartCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.catRight}>
+                      <Text style={styles.catItemCount}>{items.length} items</Text>
+                      <Feather
+                        name={isOpen ? 'chevron-up' : 'chevron-down'}
+                        size={18}
+                        color={isOpen ? PRIMARY : '#94a3b8'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Items — visible only when expanded */}
+                  {isOpen && (
+                    <View style={styles.itemsContainer}>
+                      {items.length === 0 ? (
+                        <View style={styles.emptyCat}>
+                          <Text style={styles.emptyCatText}>No items in this category</Text>
+                        </View>
+                      ) : (
+                        items.map(item => renderItem(item))
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* ── BOTTOM BAR ── */}
+        <View style={styles.bottomBar}>
+          <View style={styles.dineInCounter}>
+            <Feather name="list" size={14} color="#64748b" />
+            <Text style={styles.dineInCount}>{orderTypeLabel}: {totalItems}</Text>
+          </View>
+          <View style={styles.searchBoxBottom}>
+            <Feather name="search" size={14} color="#94a3b8" />
+            <TextInput
+              style={[styles.searchInputBottom, { outlineStyle: 'none' } as any]}
+              placeholder="Search items by name, code"
+              placeholderTextColor="#94a3b8"
+              value={searchMode ? searchQuery : ''}
+              onFocus={() => setSearchMode(true)}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.cartBtn, totalItems === 0 && styles.cartBtnDisabled]}
+            onPress={handleGoToCart}
+            disabled={totalItems === 0}
+          >
+            {totalItems > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{totalItems}</Text>
+              </View>
+            )}
+            <Feather name="shopping-cart" size={22} color="#fff" />
+            <Text style={styles.cartLabel}>Cart</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── CUSTOMIZATION MODAL ── */}
+        <CustomizationModal
+          visible={!!selectedModItem}
+          item={selectedModItem}
+          onClose={() => setSelectedModItem(null)}
+          onAddToCart={addToCartWithModifiers}
+        />
+
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+
+  // Header
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 8,
+  },
+  backBtn: { padding: 4 },
+  headerMid: { flex: 1, marginLeft: 4 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  headerSub: { fontSize: 12, color: '#64748b', fontWeight: '500' },
+  searchIconBtn: { padding: 6 },
+  onlineBadge: {
+    backgroundColor: '#eef2ff', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: '#c7d2fe',
+  },
+  onlineBadgeText: { fontSize: 11, fontWeight: '700', color: PRIMARY },
+
+  // Search bar
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#334155' },
+
+  // Scroll
+  scrollView: { flex: 1 },
+
+  // ── CATEGORY ACCORDION ──
+  categoryBlock: {
+    backgroundColor: '#fff',
+    marginBottom: 6,
+    borderRadius: 0,
+  },
+  catHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+  },
+  catHeaderOpen: {
+    borderBottomColor: PRIMARY + '30',
+    backgroundColor: '#fafafa',
+  },
+  catLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  catIndicator: { width: 4, height: 20, borderRadius: 2 },
+  catName: { fontSize: 15, fontWeight: '700', color: '#334155' },
+  catNameOpen: { color: PRIMARY },
+  catBadge: {
+    backgroundColor: PRIMARY, borderRadius: 10,
+    minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  catBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff' },
+  catRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  catItemCount: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
+
+  // Items container (inside accordion)
+  itemsContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+  },
+  emptyCat: { padding: 20, alignItems: 'center' },
+  emptyCatText: { color: '#94a3b8', fontSize: 13 },
+
+  // ── ITEM ROW ──
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#f8fafc', gap: 12,
+    backgroundColor: '#fff',
+  },
+  vegBox: {
+    width: 14, height: 14, borderRadius: 2, borderWidth: 1.5,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  vegDot: { width: 7, height: 7, borderRadius: 1 },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 14, fontWeight: '600', color: '#0f172a', marginBottom: 2 },
+  itemPrice: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+
+  // + button (when qty = 0)
+  addBtn: {
+    width: 34, height: 34, borderRadius: 8,
+    borderWidth: 1.5, borderColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#eef2ff',
+  },
+
+  // Qty stepper (when qty > 0)
+  qtyControls: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 8,
+    overflow: 'hidden', backgroundColor: '#fff',
+  },
+  qtyBtn: { padding: 8, backgroundColor: '#f8f9ff' },
+  qtyNum: {
+    fontSize: 14, fontWeight: '800', color: PRIMARY,
+    minWidth: 30, textAlign: 'center',
+  },
+
+  unavailableTag: {
+    fontSize: 10, fontWeight: '700', color: '#94a3b8',
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 4,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+
+  // Search results
+  searchCatLabel: {
+    fontSize: 10, fontWeight: '800', color: '#94a3b8', letterSpacing: 0.8,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+    backgroundColor: '#f8fafc',
+  },
+  emptyState: { padding: 48, alignItems: 'center', gap: 10 },
+  emptyText: { color: '#94a3b8', fontSize: 14, fontWeight: '500', textAlign: 'center' },
+
+  // ── BOTTOM BAR ──
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0',
+    paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+  },
+  dineInCounter: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+  },
+  dineInCount: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  searchBoxBottom: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#f8fafc', borderRadius: 10, paddingHorizontal: 10,
+    paddingVertical: 8, gap: 6, borderWidth: 1, borderColor: '#e2e8f0',
+  },
+  searchInputBottom: { flex: 1, fontSize: 13, color: '#334155' },
+  cartBtn: {
+    backgroundColor: PRIMARY, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+    alignItems: 'center', justifyContent: 'center', position: 'relative',
+  },
+  cartBtnDisabled: { backgroundColor: '#cbd5e1' },
+  cartBadge: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: '#e85d04', borderRadius: 10,
+    width: 18, height: 18, justifyContent: 'center', alignItems: 'center', zIndex: 1,
+  },
+  cartBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  cartLabel: { fontSize: 10, fontWeight: '700', color: '#fff', marginTop: 2 },
+});
+
+--- captain-app/src\screens\TablesScreen.tsx ---
+import React, { useState, useCallback, useRef } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  SafeAreaView, ActivityIndicator, RefreshControl, Alert, Platform,
+  Modal, TextInput, ScrollView
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { waiterApi } from '../api/waiterApi';
+import api from '../api/axios';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+
+const PRIMARY = '#6366f1';      // Indigo — matches web app
+const PRIMARY_DARK = '#4f46e5';
+const YELLOW = '#FFC107';       // Occupied table — same as web app
+const SETTLE_RED = '#e85d04';   // Settle & Save — orange like web app KOT btn
+
+type OrderType = 'DINE_IN' | 'DELIVERY' | 'PICKUP';
+
+export default function TablesScreen({ navigation }: any) {
+  const [activeTab, setActiveTab] = useState('AC');
+  const [tables, setTables] = useState<any[]>([]);
+  const [tableOrderMap, setTableOrderMap] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const intervalRef = useRef<any>(null);
+
+  // Order type popup
+  const [showOrderTypeModal, setShowOrderTypeModal] = useState(false);
+  const [selectedOrderType, setSelectedOrderType] = useState<OrderType>('DINE_IN');
+
+  // 3-dot menu
+  const [threeDotTable, setThreeDotTable] = useState<any>(null);
+  const [showThreeDot, setShowThreeDot] = useState(false);
+
+  // Add Table Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTableNo, setNewTableNo] = useState('');
+  const [newCapacity, setNewCapacity] = useState('4');
+  const [newCategory, setNewCategory] = useState('AC');
+  const [addingTable, setAddingTable] = useState(false);
+
+  const getElapsedTime = (dateString: string) => {
+    if (!dateString) return '0m';
+    const diffMins = Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
+    if (diffMins < 60) return `${diffMins}m`;
+    return `${Math.floor(diffMins / 60)}h ${diffMins % 60}m`;
+  };
+
+  const fetchTablesAndOrders = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [tablesRes, ordersRes] = await Promise.all([
+        waiterApi.getTables(),
+        waiterApi.getAllOrders()
+      ]);
+      const activeOrders: any[] = ordersRes || [];
+
+      // Build tableId → order map (pick the most recent non-SERVED or SERVED-unpaid order)
+      const orderMap: Record<string, any> = {};
+      activeOrders.forEach((o: any) => {
+        if (!o.table_id) return;
+        const existing = orderMap[o.table_id];
+        if (!existing) { orderMap[o.table_id] = o; }
+      });
+
+      const mapped = (tablesRes || []).map((t: any) => {
+        const order = orderMap[t.id];
+        
+        let tableStatus = 'free';
+        if (order) {
+           if (order.status === 'SERVED' && order.payment_status !== 'PAID') {
+             tableStatus = 'printed';
+           } else if (order.source === 'CUSTOMER' && order.status === 'PENDING') {
+             tableStatus = 'customer';
+           } else {
+             tableStatus = 'running';
+           }
+        }
+
+        return {
+          ...t,
+          active_order: order || null,
+          is_occupied: !!order,
+          tableStatus,
+          active_order_amount: order?.total_amount || 0,
+          active_order_time: order?.created_at || null,
+          order_status: order?.status || null,
+          payment_status: order?.payment_status || null,
+        };
+      });
+      setTables(mapped);
+      setTableOrderMap(orderMap);
+    } catch { }
+    finally { if (!silent) setLoading(false); }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTablesAndOrders();
+      intervalRef.current = setInterval(() => fetchTablesAndOrders(true), 5000);
+      return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchTablesAndOrders(true);
+    setRefreshing(false);
+  }, []);
+
+  const filteredTables = tables.filter(t => {
+    const cat = ((t.category || t.zone_type || 'AC') + '').toLowerCase().trim();
+    const tab = activeTab.toLowerCase().trim();
+    return cat === tab;
+  });
+
+  const handleTablePress = (table: any) => {
+    if (!table.is_occupied) {
+      // Free table → go to menu with selected order type
+      navigation.navigate('TableMenu', {
+        tableId: table.id,
+        tableNumber: table.table_number,
+        orderType: selectedOrderType,
+      });
+    } else {
+      // Occupied table → open 3-dot options
+      setThreeDotTable(table);
+      setShowThreeDot(true);
+    }
+  };
+
+  const handleSettleAndSave = (table: any) => {
+    setShowThreeDot(false);
+    if (!table.active_order) return;
+    navigation.navigate('Checkout', {
+      orderId: table.active_order.id,
+      tableNumber: table.table_number,
+    });
+  };
+
+  const handleAddOrder = (table: any) => {
+    setShowThreeDot(false);
+    navigation.navigate('TableMenu', {
+      tableId: table.id,
+      tableNumber: table.table_number,
+      orderType: selectedOrderType,
+    });
+  };
+
+  const handleDeleteOrder = async (table: any) => {
+    setShowThreeDot(false);
+    if (!table.active_order) return;
+    const doDelete = async () => {
+      try {
+        await waiterApi.deleteOrder(table.active_order.id);
+        fetchTablesAndOrders(true);
+      } catch (e: any) {
+        const msg = e.response?.data?.detail || 'Failed to delete';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete order for this table?')) doDelete();
+    } else {
+      Alert.alert('Delete Order?', 'This will remove the active order.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete }
+      ]);
+    }
+  };
+
+  const handleAddTable = async () => {
+    if (!newTableNo.trim()) {
+      const msg = 'Please enter a table number';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      return;
+    }
+    setAddingTable(true);
+    try {
+      await api.post('/tables/', {
+        table_number: parseInt(newTableNo),
+        capacity: parseInt(newCapacity) || 4,
+        category: newCategory,
+      });
+      setShowAddModal(false);
+      setNewTableNo(''); setNewCapacity('4'); setNewCategory('AC');
+      fetchTablesAndOrders();
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Failed to add table';
+      Platform.OS === 'web' ? window.alert(`Error: ${msg}`) : Alert.alert('Error', msg);
+    } finally { setAddingTable(false); }
+  };
+
+  const orderTypeLabel = selectedOrderType === 'DINE_IN' ? 'Dine In'
+    : selectedOrderType === 'DELIVERY' ? 'Delivery' : 'Pick Up';
+
+  const renderTable = ({ item: table }: { item: any }) => {
+    const isOccupied = table.is_occupied;
+    const isServedUnpaid = table.order_status === 'SERVED' && table.payment_status !== 'PAID';
+
+    const STATUS_COLORS: any = {
+      free: { bg: '#ffffff', text: '#334155', border: 'rgba(0,0,0,0.07)' },
+      customer: { bg: '#eef2ff', text: '#4338ca', border: '#a5b4fc' }, 
+      running: { bg: '#fffbeb', text: '#b45309', border: '#fcd34d' },  
+      printed: { bg: '#ecfdf5', text: '#065f46', border: '#6ee7b7' },  
+      reserved: { bg: '#fffbeb', text: '#d97706', border: '#fde68a' }
+    };
+    const style = STATUS_COLORS[table.tableStatus || 'free'];
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => handleTablePress(table)}
+        style={[
+          styles.card,
+          { backgroundColor: style.bg, borderColor: style.border, borderWidth: 1.5 }
+        ]}
+      >
+        {/* Time badge */}
+        {isOccupied && table.active_order_time && (
+          <View style={[styles.timeBadge, { backgroundColor: 'rgba(0,0,0,0.06)' }]}>
+            <Feather name="clock" size={10} color={style.text} />
+            <Text style={[styles.timeText, { color: style.text }]}>{getElapsedTime(table.active_order_time)}</Text>
+          </View>
+        )}
+
+        {/* Table number */}
+        <Text style={[styles.tableNum, { color: style.text }]}>
+          {table.table_number}
+        </Text>
+
+        {/* Settle & Save button OR amount + 3-dot */}
+        {isOccupied ? (
+          isServedUnpaid ? (
+            <TouchableOpacity
+              style={[styles.settleBtn, { backgroundColor: '#10b981', shadowColor: '#10b981' }]}
+              onPress={() => handleSettleAndSave(table)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.settleBtnText}>Settle & Save</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.cardFooter}>
+              <Text style={[styles.amountText, { color: style.text }]}>
+                {table.active_order_amount ? `₹${Math.round(table.active_order_amount)}` : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setThreeDotTable(table); setShowThreeDot(true); }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="more-vertical" size={16} color={style.text} />
+              </TouchableOpacity>
+            </View>
+          )
+        ) : (
+          <View style={styles.cardFooter}>
+            <Text style={styles.availableText}>Available</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerAll]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+
+        {/* AC / Non AC Tabs */}
+        <View style={styles.tabRow}>
+          {['AC', 'Non AC'].map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.activeTab]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Tables Grid */}
+        <FlatList
+          data={filteredTables}
+          keyExtractor={item => item.id.toString()}
+          renderItem={renderTable}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <MaterialCommunityIcons name="table-off" size={44} color="#cbd5e1" />
+              <Text style={styles.emptyText}>No tables in this section</Text>
+              <TouchableOpacity style={styles.addEmptyBtn} onPress={() => setShowAddModal(true)}>
+                <Text style={styles.addEmptyBtnText}>+ Add Table</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+
+        {/* Bottom Bar */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity style={styles.dineInBtn} onPress={() => setShowOrderTypeModal(true)}>
+            <MaterialCommunityIcons name="checkbox-marked-circle" size={18} color="#fff" />
+            <Text style={styles.dineInText}>{orderTypeLabel}</Text>
+            <Feather name="chevron-up" size={14} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addTableBtn} onPress={() => setShowAddModal(true)}>
+            <Feather name="plus-circle" size={18} color={PRIMARY} />
+            <Text style={styles.addTableText}>Add Table</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── ORDER TYPE MODAL ── */}
+        <Modal visible={showOrderTypeModal} transparent animationType="slide" onRequestClose={() => setShowOrderTypeModal(false)}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowOrderTypeModal(false)}>
+            <View style={styles.orderTypeSheet}>
+              {(['DINE_IN', 'DELIVERY', 'PICKUP'] as OrderType[]).map((type, idx) => {
+                const label = type === 'DINE_IN' ? 'Dine In' : type === 'DELIVERY' ? 'Delivery' : 'Pick Up';
+                const isSelected = selectedOrderType === type;
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.orderTypeItem,
+                      isSelected && styles.orderTypeItemActive,
+                      idx < 2 && { borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }
+                    ]}
+                    onPress={() => { setSelectedOrderType(type); setShowOrderTypeModal(false); }}
+                  >
+                    <Text style={[styles.orderTypeText, isSelected && styles.orderTypeTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ── 3-DOT MENU MODAL ── */}
+        <Modal visible={showThreeDot} transparent animationType="fade" onRequestClose={() => setShowThreeDot(false)}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowThreeDot(false)}>
+            <View style={styles.threeDotSheet}>
+              <View style={styles.threeDotHeader}>
+                <Text style={styles.threeDotTitle}>Table {threeDotTable?.table_number}</Text>
+                <Text style={styles.threeDotSub}>
+                  {threeDotTable?.order_status} · ₹{Math.round(threeDotTable?.active_order_amount || 0)}
+                </Text>
+              </View>
+              {[
+                { label: 'Add / Edit Items', icon: 'edit-2', action: () => handleAddOrder(threeDotTable) },
+                { label: 'Settle & Save', icon: 'credit-card', action: () => handleSettleAndSave(threeDotTable), color: PRIMARY },
+                { label: 'Delete Order', icon: 'trash-2', action: () => handleDeleteOrder(threeDotTable), color: '#ef4444' },
+              ].map((opt, i) => (
+                <TouchableOpacity key={i} style={styles.threeDotItem} onPress={opt.action}>
+                  <Feather name={opt.icon as any} size={18} color={opt.color || '#334155'} />
+                  <Text style={[styles.threeDotItemText, { color: opt.color || '#334155' }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ── ADD TABLE MODAL ── */}
+        <Modal visible={showAddModal} transparent animationType="fade" onRequestClose={() => setShowAddModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Add New Table</Text>
+              <View style={styles.modalRow}>
+                <View style={styles.halfInput}>
+                  <Text style={styles.inputLabel}>Table No.</Text>
+                  <TextInput
+                    style={[styles.textInput, { outlineStyle: 'none' } as any]}
+                    keyboardType="numeric"
+                    value={newTableNo}
+                    onChangeText={setNewTableNo}
+                    placeholder="Table number"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+                <View style={styles.halfInput}>
+                  <Text style={styles.inputLabel}>Capacity</Text>
+                  <TextInput
+                    style={[styles.textInput, { outlineStyle: 'none' } as any]}
+                    keyboardType="numeric"
+                    value={newCapacity}
+                    onChangeText={setNewCapacity}
+                    placeholder="Seats"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+              </View>
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={styles.toggleRow}>
+                {['AC', 'Non AC'].map(cat => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.toggleBtn, newCategory === cat && styles.toggleBtnActive]}
+                    onPress={() => setNewCategory(cat)}
+                  >
+                    <Text style={[styles.toggleBtnText, newCategory === cat && { color: '#fff' }]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.createBtn, addingTable && { opacity: 0.7 }]}
+                  onPress={handleAddTable}
+                  disabled={addingTable}
+                >
+                  {addingTable
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={styles.createBtnText}>Create</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  centerAll: { justifyContent: 'center', alignItems: 'center' },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 16,
+  },
+  tab: {
+    paddingVertical: 14, paddingHorizontal: 20, marginRight: 4,
+    borderBottomWidth: 3, borderBottomColor: 'transparent',
+  },
+  activeTab: { borderBottomColor: PRIMARY },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
+  activeTabText: { color: PRIMARY, fontWeight: '800' },
+  listContent: { padding: 10, paddingBottom: 90 },
+  card: {
+    flex: 1, margin: 6, minHeight: 110, borderRadius: 12, padding: 10,
+    justifyContent: 'space-between',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)',
+  },
+  timeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 20,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  timeText: { fontSize: 10, fontWeight: '700', color: '#5c4000' },
+  tableNum: { fontSize: 34, fontWeight: '900', textAlign: 'center', marginVertical: 2 },
+  settleBtn: {
+    backgroundColor: SETTLE_RED, borderRadius: 8,
+    paddingVertical: 9, alignItems: 'center',
+    shadowColor: SETTLE_RED, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
+  },
+  settleBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  amountText: { fontSize: 14, fontWeight: '700', color: '#1a1a1a' },
+  availableText: { fontSize: 12, fontWeight: '600', color: '#94a3b8', textAlign: 'center', width: '100%' },
+  emptyBox: { padding: 48, alignItems: 'center', gap: 12 },
+  emptyText: { color: '#64748b', fontSize: 15, fontWeight: '500' },
+  addEmptyBtn: {
+    marginTop: 4, paddingHorizontal: 20, paddingVertical: 10,
+    backgroundColor: PRIMARY, borderRadius: 10,
+  },
+  addEmptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', backgroundColor: '#fff',
+    borderTopWidth: 1, borderTopColor: '#e2e8f0',
+    paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+  },
+  dineInBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: PRIMARY, borderRadius: 10, paddingVertical: 12, gap: 6,
+  },
+  dineInText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  addTableBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, gap: 6,
+    borderWidth: 1.5, borderColor: PRIMARY,
+  },
+  addTableText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },
+  // Modals
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  orderTypeSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    overflow: 'hidden', marginBottom: 0,
+  },
+  orderTypeItem: {
+    paddingVertical: 20, paddingHorizontal: 24, alignItems: 'center',
+  },
+  orderTypeItemActive: { backgroundColor: PRIMARY },
+  orderTypeText: { fontSize: 17, fontWeight: '700', color: '#334155' },
+  orderTypeTextActive: { color: '#fff' },
+  threeDotSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingTop: 20, paddingBottom: 32,
+  },
+  threeDotHeader: {
+    paddingHorizontal: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+  },
+  threeDotTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  threeDotSub: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  threeDotItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 16, paddingHorizontal: 20,
+    borderBottomWidth: 1, borderBottomColor: '#f8fafc',
+  },
+  threeDotItemText: { fontSize: 15, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: {
+    backgroundColor: '#fff', borderRadius: 16, padding: 24,
+    width: '88%', maxWidth: 400,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15, shadowRadius: 24, elevation: 12,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a', marginBottom: 20 },
+  modalRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  halfInput: { flex: 1 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  textInput: {
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
+    color: '#0f172a', backgroundColor: '#fff',
+  },
+  toggleRow: {
+    flexDirection: 'row', borderWidth: 1, borderColor: '#e2e8f0',
+    borderRadius: 8, overflow: 'hidden', marginBottom: 24,
+  },
+  toggleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', backgroundColor: '#f8fafc' },
+  toggleBtnActive: { backgroundColor: PRIMARY },
+  toggleBtnText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 10,
+    borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center',
+  },
+  cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#334155' },
+  createBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 10,
+    backgroundColor: PRIMARY, alignItems: 'center',
+  },
+  createBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+});
+
+
+
+--- captain-app/src\utils\PrinterService.ts ---
+export class PrinterService {
+  device: any = null;
+  server: any = null;
+  characteristic: any = null;
+
+  async connectBluetooth() {
+    try {
+      const nav: any = navigator;
+      if (!nav.bluetooth) {
+        throw new Error("Web Bluetooth API is not supported in this browser.");
+      }
+
+      this.device = await nav.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2']
+      });
+
+      this.server = await this.device.gatt.connect();
+      const service = await this.server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+      this.characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+      
+      return true;
+    } catch (err: any) {
+      console.error("Bluetooth Connection Error:", err);
+      throw err;
+    }
+  }
+
+  async connectUSB() {
+    try {
+      const nav: any = navigator;
+      if (!nav.serial) {
+        throw new Error("Web Serial API is not supported in this browser.");
+      }
+      
+      const port = await nav.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      this.device = port;
+      
+      return true;
+    } catch (err: any) {
+      console.error("USB Connection Error:", err);
+      throw err;
+    }
+  }
+
+  async printReceipt(billText: string, type: 'bluetooth' | 'usb') {
+    try {
+      const encoder = new TextEncoder();
+      // ESC/POS commands for basic text and cut
+      const ESC_INIT = new Uint8Array([0x1b, 0x40]); // Initialize
+      const GS_CUT = new Uint8Array([0x1d, 0x56, 0x00]); // Cut paper
+      
+      const textData = encoder.encode(billText + '\n\n\n\n');
+      
+      const printData = new Uint8Array(ESC_INIT.length + textData.length + GS_CUT.length);
+      printData.set(ESC_INIT, 0);
+      printData.set(textData, ESC_INIT.length);
+      printData.set(GS_CUT, ESC_INIT.length + textData.length);
+      
+      if (type === 'bluetooth') {
+        if (!this.characteristic) throw new Error("Printer not connected");
+        const CHUNK_SIZE = 512;
+        for (let i = 0; i < printData.length; i += CHUNK_SIZE) {
+          const chunk = printData.slice(i, i + CHUNK_SIZE);
+          await this.characteristic.writeValue(chunk);
+        }
+      } else if (type === 'usb') {
+        if (!this.device) throw new Error("Printer not connected");
+        const writer = this.device.writable.getWriter();
+        await writer.write(printData);
+        writer.releaseLock();
+      }
+      return true;
+    } catch (err: any) {
+      console.error("Print Error:", err);
+      throw err;
+    }
+  }
+}
+
+export const printerService = new PrinterService();

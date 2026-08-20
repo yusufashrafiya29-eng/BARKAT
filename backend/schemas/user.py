@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from datetime import datetime
 from models.user import UserRole
@@ -7,8 +7,8 @@ from typing import Optional
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: Optional[str] = None
-    phone_number: str  # Now required for OTP
+    full_name: Optional[str] = Field(default=None, min_length=1)
+    phone_number: str = Field(..., min_length=10, max_length=15)  # Now required for OTP
     role: UserRole = UserRole.WAITER
     is_active: bool = True
     is_verified: bool = False

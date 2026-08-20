@@ -1,0 +1,814 @@
+\n--- backend/models\aggregator.py ---\nimport uuid
+from sqlalchemy import Column, String, Float, ForeignKey, DateTime, func, JSON, Boolean
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+class AggregatorOrder(Base):
+    __tablename__ = "aggregator_orders"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    
+    # External IDs
+    platform_order_id = Column(String, nullable=True, index=True) # Zomato/Swiggy ID
+    
+    # Platform Info
+    platform = Column(String, nullable=False) # 'Zomato', 'Swiggy', 'ONDC Food', 'Direct Web'
+    
+    # Customer Info
+    customer_name = Column(String, nullable=True)
+    customer_phone = Column(String, nullable=True)
+    
+    # Order Details
+    items_summary = Column(String, nullable=True) # Text summary for quick UI view
+    raw_payload = Column(JSON, nullable=True) # Store full JSON for debugging/syncing
+    
+    # Financials
+    gross_amount = Column(Float, default=0.0, nullable=False)
+    platform_commission_rate = Column(Float, default=0.0, nullable=False) # e.g. 22 for 22%
+    ad_deduction = Column(Float, default=0.0, nullable=False)
+    gst_on_commission = Column(Float, default=0.0, nullable=False)
+    net_payout = Column(Float, default=0.0, nullable=False)
+    
+    # Status tracking
+    status = Column(String, default="NEW", nullable=False) # NEW, KITCHEN_PREPARING, READY_FOR_RIDER
+    
+    # Rider Info
+    rider_name = Column(String, nullable=True)
+    rider_phone = Column(String, nullable=True)
+    rider_status = Column(String, default="ASSIGNED_WAITING", nullable=False)
+    eta = Column(String, nullable=True)
+    
+    # Timestamps
+    ordered_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    restaurant = relationship("Restaurant")
+\n--- backend/models\announcement.py ---\nimport uuid
+from sqlalchemy import Column, String, Text, Boolean, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    target_role = Column(String, default="ALL", nullable=False) # "ALL" or "OWNER"
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+\n--- backend/models\billing.py ---\nimport enum
+import uuid
+from sqlalchemy import Column, String, Float, ForeignKey, Enum as SAEnum, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+class PaymentMethod(str, enum.Enum):
+    CASH = "CASH"
+    UPI = "UPI"
+    CARD = "CARD"
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bill_id = Column(UUID(as_uuid=True), ForeignKey("bills.id", ondelete="CASCADE"), nullable=False)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    
+    amount = Column(Float, nullable=False)
+    payment_method = Column(String, nullable=False) # 'CASH', 'UPI', 'CARD', 'TAB'
+    transaction_reference = Column(String, nullable=True)
+    status = Column(String, default="COMPLETED", nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    bill = relationship("Bill", back_populates="transactions")
+
+class Bill(Base):
+    __tablename__ = "bills"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False, unique=True)
+    
+    subtotal = Column(Float, nullable=False)
+    tax_amount = Column(Float, nullable=False, default=0.0)
+    discount_amount = Column(Float, nullable=False, default=0.0)
+    total_amount = Column(Float, nullable=False)
+    
+    payment_method = Column(SAEnum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
+    status = Column(SAEnum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
+    
+    amount_paid = Column(Float, nullable=False, default=0.0)
+    transaction_id = Column(String, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    order = relationship("Order")
+    transactions = relationship("PaymentTransaction", back_populates="bill", cascade="all, delete-orphan")
+\n--- backend/models\cash_register.py ---\nimport enum
+import uuid
+from sqlalchemy import Column, String, Enum as SAEnum, Float, DateTime, ForeignKey, func, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+
+class ShiftStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+
+
+class TransactionType(str, enum.Enum):
+    CASH_IN = "CASH_IN"
+    CASH_OUT = "CASH_OUT"
+
+
+class CashShift(Base):
+    __tablename__ = "cash_shifts"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    opened_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    closed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    opening_balance = Column(Float, nullable=False, default=0.0)
+    closing_balance = Column(Float, nullable=True)   # physically counted at close
+    expected_balance = Column(Float, nullable=True)  # calculated by system
+    net_sales = Column(Float, nullable=False, default=0.0)  # auto-updated on PAID orders
+    total_cash_in = Column(Float, nullable=False, default=0.0)
+    total_cash_out = Column(Float, nullable=False, default=0.0)
+
+    status = Column(SAEnum(ShiftStatus), default=ShiftStatus.OPEN, nullable=False)
+    notes = Column(Text, nullable=True)
+
+    opened_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    transactions = relationship("CashTransaction", back_populates="shift", cascade="all, delete-orphan")
+
+
+class CashTransaction(Base):
+    __tablename__ = "cash_transactions"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    shift_id = Column(UUID(as_uuid=True), ForeignKey("cash_shifts.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    type = Column(SAEnum(TransactionType), nullable=False)
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    shift = relationship("CashShift", back_populates="transactions")
+\n--- backend/models\customer.py ---\nimport uuid
+from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, func, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    
+    phone_number = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    
+    # Loyalty & Analytics
+    loyalty_points = Column(Integer, default=0, nullable=False)
+    total_spent = Column(Float, default=0.0, nullable=False)
+    total_visits = Column(Integer, default=1, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Ensure a customer is unique per restaurant by phone number
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'phone_number', name='uix_restaurant_customer_phone'),
+    )
+
+    # Relationships
+    restaurant = relationship("Restaurant")
+\n--- backend/models\enterprise.py ---\nimport uuid
+from sqlalchemy import Column, String, Float, Boolean, Integer, DateTime, func, ForeignKey, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+
+class ExpenseVoucher(Base):
+    __tablename__ = "expense_vouchers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    voucher_id = Column(String, nullable=False) # e.g. EXP-101
+    payee = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    amount = Column(Float, default=0.0, nullable=False)
+    payment_mode = Column(String, nullable=False)
+    timestamp = Column(String, nullable=False)
+    remarks = Column(Text, default="")
+    verified_by = Column(String, default="Owner Portal")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    code = Column(String, nullable=False, index=True)
+    type = Column(String, nullable=False) # PERCENTAGE or FIXED
+    value = Column(Float, nullable=False)
+    min_order = Column(Float, default=0.0)
+    active = Column(Boolean, default=True)
+    expiry = Column(String, default="2026-12-31")
+    usage_count = Column(Integer, default=0)
+
+class HappyHour(Base):
+    __tablename__ = "happy_hours"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    days = Column(String, default="Mon,Tue,Wed,Thu,Fri,Sat,Sun") # Comma separated or JSON string
+    start_time = Column(String, default="15:00")
+    end_time = Column(String, default="18:00")
+    discount_percent = Column(Float, default=20.0)
+    category = Column(String, default="Beverages")
+    active = Column(Boolean, default=True)
+
+class BogoRule(Base):
+    __tablename__ = "bogo_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    buy_item = Column(String, nullable=False)
+    buy_qty = Column(Integer, default=1)
+    get_item = Column(String, nullable=False)
+    get_qty = Column(Integer, default=1)
+    active = Column(Boolean, default=True)
+
+class BranchOutlet(Base):
+    __tablename__ = "branch_outlets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    branch_code = Column(String, nullable=False) # e.g. BR-1
+    name = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    manager = Column(String, default="Assigned Manager")
+    status = Column(String, default="Online (Connected)")
+    today_sales = Column(String, default="₹0")
+    health_score = Column(String, default="100%")
+
+class CentralStockItem(Base):
+    __tablename__ = "central_stock_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    item_code = Column(String, nullable=False) # e.g. STK-101
+    name = Column(String, nullable=False)
+    total_batch = Column(Float, default=0.0)
+    unit = Column(String, nullable=False)
+    batch_date = Column(String, nullable=False)
+    expiry = Column(String, nullable=False)
+    temperature = Column(String, default="4°C Chilled")
+    qc_status = Column(String, default="Passed (Chef Approved 🟢)")
+
+class StockTransfer(Base):
+    __tablename__ = "stock_transfers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    transfer_code = Column(String, nullable=False) # e.g. TR-9001
+    voucher_number = Column(String, nullable=False) # e.g. WTV-2026-8801
+    source_kitchen = Column(String, default="Central Commissary (Base Kitchen HQ)")
+    destination_branch = Column(String, nullable=False)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, default=0.0)
+    unit = Column(String, nullable=False)
+    dispatched_at = Column(String, nullable=False)
+    status = Column(String, default="IN_TRANSIT")
+    driver_name = Column(String, nullable=False)
+
+class AggregatorOrder(Base):
+    __tablename__ = "aggregator_orders"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True)
+    order_id = Column(String, nullable=False, index=True) # e.g. ZOM-84921
+    platform = Column(String, nullable=False) # Zomato, Swiggy, ONDC Food, Direct Web
+    customer_name = Column(String, nullable=False)
+    items_summary = Column(Text, nullable=False)
+    gross_amount = Column(Float, default=0.0)
+    platform_commission_rate = Column(Float, default=0.0)
+    ad_deduction = Column(Float, default=0.0)
+    gst_on_commission = Column(Float, default=0.0)
+    net_payout = Column(Float, default=0.0)
+    rider_name = Column(String, default="Unassigned")
+    rider_status = Column(String, default="ASSIGNED_WAITING")
+    eta = Column(String, default="Arriving soon")
+    status = Column(String, default="NEW")
+    ordered_at = Column(String, default="Just Now")
+\n--- backend/models\inventory.py ---\nimport uuid
+from sqlalchemy import Column, String, Float, Boolean, DateTime, func, ForeignKey
+from sqlalchemy.schema import UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+
+class StockItem(Base):
+    __tablename__ = "stock_items"
+
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'name', name='uq_stock_item_name_per_restaurant'),
+    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    name = Column(String, index=True, nullable=False)
+    quantity = Column(Float, default=0.0, nullable=False)
+    unit = Column(String, nullable=False) # e.g., 'kg', 'pcs'
+    minimum_threshold = Column(Float, default=0.0, nullable=False)
+    
+    # Production additions
+    cost_price = Column(Float, default=0.0, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+\n--- backend/models\menu.py ---\nimport uuid
+from sqlalchemy import Column, String, Boolean, Float, Integer, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.schema import UniqueConstraint
+from db.session import Base
+
+class Category(Base):
+    __tablename__ = "categories"
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'name', name='uq_category_name_per_restaurant'),
+    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    station = Column(String, default="Kitchen") # Routing for KDS
+
+    # Relationships
+    menu_items = relationship("MenuItem", back_populates="category", cascade="all, delete-orphan")
+
+class RecipeIngredient(Base):
+    __tablename__ = "recipe_ingredients"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id = Column(UUID(as_uuid=True), ForeignKey("menu_items.id"), nullable=False)
+    stock_item_id = Column(UUID(as_uuid=True), ForeignKey("stock_items.id"), nullable=False)
+    quantity = Column(Float, nullable=False) # e.g. 150.0
+    unit = Column(String, nullable=False) # e.g. 'g' or 'ml' or 'pcs'
+
+    menu_item = relationship("MenuItem", back_populates="recipe_ingredients")
+    stock_item = relationship("StockItem")
+
+class MenuItem(Base):
+    __tablename__ = "menu_items"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    
+    name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    price = Column(Float, nullable=False)
+    
+    # Tax & Compliance
+    tax_rate = Column(Float, default=5.0) # Standard 5% GST for food
+    
+    # Required Improvements
+    is_veg = Column(Boolean, default=False)
+    is_available = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
+    preparation_time = Column(Integer, nullable=True) # minutes
+    image_url = Column(String, nullable=True)
+    image_url_extra1 = Column(String, nullable=True)
+    image_url_extra2 = Column(String, nullable=True)
+    model_3d_url = Column(String, nullable=True)
+    model_3d_task_id = Column(String, nullable=True)
+    model_3d_height = Column(Float, default=12.0, nullable=False)
+    model_3d_active = Column(Boolean, default=True, nullable=False)
+
+
+
+    # Relationships
+    category = relationship("Category", back_populates="menu_items")
+    recipe_ingredients = relationship("RecipeIngredient", back_populates="menu_item", cascade="all, delete-orphan")
+    modifier_groups = relationship("ModifierGroup", back_populates="menu_item", cascade="all, delete-orphan")
+class ModifierGroup(Base):
+    __tablename__ = "modifier_groups"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id = Column(UUID(as_uuid=True), ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    is_required = Column(Boolean, default=False)
+    min_selections = Column(Integer, default=0)
+    max_selections = Column(Integer, default=1)
+    price_replaces_base = Column(Boolean, default=False)
+
+    menu_item = relationship("MenuItem", back_populates="modifier_groups")
+    modifiers = relationship("Modifier", back_populates="group", cascade="all, delete-orphan")
+
+class Modifier(Base):
+    __tablename__ = "modifiers"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(UUID(as_uuid=True), ForeignKey("modifier_groups.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    price = Column(Float, default=0.0)
+    is_available = Column(Boolean, default=True)
+
+    group = relationship("ModifierGroup", back_populates="modifiers")
+\n--- backend/models\notification.py ---\nimport enum
+import uuid
+from sqlalchemy import Column, String, ForeignKey, Enum as SAEnum, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+
+class MessageStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+
+class MessageType(str, enum.Enum):
+    ORDER_CONFIRMED = "ORDER_CONFIRMED"
+    ORDER_PREPARING = "ORDER_PREPARING"
+    ORDER_READY = "ORDER_READY"
+    BILL_GENERATED = "BILL_GENERATED"
+
+class NotificationLog(Base):
+    __tablename__ = "notification_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
+    customer_phone = Column(String, nullable=False)
+    message_type = Column(SAEnum(MessageType), nullable=False)
+    status = Column(SAEnum(MessageStatus), default=MessageStatus.PENDING, nullable=False)
+    
+    # Optional Provider specific trace (Twilio/Interakt tracking ID)
+    provider_response = Column(String, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+\n--- backend/models\order.py ---\nimport enum
+import uuid
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, Enum as SAEnum, DateTime, func, Boolean
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+class OrderStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    PREPARING = "PREPARING"
+    READY = "READY"
+    SERVED = "SERVED"
+    CANCELLED = "CANCELLED"
+
+class Order(Base):
+    __tablename__ = "orders"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    table_id = Column(UUID(as_uuid=True), ForeignKey("tables.id"), nullable=True)
+    order_type = Column(String, default="DINE_IN", nullable=False)
+    
+    # Waiter tracking
+    waiter_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    customer_phone = Column(String, nullable=True) # Used for WhatsApp
+    customer_name = Column(String, nullable=True) # Gathered for UI
+    customer_address = Column(String, nullable=True) # Used for Locality Summary
+    guests_count = Column(Integer, nullable=True) # Used for Cover Size Summary
+    counter_name = Column(String, default="Main Register", nullable=False) # POS terminal tracking
+    
+    status = Column(SAEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
+    
+    # Financial fields
+    subtotal_amount = Column(Float, default=0.0, nullable=False)
+    tax_amount = Column(Float, default=0.0, nullable=False)
+    tip_amount = Column(Float, default=0.0, nullable=False)
+    total_amount = Column(Float, default=0.0, nullable=False)
+    
+    # New fields for Customer vs Waiter ordering
+    source = Column(String, default="WAITER", nullable=False)
+    is_accepted = Column(Boolean, default=True, nullable=False)
+    payment_status = Column(String, default="PENDING", nullable=False)
+    is_inventory_deducted = Column(Boolean, default=False, nullable=False)
+    
+    # Razorpay tracking
+    razorpay_order_id = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    table = relationship("Table", back_populates="orders")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    waiter = relationship("User")
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
+    menu_item_id = Column(UUID(as_uuid=True), ForeignKey("menu_items.id"), nullable=False)
+    
+    quantity = Column(Integer, nullable=False, default=1)
+    price_at_order_time = Column(Float, nullable=False)
+    subtotal = Column(Float, nullable=False) # Extracted via Service logic
+    notes = Column(String, nullable=True)
+    status = Column(String, default="PENDING", nullable=False) # PENDING, PREPARING, READY
+    is_parcel = Column(Boolean, default=False, nullable=False)
+
+    # Relationships
+    order = relationship("Order", back_populates="items")
+    menu_item = relationship("MenuItem")
+    modifiers = relationship("OrderItemModifier", back_populates="order_item", cascade="all, delete-orphan")
+class OrderItemModifier(Base):
+    __tablename__ = "order_item_modifiers"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_item_id = Column(UUID(as_uuid=True), ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
+    modifier_id = Column(UUID(as_uuid=True), ForeignKey("modifiers.id", ondelete="CASCADE"), nullable=False)
+    
+    price_at_order_time = Column(Float, nullable=False, default=0.0)
+
+    # Relationships
+    order_item = relationship("OrderItem", back_populates="modifiers")
+    modifier = relationship("Modifier")
+\n--- backend/models\otp.py ---\nimport uuid
+from sqlalchemy import Column, String, DateTime, Boolean, func
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+
+
+class OTP(Base):
+    __tablename__ = "otps"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, index=True, nullable=False)
+    otp_code = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+\n--- backend/models\reservation.py ---\nimport uuid
+from sqlalchemy import Column, String, Integer, Float, Date, Time, ForeignKey, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from db.session import Base
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    table_id = Column(UUID(as_uuid=True), ForeignKey("tables.id"), nullable=True) # Assigned later or during manual booking
+    
+    customer_name = Column(String, nullable=False)
+    customer_phone = Column(String, nullable=False)
+    reservation_date = Column(Date, nullable=False)
+    reservation_time = Column(Time, nullable=False)
+    guest_count = Column(Integer, nullable=False)
+    
+    # PENDING (for public booking before approval/payment), CONFIRMED, CANCELLED, COMPLETED
+    status = Column(String, nullable=False, default="CONFIRMED") 
+    
+    # NONE, PENDING, PAID, REFUNDED
+    payment_status = Column(String, nullable=False, default="NONE")
+    advance_amount = Column(Float, nullable=False, default=0.0)
+    
+    razorpay_order_id = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    restaurant = relationship("Restaurant")
+    table = relationship("Table")
+\n--- backend/models\restaurant.py ---\nimport uuid
+from sqlalchemy import Column, String, DateTime, func, Float, Boolean, Integer
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+from sqlalchemy.orm import relationship
+
+class Restaurant(Base):
+    __tablename__ = "restaurants"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    logo_url = Column(String, nullable=True)
+    
+    # Tax & Compliance fields
+    gstin = Column(String, nullable=True)
+    fssai = Column(String, nullable=True)
+    advance_booking_fee = Column(Float, nullable=False, default=0.0)
+    
+    # Platform Approval
+    is_approved = Column(Boolean, default=False, nullable=False)
+    
+    # Subscription fields
+    subscription_status = Column(String, default="trial") # "trial", "active", "expired"
+    subscription_plan = Column(String, default="basic") # "basic", "pro", "max"
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
+    model_3d_credits = Column(Integer, default=10, nullable=False)
+
+    
+    # Audit timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    # Relationships
+    users = relationship("User", back_populates="restaurant")
+\n--- backend/models\saas_payment.py ---\nimport uuid
+from sqlalchemy import Column, String, DateTime, Float, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+from db.session import Base
+from sqlalchemy.orm import relationship
+
+class SaaSPayment(Base):
+    __tablename__ = "saas_payments"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    
+    amount = Column(Float, nullable=False)
+    currency = Column(String, default="INR")
+    plan_name = Column(String, nullable=False) # basic, pro, max
+    billing_cycle = Column(String, nullable=False) # monthly, yearly
+    
+    razorpay_order_id = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
+    razorpay_signature = Column(String, nullable=True)
+    
+    status = Column(String, default="PENDING") # PENDING, PAID, FAILED
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    restaurant = relationship("Restaurant")
+\n--- backend/models\settings.py ---\nfrom sqlalchemy import Column, String, ForeignKey, UniqueConstraint
+from db.session import Base
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
+
+class RestaurantConfig(Base):
+    __tablename__ = "restaurant_config"
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'key', name='uq_config_key_per_restaurant'),
+    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    key = Column(String, index=True, nullable=False)
+    value = Column(String, nullable=False)
+
+class PlatformConfig(Base):
+    __tablename__ = "platform_config"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+\n--- backend/models\table.py ---\nimport uuid
+from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy import ForeignKey, UniqueConstraint
+from db.session import Base
+
+class Table(Base):
+    __tablename__ = "tables"
+    __table_args__ = (
+        UniqueConstraint('restaurant_id', 'table_number', name='uq_table_number_per_restaurant'),
+    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    table_number = Column(Integer, index=True, nullable=False)
+    capacity = Column(Integer, nullable=False, default=4)
+    category = Column(String, nullable=False, default="Non-AC")
+    qr_code_url = Column(String, nullable=True)
+    last_order_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Floor Plan Coordinates (percentages 0-100)
+    position_x = Column(Float, nullable=True, default=0.0)
+    position_y = Column(Float, nullable=True, default=0.0)
+
+    # Relationships
+    orders = relationship("Order", back_populates="table")
+\n--- backend/models\ticket.py ---\nfrom sqlalchemy import Column, String, DateTime, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID
+from datetime import datetime, timezone
+import uuid
+from db.session import Base
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False)
+    opened_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    subject = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String, default="OPEN", nullable=False) # OPEN, IN_PROGRESS, RESOLVED
+    resolution_notes = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+\n--- backend/models\user.py ---\nimport enum
+import uuid
+from sqlalchemy import Column, String, Enum as SAEnum, Boolean, DateTime, func, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
+from db.session import Base
+from sqlalchemy.orm import relationship
+
+class UserRole(str, enum.Enum):
+    OWNER = "OWNER"
+    WAITER = "WAITER"
+    KITCHEN = "KITCHEN"
+    MANAGER = "MANAGER"
+    SUPERADMIN = "SUPERADMIN"
+    RUNNER = "RUNNER"
+
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
+
+    # UUID is synced with Supabase Auth UUID when Supabase is configured.
+    # In local dev mode, we generate our own UUID.
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    phone_number = Column(String, nullable=False)  # Required for OTP
+
+    role = Column(SAEnum(UserRole), default=UserRole.WAITER, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    is_approved = Column(Boolean, default=False, nullable=False)  # Owner must approve staff before login
+
+    # Restaurant association
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=True)
+    restaurant_email = Column(String, nullable=True) # For STAFF to link with OWNER
+
+    # Relationships
+    restaurant = relationship("Restaurant", back_populates="users")
+
+
+    # Local password hash — only used in dev mode (when Supabase is not configured).
+    # In production, Supabase Auth handles passwords; this column stays NULL.
+    password_hash = Column(String, nullable=True)
+
+    # RBAC Menu restrictions for specialized waiters
+    allowed_categories = Column(JSON, default=list, nullable=False)
+
+    # Audit timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+\n--- backend/models\__init__.py ---\n# Ensure metadata creates all tables by importing them together
+from .user import User, UserRole
+from .table import Table
+from .menu import Category, MenuItem
+from .order import Order, OrderItem, OrderStatus
+from .billing import Bill, PaymentTransaction
+from .inventory import StockItem
+from .notification import NotificationLog
+from .otp import OTP
+from .settings import RestaurantConfig
+from .restaurant import Restaurant
+from .cash_register import CashShift, CashTransaction
+from .announcement import Announcement
+from .ticket import Ticket
+from .enterprise import (
+    ExpenseVoucher, Coupon, HappyHour, BogoRule,
+    BranchOutlet, CentralStockItem, StockTransfer
+)
+from .aggregator import AggregatorOrder
+from .customer import Customer
+from .reservation import Reservation

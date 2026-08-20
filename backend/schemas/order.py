@@ -1,5 +1,5 @@
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime
@@ -29,7 +29,7 @@ class OrderItemModifierRead(OrderItemModifierBase):
 
 class OrderItemCreate(BaseModel):
     menu_item_id: UUID
-    quantity: int = 1
+    quantity: int = Field(default=1, ge=1)
     notes: Optional[str] = None
     is_parcel: bool = False
     modifiers: List[OrderItemModifierCreate] = []
@@ -56,10 +56,10 @@ class OrderCreate(BaseModel):
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
     customer_address: Optional[str] = None
-    guests_count: Optional[int] = None
+    guests_count: Optional[int] = Field(default=None, ge=1)
     counter_name: str = "Main Register"
     source: str = "CUSTOMER"
-    tip_amount: float = 0.0
+    tip_amount: float = Field(default=0.0, ge=0.0)
     status: Optional[str] = None
     is_accepted: bool = False
     

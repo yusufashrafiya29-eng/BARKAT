@@ -10,7 +10,12 @@ def _verify_password(plain: str, hashed: str) -> bool:
     """Verify bcrypt password hash."""
     try:
         return bcrypt.checkpw(plain.encode(), hashed.encode())
-    except Exception:
+    except (ValueError, TypeError):
+        return False
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Bcrypt verification failed with unexpected error")
         return False
 
 def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> Order:

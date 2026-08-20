@@ -1,0 +1,1254 @@
+\n--- backend/services\billing_service.py ---\nfrom sqlalchemy.orm import Session
+from fastapi import HTTPException
+from uuid import UUID
+from models.order import Order
+from models.billing import Bill, PaymentStatus, PaymentTransaction
+from schemas.billing import BillCreate, PaymentConfirmation
+
+def generate_bill(db: Session, order_id: UUID, bill_in: BillCreate, restaurant_id: str) -> Bill:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found. Cannot generate bill.")
+        
+    subtotal = order.subtotal_amount or 0.0
+    tax_amount = order.tax_amount or 0.0
+    discount = bill_in.discount_amount or 0.0
+    total_amount = subtotal + tax_amount - discount
+    if total_amount < 0:
+        total_amount = 0.0
+
+    existing = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
+    if existing:
+        existing.subtotal = subtotal
+        existing.tax_amount = tax_amount
+        existing.discount_amount = discount
+        existing.total_amount = total_amount
+        existing.payment_method = bill_in.payment_method
+        db.commit()
+        db.refresh(existing)
+        return existing
+        
+    new_bill = Bill(
+        restaurant_id=restaurant_id,
+        order_id=order_id,
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        discount_amount=discount,
+        total_amount=total_amount,
+        payment_method=bill_in.payment_method,
+        status=PaymentStatus.PENDING
+    )
+    db.add(new_bill)
+    db.commit()
+    db.refresh(new_bill)
+    return new_bill
+
+def confirm_payment(db: Session, order_id: UUID, payload: PaymentConfirmation, restaurant_id: str) -> Bill:
+    bill = db.query(Bill).filter(Bill.order_id == order_id, Bill.restaurant_id == restaurant_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found for this order. Generate bill first.")
+        
+    if bill.status == PaymentStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Bill is already fully paid.")
+        
+    txn = PaymentTransaction(
+        bill_id=bill.id,
+        restaurant_id=restaurant_id,
+        amount=payload.amount,
+        payment_method=payload.payment_method,
+        transaction_reference=payload.transaction_reference,
+        status="COMPLETED"
+    )
+    db.add(txn)
+    
+    bill.amount_paid = (bill.amount_paid or 0.0) + payload.amount
+    
+    # Update the bill's main payment method to reflect the actual confirmed payment
+    bill.payment_method = payload.payment_method
+    
+    if (bill.amount_paid or 0.0) >= (bill.total_amount or 0.0):
+        bill.status = PaymentStatus.COMPLETED
+        
+        # FIX BUG-012: Update order payment status inline (same transaction)
+        # Avoids double-commit race condition from calling update_payment_status()
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if order and order.payment_status != 'PAID':
+            order.payment_status = 'PAID'
+            # Trigger CRM & cash register via the service but AFTER our single commit
+            # We pass db without committing inside — the commit below covers everything
+            _handle_order_paid_side_effects(db, order, restaurant_id, payload.payment_method)
+            
+    db.commit()  # Single commit covers bill, txn, and order status
+    db.refresh(bill)
+    return bill
+
+
+def _handle_order_paid_side_effects(db: Session, order, restaurant_id: str, payment_method: str = "CASH"):
+    """Handle CRM, loyalty, and cash register updates when an order is paid.
+    Called within an open transaction — does NOT commit itself.
+    """
+    # Auto-record sale in active cash shift
+    from services.cash_service import record_sale
+    record_sale(db, restaurant_id, order.total_amount, payment_method)
+    
+    # CRM & Loyalty Points
+    if order.customer_phone:
+        from models.customer import Customer
+        from services.notification_service import send_whatsapp_receipt
+        
+        customer = db.query(Customer).filter(
+            Customer.restaurant_id == restaurant_id,
+            Customer.phone_number == order.customer_phone
+        ).first()
+        
+        points_earned = int((order.total_amount or 0) // 100)
+        
+        if not customer:
+            customer = Customer(
+                restaurant_id=restaurant_id,
+                phone_number=order.customer_phone,
+                name=order.customer_name,
+                loyalty_points=points_earned,
+                total_spent=order.total_amount or 0,
+                total_visits=1
+            )
+            db.add(customer)
+        else:
+            customer.loyalty_points += points_earned
+            customer.total_spent += (order.total_amount or 0)
+            customer.total_visits += 1
+            if order.customer_name and not customer.name:
+                customer.name = order.customer_name
+        
+        # Note: send_whatsapp_receipt is fire-and-forget; no DB state change
+        try:
+            send_whatsapp_receipt(order, customer)
+        except Exception:
+            pass  # Non-fatal: receipt failure should not block payment confirmation
+\n--- backend/services\cash_service.py ---\nfrom sqlalchemy.orm import Session
+from uuid import UUID
+from fastapi import HTTPException
+from datetime import datetime, timezone
+
+from models.cash_register import CashShift, CashTransaction, ShiftStatus, TransactionType
+
+
+def get_current_shift(db: Session, restaurant_id: str) -> CashShift | None:
+    """Returns the currently OPEN shift for this restaurant, or None."""
+    return db.query(CashShift).filter(
+        CashShift.restaurant_id == restaurant_id,
+        CashShift.status == ShiftStatus.OPEN
+    ).first()
+
+
+def open_shift(db: Session, restaurant_id: str, user_id: str, opening_balance: float) -> CashShift:
+    """Opens a new cash shift. Raises 409 if a shift is already open."""
+    existing = get_current_shift(db, restaurant_id)
+    if existing:
+        raise HTTPException(status_code=409, detail="A shift is already open. Close it first before opening a new one.")
+
+    shift = CashShift(
+        restaurant_id=restaurant_id,
+        opened_by=user_id,
+        opening_balance=opening_balance,
+        net_sales=0.0,
+        total_cash_in=0.0,
+        total_cash_out=0.0,
+        status=ShiftStatus.OPEN
+    )
+    db.add(shift)
+    db.commit()
+    db.refresh(shift)
+    return shift
+
+
+def close_shift(db: Session, shift_id: str, restaurant_id: str, user_id: str, closing_balance: float, notes: str | None) -> CashShift:
+    """Closes a shift, records physical count, calculates discrepancy."""
+    shift = db.query(CashShift).filter(
+        CashShift.id == shift_id,
+        CashShift.restaurant_id == restaurant_id,
+        CashShift.status == ShiftStatus.OPEN
+    ).first()
+
+    if not shift:
+        raise HTTPException(status_code=404, detail="Active shift not found.")
+
+    # Expected = opening + all cash sales + cash in - cash out
+    expected = shift.opening_balance + shift.net_sales + shift.total_cash_in - shift.total_cash_out
+
+    shift.closing_balance = closing_balance
+    shift.expected_balance = round(expected, 2)
+    shift.closed_by = user_id
+    shift.notes = notes
+    shift.status = ShiftStatus.CLOSED
+    shift.closed_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(shift)
+    return shift
+
+
+def add_transaction(
+    db: Session,
+    shift_id: str,
+    restaurant_id: str,
+    user_id: str,
+    type: TransactionType,
+    amount: float,
+    description: str | None
+) -> CashTransaction:
+    """Adds a manual CASH_IN or CASH_OUT entry to the active shift."""
+    shift = db.query(CashShift).filter(
+        CashShift.id == shift_id,
+        CashShift.restaurant_id == restaurant_id,
+        CashShift.status == ShiftStatus.OPEN
+    ).first()
+
+    if not shift:
+        raise HTTPException(status_code=404, detail="Active shift not found.")
+
+    tx = CashTransaction(
+        shift_id=shift_id,
+        created_by=user_id,
+        type=type,
+        amount=amount,
+        description=description
+    )
+    db.add(tx)
+
+    # Update shift running totals
+    if type == TransactionType.CASH_IN:
+        shift.total_cash_in += amount
+    else:
+        shift.total_cash_out += amount
+
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
+def record_sale(db: Session, restaurant_id: str, amount: float, payment_method: str = "CASH"):
+    """Called automatically when an order is marked PAID. Adds to net_sales of current shift ONLY IF paid in CASH."""
+    if payment_method.upper() != "CASH":
+        return
+        
+    shift = get_current_shift(db, restaurant_id)
+    if shift:
+        shift.net_sales += amount
+        # Intentionally NOT calling db.commit() here. 
+        # The parent caller (billing_service) is responsible for committing the entire transaction atomically.
+
+
+def get_shift_history(db: Session, restaurant_id: str, limit: int = 30):
+    """Returns last N closed shifts."""
+    return db.query(CashShift).filter(
+        CashShift.restaurant_id == restaurant_id,
+    ).order_by(CashShift.opened_at.desc()).limit(limit).all()
+\n--- backend/services\inventory_service.py ---\nfrom sqlalchemy.orm import Session
+from fastapi import HTTPException
+from uuid import UUID
+from models.inventory import StockItem
+from schemas.inventory import StockItemCreate, StockItemUpdate
+
+def get_all_stock(db: Session, active_only: bool, restaurant_id: str):
+    query = db.query(StockItem).filter(StockItem.restaurant_id == restaurant_id)
+    if active_only:
+        query = query.filter(StockItem.is_active == True)
+    return query.order_by(StockItem.name).all()
+
+def create_stock_item(db: Session, item_in: StockItemCreate, restaurant_id: str) -> StockItem:
+    obj = StockItem(**item_in.model_dump(), restaurant_id=restaurant_id)
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def adjust_stock(db: Session, item_id: UUID, quantity_change: float, restaurant_id: str) -> StockItem:
+    obj = db.query(StockItem).filter(StockItem.id == item_id, StockItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+    
+    # Simple atomic adjust - can handle both positive (restock) and negative (usage)
+    obj.quantity += quantity_change
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def update_stock_item(db: Session, item_id: UUID, item_in: StockItemUpdate, restaurant_id: str) -> StockItem:
+    obj = db.query(StockItem).filter(StockItem.id == item_id, StockItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+        
+    update_data = item_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(obj, field, value)
+        
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def delete_stock_item(db: Session, item_id: UUID, restaurant_id: str):
+    obj = db.query(StockItem).filter(StockItem.id == item_id, StockItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+        
+    db.delete(obj)
+    db.commit()
+    return {"message": "Stock item deleted"}
+\n--- backend/services\menu_service.py ---\nfrom sqlalchemy.orm import Session
+from models.menu import Category, MenuItem
+from schemas.menu import CategoryCreate, MenuItemCreate
+
+def get_all_active_categories(db: Session, restaurant_id: str):
+    from sqlalchemy.orm import contains_eager, selectinload
+    from models.menu import ModifierGroup
+    return db.query(Category).outerjoin(MenuItem, 
+        (MenuItem.category_id == Category.id) & (MenuItem.is_deleted == False)
+    ).options(
+        contains_eager(Category.menu_items).selectinload(MenuItem.recipe_ingredients),
+        contains_eager(Category.menu_items).selectinload(MenuItem.modifier_groups).selectinload(ModifierGroup.modifiers)
+    ).filter(
+        Category.is_active == True, 
+        Category.restaurant_id == restaurant_id
+    ).all()
+
+def create_category(db: Session, cat_in: CategoryCreate, restaurant_id: str) -> Category:
+    obj = Category(**cat_in.model_dump(), restaurant_id=restaurant_id)
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def create_menu_item(db: Session, item_in: MenuItemCreate, restaurant_id: str) -> MenuItem:
+    from models.menu import ModifierGroup, Modifier
+    
+    item_data = item_in.model_dump()
+    modifier_groups_data = item_data.pop('modifier_groups', None)
+    
+    obj = MenuItem(**item_data, restaurant_id=restaurant_id)
+    db.add(obj)
+    db.flush() # to get obj.id
+    
+    if modifier_groups_data:
+        for mg_data in modifier_groups_data:
+            modifiers_data = mg_data.pop('modifiers', [])
+            new_mg = ModifierGroup(**mg_data, menu_item_id=obj.id)
+            db.add(new_mg)
+            db.flush()
+            
+            for m_data in modifiers_data:
+                new_m = Modifier(**m_data, group_id=new_mg.id)
+                db.add(new_m)
+                
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def update_menu_item(db: Session, item_id: str, item_in: dict, restaurant_id: str) -> MenuItem:
+    from fastapi import HTTPException
+    from models.menu import ModifierGroup, Modifier
+    
+    obj = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+    
+    modifier_groups_data = item_in.pop('modifier_groups', None)
+    
+    for field, value in item_in.items():
+        if value is not None:
+            setattr(obj, field, value)
+            
+    if modifier_groups_data is not None:
+        # Delete existing modifier groups
+        db.query(ModifierGroup).filter(ModifierGroup.menu_item_id == obj.id).delete()
+        
+        # Add new modifier groups and modifiers
+        for mg_data in modifier_groups_data:
+            mg_dict = mg_data if isinstance(mg_data, dict) else mg_data.model_dump()
+            modifiers_data = mg_dict.pop('modifiers', [])
+            
+            new_mg = ModifierGroup(**mg_dict, menu_item_id=obj.id)
+            db.add(new_mg)
+            db.flush() # get new_mg.id
+            
+            for m_data in modifiers_data:
+                m_dict = m_data if isinstance(m_data, dict) else m_data.model_dump()
+                new_m = Modifier(**m_dict, group_id=new_mg.id)
+                db.add(new_m)
+            
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def delete_menu_item(db: Session, item_id: str, restaurant_id: str):
+    from fastapi import HTTPException
+    obj = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+        
+    obj.is_deleted = True
+    obj.is_available = False # Mark as out of stock too
+    db.commit()
+    return {"message": "Menu item removed from menu"}
+\n--- backend/services\meshy_service.py ---\nimport requests
+from core.config import settings
+
+MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1"
+
+def get_headers():
+    if not settings.MESHY_API_KEY:
+        raise ValueError("MESHY_API_KEY is not configured")
+    return {
+        "Authorization": f"Bearer {settings.MESHY_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+def generate_3d_model_task(
+    image_urls: list, 
+    ai_model: str = "meshy-6", 
+    enable_pbr: bool = True, 
+    texture_resolution: str = "2k"
+) -> str:
+    """
+    Submits a single-image or multi-image to 3D task to Meshy API.
+    Returns a prefixed task ID: 'single_taskid' or 'multi_taskid'.
+    """
+    headers = get_headers()
+    
+    # Common texturing parameters
+    # Note: 'de-lighting' is automatic on newer models, but we specify texturing parameters here
+    params = {
+        "ai_model": ai_model,
+        "should_texture": True,
+        "enable_pbr": enable_pbr,
+        "texture_resolution": texture_resolution
+    }
+
+    if len(image_urls) > 1:
+        # Submit to Multi-Image endpoint
+        payload = {
+            "image_urls": image_urls,
+            **params
+        }
+        print(f"Submitting Multi-Image-to-3D task to Meshy for {len(image_urls)} images: {image_urls}")
+        response = requests.post(f"{MESHY_BASE_URL}/multi-image-to-3d", headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        raw_id = data.get("id") or data.get("result")
+        if not raw_id:
+            raise Exception(f"Meshy multi-image task creation failed: {data}")
+        task_id = f"multi_{raw_id}"
+    else:
+        # Submit to Single-Image endpoint
+        payload = {
+            "image_url": image_urls[0],
+            **params
+        }
+        print(f"Submitting Single-Image-to-3D task to Meshy for: {image_urls[0]}")
+        response = requests.post(f"{MESHY_BASE_URL}/image-to-3d", headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        raw_id = data.get("id") or data.get("result")
+        if not raw_id:
+            raise Exception(f"Meshy single-image task creation failed: {data}")
+        task_id = f"single_{raw_id}"
+        
+    print(f"Meshy 3D generation started successfully. Task ID: {task_id}")
+    return task_id
+
+def check_3d_model_status(task_id: str) -> dict:
+    """
+    Checks the status of any Meshy task (single, multi, or resize) using its prefix.
+    Returns a dict: {"status": "running"|"success"|"failed", "model_url": "..."}
+    """
+    headers = get_headers()
+    
+    # 1. Route to correct endpoint based on prefix
+    if task_id.startswith("resize_"):
+        raw_id = task_id.replace("resize_", "")
+        url = f"{MESHY_BASE_URL}/resize/{raw_id}"
+    elif task_id.startswith("multi_"):
+        raw_id = task_id.replace("multi_", "")
+        url = f"{MESHY_BASE_URL}/multi-image-to-3d/{raw_id}"
+    else:
+        raw_id = task_id.replace("single_", "")
+        url = f"{MESHY_BASE_URL}/image-to-3d/{raw_id}"
+        
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+        
+    data = response.json()
+    status = data.get("status")
+    
+    result = {"status": "running", "model_url": None}
+    
+    if status == "SUCCEEDED":
+        model_urls = data.get("model_urls", {})
+        glb_url = model_urls.get("glb")
+        if glb_url:
+            result["status"] = "success"
+            result["model_url"] = glb_url
+        else:
+            result["status"] = "failed"
+            print(f"Meshy task succeeded but GLB URL was not found in response: {data}")
+    elif status == "FAILED":
+        result["status"] = "failed"
+        print(f"Meshy task {task_id} failed with error: {data.get('task_error')}")
+    else:
+        result["status"] = "running"
+        
+    return result
+
+def resize_3d_model_task(input_task_id: str, resize_height_meters: float) -> str:
+    """
+    Submits a resize task to Meshy using a base task ID.
+    Returns the task_id.
+    """
+    headers = get_headers()
+    # Strip any prefixes before sending to Meshy
+    raw_task_id = input_task_id.replace("single_", "").replace("multi_", "")
+    
+    payload = {
+        "input_task_id": raw_task_id,
+        "resize_height": resize_height_meters
+    }
+    print(f"Submitting Resize task to Meshy for: {raw_task_id} with height {resize_height_meters}m")
+    response = requests.post(f"{MESHY_BASE_URL}/resize", headers=headers, json=payload)
+    response.raise_for_status()
+    
+    data = response.json()
+    raw_id = data.get("id") or data.get("result")
+    if not raw_id:
+        raise Exception(f"Meshy resize task creation failed, response: {data}")
+        
+    task_id = f"resize_{raw_id}"
+    print(f"Meshy Resize task started successfully. Task ID: {task_id}")
+    return task_id
+\n--- backend/services\notification_service.py ---\ndef send_whatsapp_receipt(order, customer, restaurant_name: str = "MyRestro"):
+    """
+    MOCK PROVIDER for WhatsApp Receipts.
+    This simulates a successful WhatsApp API call.
+    """
+    if not customer or not customer.phone_number:
+        return
+        
+    receipt_text = f"""
+======================================
+🧾 DIGITAL RECEIPT
+======================================
+Hello {customer.name or 'Valued Guest'},
+
+Thank you for dining at {restaurant_name}!
+Your payment of ₹{order.total_amount} was received.
+
+🌟 LOYALTY POINTS EARNED
+--------------------------------------
+You earned {int(order.total_amount // 100)} points this visit!
+Total Points Balance: {customer.loyalty_points}
+
+We hope to see you again soon.
+======================================
+    """
+    
+    # Simulate API Call
+    print(f"\n[MOCK WHATSAPP API] Message successfully sent to +91 {customer.phone_number}:")
+    print(receipt_text)
+    print("-" * 50)
+\n--- backend/services\order_service.py ---\nfrom sqlalchemy.orm import Session
+from fastapi import HTTPException
+from uuid import UUID
+import bcrypt
+from models.order import Order, OrderItem, OrderStatus
+from models.menu import MenuItem
+from schemas.order import OrderCreate
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    """Verify bcrypt password hash."""
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
+
+def create_order(db: Session, order_in: OrderCreate, waiter_id: UUID = None) -> Order:
+    # 1. Validate Table Existence (if provided)
+    restaurant_id = order_in.restaurant_id
+    table = None
+    if order_in.table_id:
+        from models.table import Table
+        table = db.query(Table).filter(Table.id == order_in.table_id).first()
+        if not table:
+            raise HTTPException(status_code=404, detail="Table not found")
+        restaurant_id = table.restaurant_id
+        
+    if not restaurant_id:
+        raise HTTPException(status_code=400, detail="restaurant_id is required if table_id is missing")
+
+    # 2. Rate Limiting (30s cooldown for CUSTOMER orders)
+    from datetime import datetime, timezone, timedelta
+    if order_in.source == "CUSTOMER" and table and table.last_order_at:
+        # Ensure we compare timezone-aware datetimes
+        time_diff = datetime.now(timezone.utc) - table.last_order_at
+        if time_diff < timedelta(seconds=30):
+            raise HTTPException(
+                status_code=429, 
+                detail=f"Please wait {30 - int(time_diff.total_seconds())}s before placing another order."
+            )
+
+    # 3. Check for existing active unpaid order for the table
+    existing_order = None
+    if order_in.table_id:
+        existing_order = db.query(Order).filter(
+            Order.table_id == order_in.table_id,
+            Order.payment_status != 'PAID',
+            Order.status != OrderStatus.CANCELLED
+        ).first()
+
+    if order_in.status:
+        initial_status = OrderStatus[order_in.status]
+    else:
+        initial_status = OrderStatus.ACCEPTED if order_in.source == "WAITER" else OrderStatus.PENDING
+
+    if existing_order:
+        # Append to existing order
+        new_order = existing_order
+        if new_order.status == OrderStatus.SERVED:
+            new_order.status = initial_status
+        # If it's Print KOT, we DON'T force an ACCEPTED order to READY, 
+        # but if it was just PENDING, or if it's already SERVED, we can update it.
+        # But for safety, we won't overwrite ACCEPTED/PREPARING to READY.
+        elif order_in.status and new_order.status not in [OrderStatus.ACCEPTED, OrderStatus.PREPARING]:
+            new_order.status = OrderStatus[order_in.status]
+            
+        if order_in.source == "CUSTOMER" and not new_order.customer_phone and order_in.customer_phone:
+            new_order.customer_phone = order_in.customer_phone
+            new_order.customer_name = order_in.customer_name
+        # Update guests count if missing
+        if getattr(order_in, 'guests_count', None) and not new_order.guests_count:
+            new_order.guests_count = order_in.guests_count
+    else:
+        # Initialize new Order record safely
+        new_order = Order(
+            restaurant_id=restaurant_id,
+            table_id=order_in.table_id,
+            order_type=order_in.order_type,
+            waiter_id=waiter_id,
+            customer_phone=order_in.customer_phone,
+            customer_name=order_in.customer_name,
+            customer_address=getattr(order_in, 'customer_address', None),
+            guests_count=getattr(order_in, 'guests_count', None),
+            counter_name=getattr(order_in, 'counter_name', 'Main Register'),
+            source=order_in.source,
+            status=initial_status,
+            is_accepted=True if initial_status == OrderStatus.ACCEPTED else False,
+            tip_amount=order_in.tip_amount,
+            total_amount=0.0
+        )
+        db.add(new_order)
+        db.flush() # Flush pushes to DB without permanent commit to generate new_order.id
+    
+    
+    subtotal_sum = new_order.subtotal_amount or 0.0
+    tax_sum = new_order.tax_amount or 0.0
+    
+    # 2. We never trust the client with price calculations.
+    # We fetch the *current DB price* dynamically and calculate subtotal.
+    for item_in in order_in.items:
+        menu_item = db.query(MenuItem).filter(MenuItem.id == item_in.menu_item_id).first()
+        if not menu_item:
+            raise HTTPException(status_code=404, detail=f"Menu item {item_in.menu_item_id} not found")
+        if not menu_item.is_available:
+            raise HTTPException(status_code=400, detail=f"Menu item {menu_item.name} is currently unavailable")
+            
+        from models.menu import Modifier
+        from models.order import OrderItemModifier
+        
+        base_price = menu_item.price
+        modifiers_total = 0.0
+        selected_modifiers = []
+        
+        if hasattr(item_in, 'modifiers') and item_in.modifiers:
+            for mod_in in item_in.modifiers:
+                modifier = db.query(Modifier).filter(Modifier.id == mod_in.modifier_id).first()
+                if modifier and modifier.is_available:
+                    modifiers_total += modifier.price
+                    selected_modifiers.append(modifier)
+                    
+        unit_price = base_price + modifiers_total
+        subtotal = unit_price * item_in.quantity
+        item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
+        
+        subtotal_sum += subtotal
+        tax_sum += item_tax
+        
+        # Check if item already exists in this order to increment quantity instead of adding new row
+        # Only combine if neither has modifiers (to keep it simple and safe)
+        existing_item = None
+        if not selected_modifiers:
+            existing_item = db.query(OrderItem).filter(
+                OrderItem.order_id == new_order.id, 
+                OrderItem.menu_item_id == menu_item.id,
+                OrderItem.is_parcel == item_in.is_parcel
+            ).first()
+            
+        if existing_item and not db.query(OrderItemModifier).filter(OrderItemModifier.order_item_id == existing_item.id).first():
+            existing_item.quantity += item_in.quantity
+            existing_item.subtotal += subtotal
+        else:
+            new_order_item = OrderItem(
+                order_id=new_order.id,
+                menu_item_id=menu_item.id,
+                quantity=item_in.quantity,
+                price_at_order_time=unit_price,
+                subtotal=subtotal,
+                notes=item_in.notes,
+                is_parcel=item_in.is_parcel
+            )
+            db.add(new_order_item)
+            db.flush() # get new_order_item.id
+            
+            for modifier in selected_modifiers:
+                new_modifier_record = OrderItemModifier(
+                    order_item_id=new_order_item.id,
+                    modifier_id=modifier.id,
+                    price_at_order_time=modifier.price
+                )
+                db.add(new_modifier_record)
+        
+    # 5. Apply exact total and commit atomic transaction
+    new_order.subtotal_amount = subtotal_sum
+    new_order.tax_amount = tax_sum
+    new_order.total_amount = subtotal_sum + tax_sum + new_order.tip_amount
+    
+    # Update table's last order timestamp if customer order
+    if order_in.source == "CUSTOMER" and table:
+        table.last_order_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(new_order)
+    return new_order
+
+def get_orders_by_table(db: Session, table_id: UUID):
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).filter(Order.table_id == table_id).order_by(Order.created_at.desc()).all()
+
+def update_order_status(db: Session, order_id: UUID, new_status: OrderStatus, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Deduct BOM inventory when order is READY (KDS completed)
+    if new_status == OrderStatus.READY and order.status != OrderStatus.READY and not order.is_inventory_deducted:
+        import logging
+        inv_logger = logging.getLogger(__name__)
+        from models.menu import RecipeIngredient
+        from models.inventory import StockItem
+        for item in order.items:
+            recipes = db.query(RecipeIngredient).filter(RecipeIngredient.menu_item_id == item.menu_item_id).all()
+            for recipe in recipes:
+                stock_item = db.query(StockItem).filter(StockItem.id == recipe.stock_item_id).first()
+                if stock_item:
+                    deduction = recipe.quantity * item.quantity
+                    stock_item.quantity = max(0.0, stock_item.quantity - deduction)  # FIX: floor at 0, never go negative
+                    if stock_item.quantity <= stock_item.minimum_threshold:
+                        inv_logger.warning(f"LOW STOCK ALERT: {stock_item.name} is running low ({stock_item.quantity} {stock_item.unit} remaining). Needs restock!")
+        order.is_inventory_deducted = True
+
+    order.status = new_status
+    db.commit()
+    db.refresh(order)
+    return order
+
+def update_payment_status(db: Session, order_id: UUID, new_payment_status: str, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Check if transitioning to PAID
+    if new_payment_status == 'PAID' and order.payment_status != 'PAID':
+        from models.reservation import Reservation
+        from datetime import datetime
+        today_date = datetime.now().date()
+        reservations = db.query(Reservation).filter(
+            Reservation.table_id == order.table_id,
+            Reservation.status == 'CONFIRMED',
+            Reservation.reservation_date == today_date
+        ).all()
+        for res in reservations:
+            res.status = 'COMPLETED'
+
+        # Auto-record sale in active cash shift (if one is open)
+        from services.cash_service import record_sale
+        record_sale(db, restaurant_id, order.total_amount)
+        
+        # CRM & Loyalty Points
+        if order.customer_phone:
+            from models.customer import Customer
+            from services.notification_service import send_whatsapp_receipt
+            
+            customer = db.query(Customer).filter(
+                Customer.restaurant_id == restaurant_id,
+                Customer.phone_number == order.customer_phone
+            ).first()
+            
+            points_earned = int((order.total_amount or 0) // 100)
+            
+            if not customer:
+                customer = Customer(
+                    restaurant_id=restaurant_id,
+                    phone_number=order.customer_phone,
+                    name=order.customer_name,
+                    loyalty_points=points_earned,
+                    total_spent=order.total_amount or 0,
+                    total_visits=1
+                )
+                db.add(customer)
+            else:
+                customer.loyalty_points += points_earned
+                customer.total_spent += (order.total_amount or 0)
+                customer.total_visits += 1
+                if order.customer_name and not customer.name:
+                    customer.name = order.customer_name
+                    
+            db.commit()
+            db.refresh(customer)
+            
+            # Send digital receipt
+            send_whatsapp_receipt(order, customer)
+    
+    order.payment_status = new_payment_status
+    db.commit()
+    db.refresh(order)
+    return order
+
+def get_active_kitchen_orders(db: Session, restaurant_id: str):
+    """Fetches ACCEPTED and PREPARING orders using strict FIFO (First In First Out) ordering."""
+    from sqlalchemy.orm import joinedload
+    return db.query(Order).options(joinedload(Order.items)).filter(
+        Order.status.in_([OrderStatus.ACCEPTED, OrderStatus.PREPARING]),
+        Order.restaurant_id == restaurant_id
+    ).order_by(Order.created_at.asc()).all()
+
+def update_order_item_status(db: Session, item_id: UUID, new_status: str, restaurant_id: str) -> OrderItem:
+    from models.order import Order
+    item = db.query(OrderItem).join(Order).filter(
+        OrderItem.id == item_id,
+        Order.restaurant_id == restaurant_id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Order item not found")
+        
+    item.status = new_status
+    db.commit()
+    db.refresh(item)
+    
+    # Check if all items in the order are READY
+    order = db.query(Order).filter(Order.id == item.order_id).first()
+    if order:
+        all_ready = all(oi.status == "READY" for oi in order.items)
+        if all_ready and order.status != OrderStatus.READY:
+            order.status = OrderStatus.READY
+            db.commit()
+            
+    return item
+
+def accept_order(db: Session, order_id: UUID, waiter_id: UUID, restaurant_id: str) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order.status = OrderStatus.ACCEPTED
+    order.is_accepted = True # Keeping for DB compatibility for now, but logic uses status
+    order.waiter_id = waiter_id
+    db.commit()
+    db.refresh(order)
+    return order
+
+def delete_order(db: Session, order_id: UUID, restaurant_id: str):
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status == OrderStatus.SERVED:
+        raise HTTPException(status_code=400, detail="Cannot delete a served order")
+    db.delete(order)
+    db.commit()
+    return {"message": "Order deleted"}
+
+def clear_order_history(db: Session, restaurant_id: str, password: str, user_id: str):
+    from models.user import User
+
+    user = db.query(User).filter(User.id == user_id).first()
+    # FIX: removed broken core.security import; use local bcrypt check
+    # FIX: correct field name is password_hash (not hashed_password)
+    if not user or not _verify_password(password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+        
+    orders_to_delete = db.query(Order).filter(
+        Order.restaurant_id == restaurant_id,
+        Order.status.in_([OrderStatus.SERVED, OrderStatus.CANCELLED])
+    ).all()
+    
+    count = len(orders_to_delete)
+    for o in orders_to_delete:
+        db.delete(o)
+        
+    db.commit()
+    return {"message": f"Successfully cleared {count} historical orders", "count": count}
+
+def update_order_items(db: Session, order_id: UUID, items_in: list, restaurant_id: str, status: str = None, customer_name: str = None, customer_phone: str = None, guests_count: int = None, tip_amount: float = None) -> Order:
+    order = db.query(Order).filter(Order.id == order_id, Order.restaurant_id == restaurant_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if status and order.status not in [OrderStatus.ACCEPTED, OrderStatus.PREPARING]:
+        order.status = OrderStatus[status]
+    elif order.status == OrderStatus.SERVED:
+        raise HTTPException(status_code=400, detail="Cannot edit a served order")
+    
+    if customer_name is not None: order.customer_name = customer_name
+    if customer_phone is not None: order.customer_phone = customer_phone
+    if guests_count is not None: order.guests_count = guests_count
+    if tip_amount is not None: order.tip_amount = tip_amount
+
+    # 1. Wipe existing items
+    db.query(OrderItem).filter(OrderItem.order_id == order_id).delete()
+    
+    # 2. Re-create items and calculate total
+    subtotal_sum = 0.0
+    tax_sum = 0.0
+    for item_in in items_in:
+        menu_item = db.query(MenuItem).filter(MenuItem.id == item_in.menu_item_id).first()
+        if not menu_item:
+            raise HTTPException(status_code=404, detail=f"Menu item not found")
+        # FIX: check availability when editing order (same guard as create_order)
+        if not menu_item.is_available:
+            raise HTTPException(status_code=400, detail=f"Menu item '{menu_item.name}' is currently unavailable")
+        
+        subtotal = menu_item.price * item_in.quantity
+        item_tax = subtotal * ((menu_item.tax_rate or 0.0) / 100.0)
+        
+        subtotal_sum += subtotal
+        tax_sum += item_tax
+        
+        new_item = OrderItem(
+            order_id=order.id,
+            menu_item_id=menu_item.id,
+            quantity=item_in.quantity,
+            price_at_order_time=menu_item.price,
+            subtotal=subtotal,
+            notes=item_in.notes
+        )
+        db.add(new_item)
+        
+    # 3. Save new total — FIX: preserve tip_amount in recalculation
+    order.subtotal_amount = subtotal_sum
+    order.tax_amount = tax_sum
+    order.total_amount = subtotal_sum + tax_sum + (order.tip_amount or 0.0)
+    db.commit()
+    db.refresh(order)
+    return order
+\n--- backend/services\otp_service.py ---\nimport random
+import string
+from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+from models.otp import OTP
+from models.user import User
+
+
+class OTPService:
+    @staticmethod
+    def generate_otp(length: int = 6) -> str:
+        """Generate a numeric OTP code."""
+        return "".join(random.choices(string.digits, k=length))
+
+    @staticmethod
+    def create_otp(db: Session, email: str) -> str:
+        """Generate, save and return a new OTP."""
+        # Deactivate previous OTPs for this email
+        db.query(OTP).filter(OTP.email == email, OTP.is_used == False).update({"is_used": True})
+        
+        otp_code = OTPService.generate_otp()
+        expires_at = datetime.utcnow() + timedelta(minutes=5)
+        
+        new_otp = OTP(
+            email=email,
+            otp_code=otp_code,
+            expires_at=expires_at
+        )
+        db.add(new_otp)
+        db.commit()
+        
+        # MOCK SENDING (User approved print/log for now)
+        print(f"\n[OTP SERVICE] Sending OTP {otp_code} to {email}\n")
+        
+        return otp_code
+
+    @staticmethod
+    def verify_otp(db: Session, email: str, otp_code: str) -> bool:
+        """Verify OTP code and mark as used."""
+        otp_record = db.query(OTP).filter(
+            OTP.email == email,
+            OTP.otp_code == otp_code,
+            OTP.is_used == False,
+            OTP.expires_at > datetime.utcnow()
+        ).first()
+        
+        if not otp_record:
+            return False
+            
+        # Mark OTP as used
+        otp_record.is_used = True
+        
+        # Mark user as verified
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.is_verified = True
+            
+        db.commit()
+        return True
+\n--- backend/services\settings_service.py ---\nfrom sqlalchemy.orm import Session
+from models.settings import RestaurantConfig
+
+def get_config_value(db: Session, key: str, restaurant_id: str) -> str | None:
+    config = db.query(RestaurantConfig).filter(RestaurantConfig.key == key, RestaurantConfig.restaurant_id == restaurant_id).first()
+    if config:
+        return config.value
+    return None
+
+def set_config_value(db: Session, key: str, value: str, restaurant_id: str) -> RestaurantConfig:
+    config = db.query(RestaurantConfig).filter(RestaurantConfig.key == key, RestaurantConfig.restaurant_id == restaurant_id).first()
+    if config:
+        config.value = value
+    else:
+        config = RestaurantConfig(key=key, value=value, restaurant_id=restaurant_id)
+        db.add(config)
+    db.commit()
+    db.refresh(config)
+    return config
+\n--- backend/services\tripo_service.py ---\nimport requests
+import json
+import time
+from core.config import settings
+
+TRIPO_BASE_URL = "https://api.tripo3d.ai/v2/openapi"
+
+def get_headers():
+    if not settings.TRIPO_API_KEY:
+        raise ValueError("TRIPO_API_KEY is not configured")
+    return {
+        "Authorization": f"Bearer {settings.TRIPO_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+def upload_image_to_tripo(image_url: str) -> str:
+    """
+    Downloads an image from a URL and uploads it to Tripo3D to get a file_token.
+    """
+    try:
+        # 1. Download image
+        print(f"Downloading image from {image_url}...")
+        img_response = requests.get(image_url)
+        img_response.raise_for_status()
+        
+        # 2. Upload to Tripo
+        print("Uploading image to Tripo3D...")
+        upload_headers = {
+            "Authorization": f"Bearer {settings.TRIPO_API_KEY}"
+            # Content-Type is multipart/form-data, requests sets it automatically
+        }
+        
+        files = {
+            'file': ('image.jpg', img_response.content, 'image/jpeg')
+        }
+        
+        response = requests.post(f"{TRIPO_BASE_URL}/upload", headers=upload_headers, files=files)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data.get("code") == 0 and "data" in data and "image_token" in data["data"]:
+            return data["data"]["image_token"]
+        else:
+            raise Exception(f"Tripo upload failed: {data}")
+            
+    except Exception as e:
+        print(f"Tripo Upload Error: {e}")
+        # Fallback: Many platforms allow passing URL directly in task payload.
+        # We will return the URL as a fallback and let the task payload handle it.
+        return image_url
+
+def generate_3d_model_task(image_url: str) -> str:
+    """
+    Submits an image-to-3D task to Tripo3D API.
+    Returns the task_id.
+    """
+    headers = get_headers()
+    
+    # In Tripo V2, we can usually just send the image token or file token
+    file_token = upload_image_to_tripo(image_url)
+    
+    # Try with file_token payload
+    payload = {
+        "type": "image_to_model",
+        "file": {
+            "type": "jpg",
+            "file_token": file_token
+        }
+    }
+    
+    # If the file_token is actually a URL (fallback), adjust payload
+    if file_token.startswith("http"):
+         payload = {
+            "type": "image_to_model",
+            "file": {
+                "type": "jpg",
+                "url": file_token
+            }
+        }
+
+    response = requests.post(f"{TRIPO_BASE_URL}/task", headers=headers, json=payload)
+    
+    if response.status_code != 200:
+        raise Exception(f"Failed to submit Tripo task: {response.text}")
+        
+    data = response.json()
+    if data.get("code") == 0 and "data" in data and "task_id" in data["data"]:
+        return data["data"]["task_id"]
+    else:
+        raise Exception(f"Tripo task creation failed: {data}")
+
+def check_3d_model_status(task_id: str) -> dict:
+    """
+    Checks the status of a Tripo3D task.
+    Returns a dict: {"status": "running"|"success"|"failed", "model_url": "..."}
+    """
+    headers = get_headers()
+    
+    response = requests.get(f"{TRIPO_BASE_URL}/task/{task_id}", headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to check Tripo task status: {response.text}")
+        
+    data = response.json()
+    if data.get("code") != 0:
+        raise Exception(f"Tripo task status error: {data}")
+        
+    task_data = data.get("data", {})
+    status = task_data.get("status")
+    
+    result = {"status": status, "model_url": None}
+    
+    if status == "success":
+        # Extract the model URL (Tripo usually provides 'model' or 'pbr_model')
+        output = task_data.get("output", {})
+        model_url = output.get("pbr_model") or output.get("model")
+        result["model_url"] = model_url
+        
+    return result
+\n--- backend/services\whatsapp_service.py ---\nimport logging
+import requests
+from uuid import UUID
+from db.session import SessionLocal
+from models.notification import NotificationLog, MessageStatus, MessageType
+from core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Basic abstraction so we can switch providers later (Twilio, Meta, Interakt)
+class WhatsAppProviderConfig:
+    URL = settings.WHATSAPP_API_URL
+    HEADERS = {"Authorization": f"Bearer {settings.WHATSAPP_API_KEY}"} if settings.WHATSAPP_API_KEY else {}
+
+def trigger_whatsapp_message(order_id: UUID, phone: str, message_type: MessageType, payload: str):
+    """
+    Called strictly by FastAPI BackgroundTasks.
+    Handles the database tracking, logging, and REST execution via a distinct thread-safe session.
+    """
+    if not phone:
+        logger.info(f"Skipping WhatsApp for Order {order_id} - No phone number provided.")
+        return
+        
+    db = SessionLocal()
+    try:
+        log_entry = NotificationLog(
+            order_id=order_id,
+            customer_phone=phone,
+            message_type=message_type,
+            status=MessageStatus.PENDING
+        )
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+        
+        logger.info(f"Sending {message_type.value} to {phone}")
+        
+        if not WhatsAppProviderConfig.URL:
+            logger.info(f"[MOCK WHATSAPP] To: {phone} | MSG: {payload}")
+            log_entry.status = MessageStatus.SENT
+            log_entry.provider_response = "Mocked Console Delivery (No API URL Setup)"
+        else:
+            max_retries = 3
+            success = False
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        WhatsAppProviderConfig.URL, 
+                        json={"to": phone, "message": payload},
+                        headers=WhatsAppProviderConfig.HEADERS,
+                        timeout=5
+                    )
+                    response.raise_for_status()
+                    log_entry.provider_response = str(response.status_code)
+                    success = True
+                    break
+                except requests.RequestException as e:
+                    logger.warning(f"WhatsApp Attempt {attempt+1} failed: {str(e)}")
+                    log_entry.provider_response = str(e)
+            
+            log_entry.status = MessageStatus.SENT if success else MessageStatus.FAILED
+            
+        db.commit()
+    except Exception as e:
+        logger.error(f"WhatsApp Fatal Error: {str(e)}")
+    finally:
+        db.close()
+\n--- backend/services\ws_manager.py ---\nfrom fastapi import WebSocket
+from typing import Dict, List
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+class ConnectionManager:
+    def __init__(self):
+        # Maps restaurant_id to a list of active WebSocket connections
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, restaurant_id: str):
+        await websocket.accept()
+        if restaurant_id not in self.active_connections:
+            self.active_connections[restaurant_id] = []
+        self.active_connections[restaurant_id].append(websocket)
+        logger.info(f"Kitchen KDS connected for restaurant {restaurant_id}. Total: {len(self.active_connections[restaurant_id])}")
+
+    def disconnect(self, websocket: WebSocket, restaurant_id: str):
+        if restaurant_id in self.active_connections:
+            if websocket in self.active_connections[restaurant_id]:
+                self.active_connections[restaurant_id].remove(websocket)
+                logger.info(f"Kitchen KDS disconnected for restaurant {restaurant_id}. Remaining: {len(self.active_connections[restaurant_id])}")
+            if not self.active_connections[restaurant_id]:
+                del self.active_connections[restaurant_id]
+
+    async def broadcast(self, restaurant_id: str, message: dict):
+        if restaurant_id in self.active_connections:
+            # We must handle disconnected sockets that weren't cleaned up gracefully
+            dead_sockets = []
+            for connection in self.active_connections[restaurant_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    logger.error(f"Error broadcasting to WS: {e}")
+                    dead_sockets.append(connection)
+            
+            for dead in dead_sockets:
+                self.disconnect(dead, restaurant_id)
+
+manager = ConnectionManager()
+\n--- backend/services\__init__.py ---\n

@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
 
 class TableBase(BaseModel):
-    table_number: int
-    capacity: int = 4
+    table_number: int = Field(..., gt=0)
+    capacity: int = Field(default=4, ge=1)
     category: str = "Non-AC"
     qr_code_url: Optional[str] = None
-    position_x: Optional[float] = 0.0
-    position_y: Optional[float] = 0.0
+    position_x: Optional[float] = Field(default=0.0, ge=0.0, le=100.0)
+    position_y: Optional[float] = Field(default=0.0, ge=0.0, le=100.0)
 
 class TablePositionUpdate(BaseModel):
     id: UUID
